@@ -1,7 +1,8 @@
 #pragma once
+
 namespace VKE
 {
-	void init();
+	int init();
 
 	void run();
 
