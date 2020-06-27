@@ -51,7 +51,6 @@ namespace VKE
 
 
 		// Create list to hold instance extensions
-		std::vector<const char*> InstanceExtensions;
 		uint32_t glfwExtensionCount = 0;							// GLFW may require multiple extensions;
 		const char** glfwExtensions;								// Extensions passed as array of c-strings, so need the array to pointer
 
@@ -59,7 +58,7 @@ namespace VKE
 		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
 		// Check instance Extensions supported
-		if (!checkInstanceExtensionSupport(&InstanceExtensions))
+		if (!checkInstanceExtensionSupport(glfwExtensions, glfwExtensionCount))
 		{
 			throw std::runtime_error("VKInstance does not support required extensions!");
 		}
@@ -149,7 +148,7 @@ namespace VKE
 			/*Out queue*/ &graphicQueue);
 	}
 
-	bool VKRenderer::checkInstanceExtensionSupport(std::vector<const char*>* checkExtentions)
+	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
 	{
 		// Need to get number of extensions to create array of correct size to hold extensions
 		uint32_t ExtensionCount = 0;
@@ -161,12 +160,12 @@ namespace VKE
 		vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, extensions.data());
 
 		// Check if given extensions are available
-		for (const auto& checkExtension : *checkExtentions)
+		for (size_t i = 0; i < extensionCount; ++i)
 		{
 			bool hasExtension = false;
 			for (const auto& extension : extensions)
 			{
-				if (strcmp(checkExtension, extension.extensionName))
+				if (strcmp(checkExtentions[i], extension.extensionName))
 				{
 					hasExtension = true;
 					break;

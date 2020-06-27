@@ -39,7 +39,7 @@ namespace VKE
 		void createLogicalDevice();
 
 		/** Support functions */
-		bool checkInstanceExtensionSupport(std::vector<const char*>* checkExtentions);
+		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
 	
 		/** Getters */
