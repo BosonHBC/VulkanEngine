@@ -6,8 +6,7 @@
 
 int main()
 {
-	int exitCode = 0;
-	exitCode = VKE::init();
+	VKE::init();
 
 	VKE::run();
 
@@ -15,5 +14,5 @@ int main()
 
 	_CrtDumpMemoryLeaks();
 
-	return exitCode;
+	return 0;
 }

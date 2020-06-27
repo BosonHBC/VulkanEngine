@@ -1,43 +1,38 @@
-// Engines
+
+
 #include "Engine.h"
 #define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
-#include "Graphics/VKRenderer.h"
 
-// Plug-ins
+#define GLFW_INCLUDE_VULKAN
+#include "GLFW/glfw3.h"
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "glm/glm.hpp"
 #include "glm/mat4x4.hpp"
-// Systems
+
 #include "stdio.h"
-#include <string>
+
+#include "assert.h"
 
 namespace VKE {
-	//=================== Parameters =================== 
 	GLFWwindow* g_Window;
-	VKRenderer* g_renderer;
-	const GLuint WIDTH = 800, HEIGHT = 600;
-	const std::string WINDOW_NAME = "Default";
 
-	//=================== Function declarations =================== 
-	
-	// GLFW
-	void initGLFW();
-	void cleanupGLFW();
-	
-
-	int init()
+	void init()
 	{
-		int result = 0;
-		initGLFW();
+		glfwInit();
 
-		g_renderer = new VKRenderer();
-		if (!(result = g_renderer->init(g_Window)))
-		{
-			return result;
-		}
-		
-		return result;
+		// using Vulkan here
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+		g_Window = glfwCreateWindow(800, 600, "Test Window", nullptr, nullptr);
+
+		uint32_t ExtensionCount = 0;
+		// vulkan extension count
+		vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr);
+
+		printf("Extension Count: %i", ExtensionCount);
+
 	}
 
 	void run()
@@ -55,32 +50,10 @@ namespace VKE {
 
 	void cleanup()
 	{
-		g_renderer->cleanUp();
-		safe_delete(g_renderer);
-
-		cleanupGLFW();
-	}
-
-
-	void initGLFW()
-	{
-		glfwInit();
-
-		// using Vulkan here
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-
-		g_Window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
-
-	}
-	void cleanupGLFW()
-	{
+		
 		glfwDestroyWindow(g_Window);
 
 		glfwTerminate();
 	}
-
-
-
 
 }
