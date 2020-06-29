@@ -160,6 +160,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="Graphics\Utilities.cpp" />
     <ClCompile Include="Graphics\VKRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>

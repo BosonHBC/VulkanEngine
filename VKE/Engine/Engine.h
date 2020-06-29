@@ -1,5 +1,5 @@
 #pragma once
-
+struct GLFWwindow;
 namespace VKE
 {
 	int init();
@@ -7,4 +7,6 @@ namespace VKE
 	void run();
 
 	void cleanup();
+
+	GLFWwindow* GetGLFWWindow();
 }

@@ -62,6 +62,11 @@ namespace VKE {
 	}
 
 
+	class GLFWwindow* GetGLFWWindow()
+	{
+		return g_Window;
+	}
+
 	void initGLFW()
 	{
 		glfwInit();
