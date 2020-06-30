@@ -44,11 +44,14 @@ namespace VKE
 		void createLogicalDevice();
 		void createSurface();
 		void createSwapChain();
+		void createGraphicsPipeline();
 
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
 		bool checkDeviceExtensionSupport(const VkPhysicalDevice& device);
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
+		
+		/** -Component Create functions */
 		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
 
 	

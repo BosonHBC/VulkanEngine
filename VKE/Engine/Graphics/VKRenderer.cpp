@@ -16,6 +16,7 @@ namespace VKE
 			getPhysicalDevice();
 			createLogicalDevice();
 			createSwapChain();
+			createGraphicsPipeline();
 
 		}
 		catch (const std::runtime_error &e)
@@ -274,7 +275,41 @@ namespace VKE
 
 			SwapChain.Images.push_back(SwapChainImage);
 		}
-		printf("%d Image view has been created", SwapChainImageCount);
+		printf("%d Image view has been created\n", SwapChainImageCount);
+	}
+
+	void VKRenderer::createGraphicsPipeline()
+	{
+		// Read in SPIR-V code of shaders
+		auto VertexShaderCode = ReadFile("Content/Shaders/vert.spv");
+		auto FragShaderCode = ReadFile("Content/Shaders/frag.spv");
+
+		// Build Shader Module to link to Graphics Pipeline
+		FShaderModuleScopeGuard VertexShaderModule, FragmentShaderModule;
+		VertexShaderModule.CreateShaderModule(MainDevice.LD, VertexShaderCode);
+		FragmentShaderModule.CreateShaderModule(MainDevice.LD, FragShaderCode);
+
+		/* Shader Creation Information stage*/
+		// Vertex shader
+		VkPipelineShaderStageCreateInfo VSCreateInfo = {};
+		VSCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		VSCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;												// Shader type
+		VSCreateInfo.module = VertexShaderModule.ShaderModule;											// Module used
+		VSCreateInfo.pName = "main";																	// Entry Point name
+
+		// Fragment shader
+		VkPipelineShaderStageCreateInfo FSCreateInfo = {};
+		FSCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		FSCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		FSCreateInfo.module = FragmentShaderModule.ShaderModule;
+		FSCreateInfo.pName = "main";
+
+		VkPipelineShaderStageCreateInfo ShaderStages[] =
+		{
+			VSCreateInfo, FSCreateInfo
+		};
+
+		VkGraphicsPipelineCreateInfo PieplineCreateInfo = {};
 	}
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)

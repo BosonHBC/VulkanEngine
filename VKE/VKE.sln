@@ -11,6 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Game", "Game\Game.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Engine", "Engine\Engine.vcxproj", "{B838824B-9889-4E4E-8849-3DFFF6B77414}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AssetBuilder", "AssetBuilder", "{881659AE-D506-417E-A0BB-F34C3D1A23F4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AssetBuilder", "AssetBuilder\AssetBuilder.vcxproj", "{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -35,6 +39,14 @@ Global
 		{B838824B-9889-4E4E-8849-3DFFF6B77414}.Release|x64.Build.0 = Release|x64
 		{B838824B-9889-4E4E-8849-3DFFF6B77414}.Release|x86.ActiveCfg = Release|Win32
 		{B838824B-9889-4E4E-8849-3DFFF6B77414}.Release|x86.Build.0 = Release|Win32
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Debug|x64.ActiveCfg = Debug|x64
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Debug|x64.Build.0 = Debug|x64
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Debug|x86.ActiveCfg = Debug|Win32
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Debug|x86.Build.0 = Debug|Win32
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Release|x64.ActiveCfg = Release|x64
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Release|x64.Build.0 = Release|x64
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Release|x86.ActiveCfg = Release|Win32
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -42,6 +54,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{81A0D361-ABA5-4D7B-A124-1EA9BADD4264} = {BADA088F-1BDE-44B5-80BA-977927BCA7EF}
 		{B838824B-9889-4E4E-8849-3DFFF6B77414} = {C50B3182-ED27-4047-8A27-3DEEF593BA64}
+		{4FE31365-DC95-4130-83BF-C2B0C8D8C05C} = {881659AE-D506-417E-A0BB-F34C3D1A23F4}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {1B27CD84-7541-4676-B9FF-2D0C8F656947}

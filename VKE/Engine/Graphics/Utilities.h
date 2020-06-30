@@ -54,8 +54,27 @@ namespace VKE
 		VkFormat ImageFormat;								// enum
 	};
 
+	struct FShaderModuleScopeGuard 
+	{
+		FShaderModuleScopeGuard() {};
+		FShaderModuleScopeGuard(const FShaderModuleScopeGuard& iOther) = delete;
+		FShaderModuleScopeGuard& operator = (const FShaderModuleScopeGuard& iOther) = delete;
+		~FShaderModuleScopeGuard();
+
+		bool CreateShaderModule(const VkDevice& LD, const std::vector<char>& iShaderCode);
+		VkShaderModule ShaderModule;
+		VkDevice LogicDevice;
+		bool Valid = false;
+	};
+
 	// ================================================
 	// =============== Global Functions =============== 
 	// ================================================
+	std::vector<char> ReadFile(const std::string& filename);
 
+	namespace FileIO
+	{
+		std::string RelativePathToAbsolutePath(const std::string& iReleative);
+		
+	}
 }

@@ -16,6 +16,12 @@
     <Filter Include="Source Files\Graphics">
       <UniqueIdentifier>{e9d3bc02-0058-4bae-96e7-7c12c2a16c8e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Content">
+      <UniqueIdentifier>{f6953793-c27f-4024-a66e-cd8acb531c7f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Content\Shaders">
+      <UniqueIdentifier>{3c61d4ac-4053-4f7f-aaba-2c25ed7ebc94}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -38,5 +44,10 @@
     <ClInclude Include="Graphics\Utilities.h">
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Content\Shaders\vert.glsl">
+      <Filter>Source Files\Content\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
