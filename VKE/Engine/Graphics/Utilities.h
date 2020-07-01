@@ -9,7 +9,15 @@ namespace VKE
 	// ================================================
 	// =============== Global Variables =============== 
 	// ================================================
+	const std::vector<const char*> ValidationLayers = {
+		"VK_LAYER_KHRONOS_validation"
+	};
 
+#ifdef NDEBUG
+	const bool EnableValidationLayers = false;
+#else
+	const bool EnableValidationLayers = true;
+#endif
 	// Device Extensions' name
 	const std::vector<const char*> DeviceExtensions = 
 	{

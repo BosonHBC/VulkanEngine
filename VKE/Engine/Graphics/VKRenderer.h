@@ -37,6 +37,11 @@ namespace VKE
 		VkQueue presentationQueue;
 		VkSurfaceKHR Surface;			// KHR extension required
 		FSwapChainData SwapChain;		// SwapChain data group
+		VkRenderPass RenderPass;
+
+		// -Pipeline
+		VkPipeline GraphicPipeline;
+		VkPipelineLayout PipelineLayout;
 
 		/** Create functions */
 		void createInstance();
@@ -44,10 +49,12 @@ namespace VKE
 		void createLogicalDevice();
 		void createSurface();
 		void createSwapChain();
+		void createRenderPass();
 		void createGraphicsPipeline();
 
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
+		bool checkValidationLayerSupport();
 		bool checkDeviceExtensionSupport(const VkPhysicalDevice& device);
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
 		

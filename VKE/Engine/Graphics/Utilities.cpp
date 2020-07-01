@@ -115,6 +115,7 @@ namespace VKE
 
 		if (Result != VK_SUCCESS)
 		{
+			printf("Fail to create Shader Module.\n");
 			return false;
 		}
 		Valid = true;
