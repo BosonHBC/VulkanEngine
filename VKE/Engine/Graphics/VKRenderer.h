@@ -35,13 +35,18 @@ namespace VKE
 		VkInstance vkInstance;
 		VkQueue graphicQueue;
 		VkQueue presentationQueue;
-		VkSurfaceKHR Surface;			// KHR extension required
-		FSwapChainData SwapChain;		// SwapChain data group
-		VkRenderPass RenderPass;
+		VkSurfaceKHR Surface;								// KHR extension required
+		FSwapChainData SwapChain;							// SwapChain data group
+		std::vector<VkFramebuffer> SwapChainFramebuffers;
+		std::vector<VkCommandBuffer> CommandBuffers;
 
 		// -Pipeline
+		VkRenderPass RenderPass;
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
+
+		// -Pools
+		VkCommandPool GraphicsCommandPool;					// Command Pool only used for graphic command
 
 		/** Create functions */
 		void createInstance();
@@ -51,6 +56,9 @@ namespace VKE
 		void createSwapChain();
 		void createRenderPass();
 		void createGraphicsPipeline();
+		void createFrameBuffer();
+		void createCommandPool();
+		void createCommandBuffers();
 
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
@@ -61,6 +69,8 @@ namespace VKE
 		/** -Component Create functions */
 		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
 
+		/** Record functions */
+		void recordCommands();
 	
 		/** Getters */
 		FQueueFamilyIndices getQueueFamilies(const VkPhysicalDevice& device);

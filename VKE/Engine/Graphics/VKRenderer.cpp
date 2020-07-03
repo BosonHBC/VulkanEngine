@@ -18,6 +18,9 @@ namespace VKE
 			createSwapChain();
 			createRenderPass();
 			createGraphicsPipeline();
+			createFrameBuffer();
+			createCommandPool();
+			recordCommands();
 
 		}
 		catch (const std::runtime_error &e)
@@ -31,6 +34,11 @@ namespace VKE
 
 	void VKRenderer::cleanUp()
 	{
+		vkDestroyCommandPool(MainDevice.LD, GraphicsCommandPool, nullptr);
+		for (auto& FrameBuffer : SwapChainFramebuffers)
+		{
+			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
+		}
 		vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
 		vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
 		vkDestroyRenderPass(MainDevice.LD, RenderPass, nullptr);
@@ -555,12 +563,84 @@ namespace VKE
 		PipelineCreateInfo.basePipelineIndex = -1;
 
 		// PipelineCache can save the cache when the next time create a pipeline
-	    VkResult Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &GraphicPipeline);
+		VkResult Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &GraphicPipeline);
 		if (Result != VK_SUCCESS)
 		{
 			throw std::runtime_error("Fail to create Graphics Pipelines.");
 		}
 
+	}
+
+	void VKRenderer::createFrameBuffer()
+	{
+		// Resize framebuffer count to equal swap chain image count
+		SwapChainFramebuffers.resize(SwapChain.Images.size());
+
+		// Create a framebuffer for each swap chain image
+		for (size_t i = 0; i < SwapChainFramebuffers.size(); ++i)
+		{
+			const uint32_t AttachmentCount = 1;
+			VkImageView Attachments[AttachmentCount] =
+			{
+				SwapChain.Images[i].ImgView
+			};
+
+			VkFramebufferCreateInfo FramebufferCreateInfo = {};
+			FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			FramebufferCreateInfo.renderPass = RenderPass;								// Render Pass layout the frame buffer will be used with
+			FramebufferCreateInfo.attachmentCount = AttachmentCount;
+			FramebufferCreateInfo.pAttachments = Attachments;							// List of attachments (1:1 with Render pass)
+			FramebufferCreateInfo.width = SwapChain.Extent.width;
+			FramebufferCreateInfo.height = SwapChain.Extent.height;
+			FramebufferCreateInfo.layers = 1;											// Frame buffer layers
+
+			// Frame buffer is 1 to 1 connected to ImageView in SwapChain now
+			VkResult Result = vkCreateFramebuffer(MainDevice.LD, &FramebufferCreateInfo, nullptr, &SwapChainFramebuffers[i]);
+			if (Result != VK_SUCCESS)
+			{
+				char Msg[100];
+				sprintf_s(Msg, "Fail to create Frame buffer[%d].", i);
+				throw std::runtime_error(Msg);
+			}
+		}
+	}
+
+	void VKRenderer::createCommandPool()
+	{
+		FQueueFamilyIndices Indices = getQueueFamilies(MainDevice.PD);
+
+		VkCommandPoolCreateInfo CommandPoolCreateInfo;
+		CommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		CommandPoolCreateInfo.queueFamilyIndex = Indices.graphicFamily;					// Queue family type that buffers from this command pool will use
+		CommandPoolCreateInfo.flags = 0;
+
+		// Create a Graphics Queue Family Command Pool
+		VkResult Result = vkCreateCommandPool(MainDevice.LD, &CommandPoolCreateInfo, nullptr, &GraphicsCommandPool);
+		if (Result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Fail to create a command pool.");
+		}
+	}
+
+	void VKRenderer::createCommandBuffers()
+	{
+		//Resize command buffer count to have one for each framebuffer
+		CommandBuffers.resize(SwapChainFramebuffers.size());
+
+		VkCommandBufferAllocateInfo cbAllocInfo = {};						// Memory exists already, only get it from the pool
+		cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		cbAllocInfo.commandPool = GraphicsCommandPool;						// Only works for graphics command pool
+		cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;				// VK_COMMAND_BUFFER_LEVEL_PRIMARY: Submitted directly to queue, can not be called by another command buffer
+																			// VK_COMMAND_BUFFER_LEVEL_SECONDARY: Command buffer within a command buffer e.g. VkCmdExecuteCommands(another command buffer)
+		cbAllocInfo.commandBufferCount = static_cast<uint32_t>(CommandBuffers.size());		// Allows allocating multiple command buffers at the same time
+
+		VkResult Result = vkAllocateCommandBuffers(MainDevice.LD, &cbAllocInfo, CommandBuffers.data());		// Don't need a custom allocation function
+		if (Result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Fail to allocate command buffers.");
+		}
+
+		// Record the command buffer and call this buffer once and once again.
 	}
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
@@ -713,6 +793,76 @@ namespace VKE
 		}
 
 		return ImageView;
+	}
+
+	void VKRenderer::recordCommands()
+	{
+		// Begin info can be the same
+		VkCommandBufferBeginInfo BufferBeginInfo = {};
+		BufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;		// Buffer can be resubmitted when it has already been submitted and is awaiting execution.
+
+		// Information about how to begin a render pass (only needed for graphical applications)
+		VkRenderPassBeginInfo RenderPassBeginInfo = {};
+		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		RenderPassBeginInfo.renderPass = RenderPass;								// Render pass to begin
+		RenderPassBeginInfo.renderArea.offset = { 0,0 };							// Start point of render pass in pixels
+		RenderPassBeginInfo.renderArea.extent = SwapChain.Extent;					// Size of region to run render pass on starting at offset
+		const uint32_t ClearColorCount = 1;
+		VkClearValue ClearValues[] = {
+			{ 0.4f, 0.4f, 0.4, 1.0f }												// Binds to first attachments
+		};
+		RenderPassBeginInfo.pClearValues = ClearValues;								// List of clear values (@TODO: Depth attachment clear value)
+		RenderPassBeginInfo.clearValueCount = ClearColorCount;
+
+		for (size_t i = 0; i < CommandBuffers.size(); ++i)
+		{
+			RenderPassBeginInfo.framebuffer = SwapChainFramebuffers[i];
+
+			// Start recording commands to command buffer
+			VkResult Result = vkBeginCommandBuffer(CommandBuffers[i], &BufferBeginInfo);
+			if (Result != VK_SUCCESS)
+			{
+				char Msg[100];
+				sprintf_s(Msg, "Fail to start recording a command buffer[%d]", i);
+				throw std::runtime_error(Msg);
+			}
+
+			// Record part
+			{
+				// Begin Render Pass
+				vkCmdBeginRenderPass(CommandBuffers[i], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+				// Bind Pipeline to be used in render pass
+				vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicPipeline);
+				/*
+					Deferred shading example:
+					G-Buffer pipeline, stores all data to multiple attachments
+					Switch to another pipeline, do lighting
+					Switch to another pipeline, do HDR
+					...
+				*/
+
+				// Execute our pipeline
+				vkCmdDraw(CommandBuffers[i],
+					3,	// vertexCount indicates how many times the pipeline will call
+					1,	// For drawing same object multiple times
+					0,	
+					0);
+				// End Render Pass
+				vkCmdEndRenderPass(CommandBuffers[i]);
+			}
+
+			Result = vkEndCommandBuffer(CommandBuffers[i]);
+			if (Result != VK_SUCCESS)
+			{
+				char Msg[100]; 
+				sprintf_s(Msg, "Fail to stop recording a command buffer[%d]", i);
+				throw std::runtime_error(Msg);
+			}
+		}
+
+
 	}
 
 	FQueueFamilyIndices VKRenderer::getQueueFamilies(const VkPhysicalDevice& device)
