@@ -3,6 +3,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
+#define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {throw std::runtime_error(Message);}
+#define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
+
 // Indices (location) of Queue Families (if they exist at all)
 namespace VKE
 {
@@ -23,6 +26,9 @@ namespace VKE
 	{
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
+
+	// Maximum 2 image on the queue
+	const int MAX_FRAME_DRAWS = 2;
 
 	// =======================================
 	// =============== Structs =============== 

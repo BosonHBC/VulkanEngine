@@ -50,6 +50,7 @@ namespace VKE {
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
+			g_renderer->draw();
 		}
 	}
 
@@ -62,7 +63,7 @@ namespace VKE {
 	}
 
 
-	class GLFWwindow* GetGLFWWindow()
+	GLFWwindow* GetGLFWWindow()
 	{
 		return g_Window;
 	}

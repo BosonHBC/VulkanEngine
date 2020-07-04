@@ -18,6 +18,7 @@ namespace VKE
 		VKRenderer& operator =(const VKRenderer& other) = delete;
 
 		int init(GLFWwindow* iWindow);
+		void draw();
 		void cleanUp();
 
 
@@ -25,6 +26,7 @@ namespace VKE
 	private:
 		GLFWwindow* window;
 
+		uint64_t ElapsedFrame = 0;
 		// Vulkan Components
 		// - Main Components
 		struct
@@ -36,9 +38,11 @@ namespace VKE
 		VkQueue graphicQueue;
 		VkQueue presentationQueue;
 		VkSurfaceKHR Surface;								// KHR extension required
+
+		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
 		FSwapChainData SwapChain;							// SwapChain data group
-		std::vector<VkFramebuffer> SwapChainFramebuffers;
-		std::vector<VkCommandBuffer> CommandBuffers;
+		std::vector<VkFramebuffer> SwapChainFramebuffers;	
+		std::vector<VkCommandBuffer> CommandBuffers;		
 
 		// -Pipeline
 		VkRenderPass RenderPass;
@@ -47,6 +51,11 @@ namespace VKE
 
 		// -Pools
 		VkCommandPool GraphicsCommandPool;					// Command Pool only used for graphic command
+
+		// -Synchronization
+		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage
+		std::vector <VkSemaphore> OnRenderFinisheds;					// If this image finishes rendering
+		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself
 
 		/** Create functions */
 		void createInstance();
@@ -59,6 +68,7 @@ namespace VKE
 		void createFrameBuffer();
 		void createCommandPool();
 		void createCommandBuffers();
+		void createSynchronization();
 
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
