@@ -160,11 +160,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="Graphics\Mesh\cMesh.cpp" />
     <ClCompile Include="Graphics\Utilities.cpp" />
     <ClCompile Include="Graphics\VKRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h" />
+    <ClInclude Include="Graphics\Mesh\cMesh.h" />
     <ClInclude Include="Graphics\Utilities.h" />
     <ClInclude Include="Graphics\VKRenderer.h" />
   </ItemGroup>

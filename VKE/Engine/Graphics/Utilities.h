@@ -2,9 +2,11 @@
 #include <vector>
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
+#include "glm/glm.hpp"
 
 #define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {throw std::runtime_error(Message);}
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
+#define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
 
 // Indices (location) of Queue Families (if they exist at all)
 namespace VKE
@@ -33,6 +35,20 @@ namespace VKE
 	// =======================================
 	// =============== Structs =============== 
 	// =======================================
+
+	// Vertex data
+	struct FVertex
+	{
+		glm::vec3 Position;		// Vertex Position (x,y,z)
+		glm::vec3 Color;
+	};
+	
+	struct FMainDevice
+	{
+		VkPhysicalDevice PD;		// Physical Device
+		VkDevice LD;				// Logical Device
+	};
+
 	struct FQueueFamilyIndices
 	{
 		int graphicFamily = -1;			// Location of Graphics Queue Family

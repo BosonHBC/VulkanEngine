@@ -6,6 +6,7 @@
 #include <vector>
 #include "Utilities.h"
 
+
 namespace VKE
 {
 	class VKRenderer
@@ -21,19 +22,13 @@ namespace VKE
 		void draw();
 		void cleanUp();
 
-
-
 	private:
 		GLFWwindow* window;
 
 		uint64_t ElapsedFrame = 0;
 		// Vulkan Components
 		// - Main Components
-		struct
-		{
-			VkPhysicalDevice PD;		// Physical Device
-			VkDevice LD;				// Logical Device
-		} MainDevice;
+		FMainDevice MainDevice;
 		VkInstance vkInstance;
 		VkQueue graphicQueue;
 		VkQueue presentationQueue;

@@ -1,10 +1,25 @@
 #include "VKRenderer.h"
+
 #include <stdexcept>
 #include "stdlib.h"
 #include <set>
 #include "assert.h"
+#include "Mesh/cMesh.h"
+
 namespace VKE
 {
+	std::vector<FVertex> Vertices = 
+	{
+		{{0.4, -0.4, 0.0}, {1.0, 0.0, 0.0}},
+		{{0.4, 0.4, 0.0}, {0.0, 1.0, 0.0}},
+		{{-0.4, 0.4, 0.0}, {0.0, 0.0, 1.0}},
+
+		{{-0.4, 0.4, 0.0}, {0.0, 0.0, 1.0}},
+		{{-0.4, -0.4, 0.0}, {1.0, 1.0, 0.0}},
+		{{0.4, -0.4, 0.0}, {1.0, 0.0, 0.0}},
+
+	};
+	std::vector<cMesh*> RenderList;
 
 	int VKRenderer::init(GLFWwindow* iWindow)
 	{
@@ -15,6 +30,10 @@ namespace VKE
 			createSurface();
 			getPhysicalDevice();
 			createLogicalDevice();
+
+			// Create Mesh
+			RenderList.push_back(new cMesh(MainDevice, Vertices));
+
 			createSwapChain();
 			createRenderPass();
 			createGraphicsPipeline();
@@ -93,6 +112,14 @@ namespace VKE
 	{
 		// wait until the device is not doing anything (nothing on any queue)
 		vkDeviceWaitIdle(MainDevice.LD);
+		
+		// Clean up render list
+		for (auto Mesh : RenderList)
+		{
+			Mesh->cleanUpVertexBuffer();
+			safe_delete(Mesh);
+		}
+		RenderList.clear();
 
 		for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 		{
@@ -108,6 +135,7 @@ namespace VKE
 		vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
 		vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
 		vkDestroyRenderPass(MainDevice.LD, RenderPass, nullptr);
+
 		for (auto & Image : SwapChain.Images)
 		{
 			vkDestroyImageView(MainDevice.LD, Image.ImgView, nullptr);
@@ -464,15 +492,37 @@ namespace VKE
 		/** 2. Create Pipeline */
 		VkGraphicsPipelineCreateInfo PieplineCreateInfo = {};
 		{
-
-			// === Vertex Input === (@TODO: Putin vertex descripton when resources created)
+			// === Vertex Input === 
 			VkPipelineVertexInputStateCreateInfo VertexInputCreateInfo = {};
 			{
+				// How the data for a single vertex (including position, color, normal, texture coordinate) is as a whole
+				VkVertexInputBindingDescription VertexBindDescription = {};
+				VertexBindDescription.binding = 0;										// Can bind multiple streams of data, this defines which one
+				VertexBindDescription.stride = sizeof(FVertex);							// Size of of a single vertex object
+				VertexBindDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;			// Define how to move between data after each vertex, 
+																						// VK_VERTEX_INPUT_RATE_VERTEX : move to the next vertex
+																						// VK_VERTEX_INPUT_RATE_INSTANCE : Move to a vertex for the next instance
+
+				// How the data for an attribute is defined within a vertex
+				const uint32_t AttrubuteDescriptionCount = 2;
+				VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
+				
+				// Position attribute
+				AttributeDescriptions[0].binding = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
+				AttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
+				AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;			// format of the data, defnie the size of the data, 3 * 32 bit float data
+				AttributeDescriptions[0].offset = offsetof(FVertex, Position);			// Similar stride concept, position start at 0, but the following attribute data should has offset of sizeof(glm::vec3)
+				// Color attribute ...
+				AttributeDescriptions[1].binding = 0;
+				AttributeDescriptions[1].location = 1;
+				AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+				AttributeDescriptions[1].offset = offsetof(FVertex, Color);
+
 				VertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-				VertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-				VertexInputCreateInfo.pVertexBindingDescriptions = nullptr;				// list of vertex binding description data spacing, stride info
-				VertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-				VertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;			// data format where to bind in shader
+				VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+				VertexInputCreateInfo.pVertexBindingDescriptions = &VertexBindDescription;				// list of vertex binding description data spacing, stride info
+				VertexInputCreateInfo.vertexAttributeDescriptionCount = AttrubuteDescriptionCount;
+				VertexInputCreateInfo.pVertexAttributeDescriptions = AttributeDescriptions;				// data format where to bind in shader
 			}
 
 			// === Input Assembly ===
@@ -902,12 +952,24 @@ namespace VKE
 				...
 			*/
 
-			// Execute our pipeline
-			vkCmdDraw(CommandBuffers[i],
-				3,	// vertexCount indicates how many times the pipeline will call
-				1,	// For drawing same object multiple times
-				0,
-				0);
+			std::vector<VkBuffer> VertexBuffers(RenderList.size());			// Buffers to bind
+			std::vector<VkDeviceSize> Offsets(RenderList.size());			// Offsets into buffers being bound
+			for (size_t j = 0; j <RenderList.size(); ++j)
+			{
+				VertexBuffers[j] = RenderList[j]->GetVertexBuffer();
+				Offsets[j] = 0;
+			}
+			vkCmdBindVertexBuffers(CommandBuffers[i], 0, 1, VertexBuffers.data(), Offsets.data());		// Command to bind vertex buffer for drawing with
+
+			for (auto Mesh : RenderList)
+			{
+				// Execute our pipeline
+				vkCmdDraw(CommandBuffers[i],
+					Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
+					1,						// For drawing same object multiple times
+					0, 0);
+			}
+
 			// End Render Pass
 			vkCmdEndRenderPass(CommandBuffers[i]);
 

@@ -1,24 +1,12 @@
 #version 450
 
-layout(location = 0) out vec3 fragColor;
+layout (location = 0) in vec3 pos;
+layout (location = 1) in vec3 col;
 
-const vec3 Position[3] = vec3[] 
-(
-    vec3(0.0, -0.4, 0.0),
-    vec3(0.4, 0.4, 0.0),
-    vec3(-0.4, 0.4, 0.0)
-);
-
-const vec3 Color[3] = vec3[]
-(
-    vec3(1.0, 0.0, 0.0),
-    vec3(0.0, 1.0, 0.0),
-    vec3(0.0, 0.0, 1.0)
-);
-
+layout (location = 0) out vec3 fragCol;
 
 void main()
 {
-    gl_Position = vec4(Position[gl_VertexIndex], 1.0);
-    fragColor = Color[gl_VertexIndex];
+    gl_Position = vec4(pos, 1.0);
+    fragCol = col;
 }

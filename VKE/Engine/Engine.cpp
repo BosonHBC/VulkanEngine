@@ -1,6 +1,6 @@
 // Engines
 #include "Engine.h"
-#define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
+
 #include "Graphics/VKRenderer.h"
 
 // Plug-ins
