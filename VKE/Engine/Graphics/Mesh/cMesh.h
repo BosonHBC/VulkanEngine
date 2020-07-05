@@ -16,22 +16,30 @@ namespace VKE
 		cMesh& operator = (const cMesh& i_other) = delete;
 		~cMesh() {}
 
-		cMesh(const FMainDevice& iMainDevice, const std::vector<FVertex>& iVertices);
+		cMesh(const FMainDevice& iMainDevice, 
+			VkQueue TransferQueue, VkCommandPool TransferCommandPool,
+			const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices);
 
-		void cleanUpVertexBuffer();
+		void cleanUp();
 
-		uint32_t GetVertexCount() const { return VertexCount; }
-		VkBuffer GetVertexBuffer() const { return VertexBuffer; }
+		uint32_t GetVertexCount() const { return VertexBuffer.Count; }
+		VkBuffer GetVertexBuffer() const { return VertexBuffer.Buffer; }
 
+		uint32_t GetIndexCount() const { return IndexBuffer.Count; }
+		VkBuffer GetIndexBuffer() const { return IndexBuffer.Buffer; }
 	private:
-		uint32_t VertexCount;
-		VkBuffer VertexBuffer;
-		VkDeviceMemory VertexBufferMemory;
-
+		struct FMeshBuffer
+		{
+			uint32_t Count;
+			VkBuffer Buffer;
+			VkDeviceMemory DeviceMemory;
+		} VertexBuffer, IndexBuffer;
+		
 		FMainDevice MainDevice;
 
-		bool createVertexBuffer(const std::vector<FVertex>& iVertices, VkBuffer& oBuffer);
-		uint32_t findMemoryTypeIndex(uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+		bool createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);
+		bool createIndexBuffer(const std::vector<uint32_t>& iIndices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);
+
 	};
 }
 

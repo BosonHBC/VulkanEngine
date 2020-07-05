@@ -8,16 +8,28 @@
 
 namespace VKE
 {
-	std::vector<FVertex> Vertices = 
+	// Vertex data
+	std::vector<FVertex> Vertices1 = 
 	{
-		{{0.4, -0.4, 0.0}, {1.0, 0.0, 0.0}},
-		{{0.4, 0.4, 0.0}, {0.0, 1.0, 0.0}},
-		{{-0.4, 0.4, 0.0}, {0.0, 0.0, 1.0}},
+		{{-0.4, -0.2, 0.0}, {1.0, 0.0, 0.0}},		// 0
+		{{-0.4, 0.2, 0.0}, {0.0, 1.0, 0.0}},			// 1
+		{{-0.8, 0.2, 0.0}, {0.0, 0.0, 1.0}},		// 2
+		{{-0.8, -0.2, 0.0}, {1.0, 1.0, 0.0}},		// 3
 
-		{{-0.4, 0.4, 0.0}, {0.0, 0.0, 1.0}},
-		{{-0.4, -0.4, 0.0}, {1.0, 1.0, 0.0}},
-		{{0.4, -0.4, 0.0}, {1.0, 0.0, 0.0}},
+	};
+	std::vector<FVertex> Vertices2 =
+	{
+		{{0.8, -0.4, 0.0}, {1.0, 0.0, 0.0}},		// 0
+		{{0.8, 0.4, 0.0}, {0.0, 1.0, 0.0}},			// 1
+		{{0.2, 0.4, 0.0}, {0.0, 0.0, 1.0}},		// 2
+		{{0.2, -0.4, 0.0}, {1.0, 1.0, 0.0}},		// 3
 
+	};
+	// Index data
+	std::vector<uint32_t> Indices =
+	{
+		3, 0, 1,
+		1, 2, 3
 	};
 	std::vector<cMesh*> RenderList;
 
@@ -30,15 +42,16 @@ namespace VKE
 			createSurface();
 			getPhysicalDevice();
 			createLogicalDevice();
-
-			// Create Mesh
-			RenderList.push_back(new cMesh(MainDevice, Vertices));
-
 			createSwapChain();
 			createRenderPass();
 			createGraphicsPipeline();
 			createFrameBuffer();
 			createCommandPool();
+
+			// Create Mesh
+			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices1, Indices));
+			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices2, Indices));
+
 			createCommandBuffers();
 			recordCommands();
 			createSynchronization();
@@ -116,7 +129,7 @@ namespace VKE
 		// Clean up render list
 		for (auto Mesh : RenderList)
 		{
-			Mesh->cleanUpVertexBuffer();
+			Mesh->cleanUp();
 			safe_delete(Mesh);
 		}
 		RenderList.clear();
@@ -461,8 +474,8 @@ namespace VKE
 	void VKRenderer::createGraphicsPipeline()
 	{
 		// Read in SPIR-V code of shaders
-		auto VertexShaderCode = ReadFile("Content/Shaders/vert.spv");
-		auto FragShaderCode = ReadFile("Content/Shaders/frag.spv");
+		auto VertexShaderCode = FileIO::ReadFile("Content/Shaders/vert.spv");
+		auto FragShaderCode = FileIO::ReadFile("Content/Shaders/frag.spv");
 
 		// Build Shader Module to link to Graphics Pipeline
 		FShaderModuleScopeGuard VertexShaderModule, FragmentShaderModule;
@@ -581,7 +594,7 @@ namespace VKE
 				RasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;			// Useful effect on wire frame effect.
 				RasterizerCreateInfo.lineWidth = 1.0f;								// How thick lines should be when drawn, needs to enable other extensions
 				RasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;				// Which face of a tri to cull
-				RasterizerCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;			// left-handed rule
+				RasterizerCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;			// right-handed rule
 				RasterizerCreateInfo.depthBiasEnable = VK_FALSE;					// Define the depth bias to fragments (good for stopping "shadow arcane")
 			}
 
@@ -952,22 +965,25 @@ namespace VKE
 				...
 			*/
 
-			std::vector<VkBuffer> VertexBuffers(RenderList.size());			// Buffers to bind
-			std::vector<VkDeviceSize> Offsets(RenderList.size());			// Offsets into buffers being bound
 			for (size_t j = 0; j <RenderList.size(); ++j)
 			{
-				VertexBuffers[j] = RenderList[j]->GetVertexBuffer();
-				Offsets[j] = 0;
-			}
-			vkCmdBindVertexBuffers(CommandBuffers[i], 0, 1, VertexBuffers.data(), Offsets.data());		// Command to bind vertex buffer for drawing with
 
-			for (auto Mesh : RenderList)
-			{
-				// Execute our pipeline
+				VkBuffer VertexBuffers[] = { RenderList[j]->GetVertexBuffer() };			// Buffers to bind
+				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
+
+				vkCmdBindVertexBuffers(CommandBuffers[i], 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
+
+				// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
+				vkCmdBindIndexBuffer(CommandBuffers[i], RenderList[j]->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+				/*
 				vkCmdDraw(CommandBuffers[i],
 					Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
 					1,						// For drawing same object multiple times
-					0, 0);
+					0, 0);*/
+
+				// Index draw
+				vkCmdDrawIndexed(CommandBuffers[i], RenderList[j]->GetIndexCount(), 1, 0, 0, 0);
 			}
 
 			// End Render Pass

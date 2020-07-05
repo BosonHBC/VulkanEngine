@@ -100,11 +100,17 @@ namespace VKE
 	// ================================================
 	// =============== Global Functions =============== 
 	// ================================================
-	std::vector<char> ReadFile(const std::string& filename);
-
+	
+	// Create buffer and allocate memory for any specific usage type of buffer
+	bool CreateBufferAndAllocateMemory(FMainDevice MainDevice, VkDeviceSize BufferSize, VkBufferUsageFlags Flags, VkMemoryPropertyFlags Properties, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
+	// Find a valid memory type index
+	uint32_t FindMemoryTypeIndex(FMainDevice MainDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+	// Copy data from src buffer to dst buffer
+	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
+		VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize);
 	namespace FileIO
 	{
+		std::vector<char> ReadFile(const std::string& filename);
 		std::string RelativePathToAbsolutePath(const std::string& iReleative);
-		
 	}
 }
