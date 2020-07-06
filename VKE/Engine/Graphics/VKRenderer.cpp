@@ -1,15 +1,19 @@
 #include "VKRenderer.h"
 
+#include "Mesh/cMesh.h"
+#include "../Transform/Transform.h"
+
 #include <stdexcept>
 #include "stdlib.h"
 #include <set>
 #include "assert.h"
-#include "Mesh/cMesh.h"
+
+#include "glm/gtc/matrix_transform.hpp"
 
 namespace VKE
 {
 	// Vertex data
-	std::vector<FVertex> Vertices1 = 
+	std::vector<FVertex> Vertices1 =
 	{
 		{{-0.4, -0.2, 0.0}, {1.0, 0.0, 0.0}},		// 0
 		{{-0.4, 0.2, 0.0}, {0.0, 1.0, 0.0}},			// 1
@@ -21,7 +25,7 @@ namespace VKE
 	{
 		{{0.8, -0.4, 0.0}, {1.0, 0.0, 0.0}},		// 0
 		{{0.8, 0.4, 0.0}, {0.0, 1.0, 0.0}},			// 1
-		{{0.2, 0.4, 0.0}, {0.0, 0.0, 1.0}},		// 2
+		{{0.2, 0.4, 0.0}, {0.0, 0.0, 1.0}},			// 2
 		{{0.2, -0.4, 0.0}, {1.0, 1.0, 0.0}},		// 3
 
 	};
@@ -31,7 +35,6 @@ namespace VKE
 		3, 0, 1,
 		1, 2, 3
 	};
-	std::vector<cMesh*> RenderList;
 
 	int VKRenderer::init(GLFWwindow* iWindow)
 	{
@@ -44,15 +47,30 @@ namespace VKE
 			createLogicalDevice();
 			createSwapChain();
 			createRenderPass();
+			createDescriptorSetLayout();
 			createGraphicsPipeline();
 			createFrameBuffer();
 			createCommandPool();
 
+			//set up MVP
+			glm::mat4 Projection = glm::perspective(glm::radians(45.f), (float)SwapChain.Extent.width / (float)SwapChain.Extent.height, 0.1f, 100.f);
+			Projection[1][1] *= -1;				// inverting Y axis since glm treats
+			FrameData = BufferFormats::FFrame(
+				Projection,
+				glm::lookAt(glm::vec3(3.f, 1.f, 2.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
+			);
 			// Create Mesh
 			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices1, Indices));
 			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices2, Indices));
 
 			createCommandBuffers();
+			// Descriptor set related
+			{
+				allocateDynamicBufferTransferSpace();
+				createUniformBuffer();
+				createDescriptorPool();
+				createDescriptorSets();
+			}
 			recordCommands();
 			createSynchronization();
 		}
@@ -61,8 +79,17 @@ namespace VKE
 			printf("ERROR: %s \n", e.what());
 			return EXIT_FAILURE;
 		}
-		
+
 		return EXIT_SUCCESS;
+	}
+
+	cTransform tempTransform;
+	void VKRenderer::tick(float dt)
+	{
+		tempTransform.gRotate(cTransform::WorldForward, 5 * dt);
+		tempTransform.Update();
+
+		RenderList[0]->SetModel(tempTransform.M());
 	}
 
 	void VKRenderer::draw()
@@ -73,7 +100,7 @@ namespace VKE
 			VK_TRUE,													// Must wait for all fences to be opened(signaled) to pass this wait
 			std::numeric_limits<uint64_t>::max());						// No time-out
 		vkResetFences(MainDevice.LD, 1, &DrawFences[CurrentFrame]);		// Need to close(reset) this fence manually
-		
+
 		/** I. get the next available image to draw to and signal(semaphore1) when we're finished with the image */
 		uint32_t ImageIndex;											// Index of next image to be drawn 
 		vkAcquireNextImageKHR(MainDevice.LD, SwapChain.SwapChain,
@@ -82,9 +109,12 @@ namespace VKE
 			VK_NULL_HANDLE,
 			&ImageIndex);
 
+		// Update uniform buffer
+		updateUniformBuffers(ImageIndex);
+
 		/** II. submit command buffer to queue (graphic queue) for execution, make sure it waits for the image to be signaled as available before drawing,
 		 and signals (semaphore2) when it has finished rendering.*/
-		// Queue Submission information
+		 // Queue Submission information
 		VkSubmitInfo SubmitInfo = {};
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.waitSemaphoreCount = 1;								// Number of semaphores to wait on
@@ -125,7 +155,9 @@ namespace VKE
 	{
 		// wait until the device is not doing anything (nothing on any queue)
 		vkDeviceWaitIdle(MainDevice.LD);
-		
+
+		_aligned_free(pDrawcallTransferSpace);
+
 		// Clean up render list
 		for (auto Mesh : RenderList)
 		{
@@ -144,6 +176,21 @@ namespace VKE
 		for (auto& FrameBuffer : SwapChainFramebuffers)
 		{
 			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
+		}
+		// Descriptor related
+		{
+			vkDestroyDescriptorPool(MainDevice.LD, DescriptorPool, nullptr);
+
+			vkDestroyDescriptorSetLayout(MainDevice.LD, DescriptorSetLayout, nullptr);
+
+			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
+			{
+				vkDestroyBuffer(MainDevice.LD, UniformBuffers_Frame[i], nullptr);
+				vkFreeMemory(MainDevice.LD, UniformBufferMemories_Frame[i], nullptr);
+				vkDestroyBuffer(MainDevice.LD, DUniformBuffers_Drawcall[i], nullptr);
+				vkFreeMemory(MainDevice.LD, DUniformBufferMemories_Drawcall[i], nullptr);
+
+			}
 		}
 		vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
 		vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
@@ -244,6 +291,12 @@ namespace VKE
 		{
 			throw std::runtime_error("Cannot find any suitable physical device");
 		}
+
+		// Information about the device itself (ID, name, type, vendor, etc)
+		VkPhysicalDeviceProperties deviceProperties;
+		vkGetPhysicalDeviceProperties(MainDevice.PD, &deviceProperties);
+		MinUniformBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;
+
 	}
 
 	void VKRenderer::createLogicalDevice()
@@ -471,6 +524,35 @@ namespace VKE
 
 	}
 
+	void VKRenderer::createDescriptorSetLayout()
+	{
+		const uint32_t BindingCount = 2;
+		VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
+		// FrameData binding info
+		Bindings[0].binding = 0;											// binding in the uniform struct in shader
+		Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;		// Type of descriptor, Uniform, dynamic_uniform, image_sampler ...
+		Bindings[0].descriptorCount = 1;									// Number of descriptor for binding
+		Bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
+		Bindings[0].pImmutableSamplers = nullptr;							// for textures setting, if texture is immutable or not
+
+		// Drawcall data binding info
+		Bindings[1].binding = 1;
+		Bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		Bindings[1].descriptorCount = 1;
+		Bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		Bindings[1].pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo;
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = BindingCount;
+		LayoutCreateInfo.pBindings = Bindings;
+		LayoutCreateInfo.pNext = nullptr;
+		LayoutCreateInfo.flags = 0;
+
+		VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &LayoutCreateInfo, nullptr, &DescriptorSetLayout);
+		RESULT_CHECK(Result, "Fail to create descriptor set layout.")
+	}
+
 	void VKRenderer::createGraphicsPipeline()
 	{
 		// Read in SPIR-V code of shaders
@@ -519,7 +601,7 @@ namespace VKE
 				// How the data for an attribute is defined within a vertex
 				const uint32_t AttrubuteDescriptionCount = 2;
 				VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
-				
+
 				// Position attribute
 				AttributeDescriptions[0].binding = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
 				AttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
@@ -594,7 +676,7 @@ namespace VKE
 				RasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;			// Useful effect on wire frame effect.
 				RasterizerCreateInfo.lineWidth = 1.0f;								// How thick lines should be when drawn, needs to enable other extensions
 				RasterizerCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;				// Which face of a tri to cull
-				RasterizerCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;			// right-handed rule
+				RasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;	// right-handed rule
 				RasterizerCreateInfo.depthBiasEnable = VK_FALSE;					// Define the depth bias to fragments (good for stopping "shadow arcane")
 			}
 
@@ -637,12 +719,12 @@ namespace VKE
 				ColorBlendStateCreateInfo.pAttachments = &ColorStateAttachments;
 			}
 
-			// === Pipeline layout (@TODO: Apply future descriptor set layouts) ===
+			// === Pipeline layout ===
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 			{
 				PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-				PipelineLayoutCreateInfo.setLayoutCount = 0;
-				PipelineLayoutCreateInfo.pSetLayouts = nullptr;
+				PipelineLayoutCreateInfo.setLayoutCount = 1;
+				PipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
 				PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 				PipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
@@ -764,7 +846,7 @@ namespace VKE
 		for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 		{
 			VkResult Result = vkCreateSemaphore(MainDevice.LD, &SemaphoreCreateInfo, nullptr, &OnImageAvailables[i]);
-			RESULT_CHECK_ARGS(Result, "Fail to create OnImageAvailables[%d] Semaphore",i);
+			RESULT_CHECK_ARGS(Result, "Fail to create OnImageAvailables[%d] Semaphore", i);
 
 			Result = vkCreateSemaphore(MainDevice.LD, &SemaphoreCreateInfo, nullptr, &OnRenderFinisheds[i]);
 			RESULT_CHECK_ARGS(Result, "Fail to create OnRenderFinisheds[%d] Semaphore", i);
@@ -772,6 +854,140 @@ namespace VKE
 			Result = vkCreateFence(MainDevice.LD, &FenceCreateInfo, nullptr, &DrawFences[i]);
 			RESULT_CHECK_ARGS(Result, "Fail to create DrawFences[%d] Fence", i);
 		}
+	}
+
+	void VKRenderer::createUniformBuffer()
+	{
+		VkDeviceSize BufferSizeFrame = sizeof(BufferFormats::FFrame);
+		VkDeviceSize BufferSizeDrawcall = DrawCallUniformAlignment * MAX_OBJECTS;
+
+		// One uniform buffer for each image (and by extension, command buffer)
+		size_t Size = SwapChain.Images.size();
+		UniformBuffers_Frame.resize(Size);
+		UniformBufferMemories_Frame.resize(Size);
+		DUniformBuffers_Drawcall.resize(Size);
+		DUniformBufferMemories_Drawcall.resize(Size);
+
+		// Create UniformBuffers
+		for (size_t i = 0; i < Size; ++i)
+		{
+			CreateBufferAndAllocateMemory(MainDevice, BufferSizeFrame, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, UniformBuffers_Frame[i], UniformBufferMemories_Frame[i]);
+			CreateBufferAndAllocateMemory(MainDevice, BufferSizeDrawcall, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DUniformBuffers_Drawcall[i], DUniformBufferMemories_Drawcall[i]);
+		}
+	}
+
+	void VKRenderer::createDescriptorPool()
+	{
+		const uint32_t PoolSizeCount = 2;
+		// Type of descriptors + how many DESCRIPTORS, not DESCRIPTOR Sets (combined makes the pool size)
+		VkDescriptorPoolSize PoolSizes[PoolSizeCount] = {};
+		// Frame pool (Uniform buffer)
+		PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		PoolSizes[0].descriptorCount = static_cast<uint32_t>(UniformBuffers_Frame.size());
+
+		// Drawcall pool (Dynamic uniform buffer)
+		PoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		PoolSizes[1].descriptorCount = static_cast<uint32_t>(DUniformBuffers_Drawcall.size());
+
+		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
+		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size());
+		PoolCreateInfo.poolSizeCount = PoolSizeCount;
+		PoolCreateInfo.pPoolSizes = PoolSizes;
+
+		VkResult Result = vkCreateDescriptorPool(MainDevice.LD, &PoolCreateInfo, nullptr, &DescriptorPool);
+		RESULT_CHECK(Result, "Failed to create a Descriptor Pool");
+	}
+
+	void VKRenderer::createDescriptorSets()
+	{
+		DescriptorSets.resize(SwapChain.Images.size());
+
+		std::vector<VkDescriptorSetLayout> SetLayouts(SwapChain.Images.size(), DescriptorSetLayout);
+
+		VkDescriptorSetAllocateInfo SetAllocInfo = {};
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = DescriptorPool;													// Pool to allocate descriptor set from
+		SetAllocInfo.descriptorSetCount = static_cast<uint32_t>(SwapChain.Images.size());				// Number of sets to allocate
+		SetAllocInfo.pSetLayouts = SetLayouts.data();													// Layouts to use to allocate sets (1:1 relationship)
+
+		// Allocate descriptor sets (multiple)
+		VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &SetAllocInfo, DescriptorSets.data());
+		RESULT_CHECK(Result, "Fail to ALlocate Descriptor Sets!");
+
+		// Update all of descriptor set buffer bindings
+		for (size_t i = 0; i < SwapChain.Images.size(); ++i)
+		{
+			const uint32_t DescriptorCount = 2;
+			// Data about connection between binding and buffer
+			VkWriteDescriptorSet SetWrites[DescriptorCount] = {};
+
+			// FRAME DESCRIPTOR
+			{
+				// Info of the buffer this descriptor is trying connecting with 
+				VkDescriptorBufferInfo Frame_BufferInfo = {};
+				Frame_BufferInfo.buffer = UniformBuffers_Frame[i];					// Buffer to get data from
+				Frame_BufferInfo.offset = 0;										// offset of the data
+				Frame_BufferInfo.range = sizeof(BufferFormats::FFrame);				// Size of data
+
+				// Frame data write info
+				SetWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				SetWrites[0].dstSet = DescriptorSets[i];							// Descriptor set to update
+				SetWrites[0].dstBinding = 0;										// matches with binding on layout/shader
+				SetWrites[0].dstArrayElement = 0;									// Index in array to update
+				SetWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of the descriptor, should match the descriptor set type
+				SetWrites[0].descriptorCount = 1;									// Amount to update
+				SetWrites[0].pBufferInfo = &Frame_BufferInfo;						// Information about buffer data to bind
+			}
+
+			// DRAWCALL DESCRIPTOR
+			{
+				// Info of the buffer this descriptor is trying connecting with 
+				VkDescriptorBufferInfo Drawcall_BufferInfo = {};
+				Drawcall_BufferInfo.buffer = DUniformBuffers_Drawcall[i];
+				Drawcall_BufferInfo.offset = 0;
+				Drawcall_BufferInfo.range = DrawCallUniformAlignment;				// Single piece of data, not the whole data
+
+				// Frame data write info
+				SetWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				SetWrites[1].dstSet = DescriptorSets[i];
+				SetWrites[1].dstBinding = 1;
+				SetWrites[1].dstArrayElement = 0;
+				SetWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+				SetWrites[1].descriptorCount = 1;
+				SetWrites[1].pBufferInfo = &Drawcall_BufferInfo;
+			}
+
+			// Update the descriptor sets with new buffer / binding info
+			vkUpdateDescriptorSets(MainDevice.LD, DescriptorCount, SetWrites,
+				0, nullptr // Allows copy descriptor set to another descriptor set
+			);
+		}
+	}
+
+	void VKRenderer::updateUniformBuffers(uint32_t ImageIndex)
+	{
+		// Copy Frame data
+		void * Data = nullptr;
+		vkMapMemory(MainDevice.LD, UniformBufferMemories_Frame[ImageIndex], 0, sizeof(BufferFormats::FFrame), 0, &Data);
+		memcpy(Data, &FrameData, sizeof(BufferFormats::FFrame));
+		vkUnmapMemory(MainDevice.LD, UniformBufferMemories_Frame[ImageIndex]);
+
+		// Update model data to pDrawcallTransferSpace
+		for (size_t i = 0; i < RenderList.size(); ++i)
+		{
+			using namespace BufferFormats;
+			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(pDrawcallTransferSpace) + (i * DrawCallUniformAlignment));
+			*Drawcall = RenderList[i]->GetDrawcall();
+		}
+		// Copy Model data
+		// Reuse void* Data
+		size_t DBufferSize = DrawCallUniformAlignment * RenderList.size();
+		vkMapMemory(MainDevice.LD, DUniformBufferMemories_Drawcall[ImageIndex], 0, DBufferSize, 0, &Data);
+		memcpy(Data, pDrawcallTransferSpace, DBufferSize);
+		vkUnmapMemory(MainDevice.LD, DUniformBufferMemories_Drawcall[ImageIndex]);
 	}
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
@@ -870,13 +1086,10 @@ namespace VKE
 
 	bool VKRenderer::checkDeviceSuitable(const VkPhysicalDevice& device)
 	{
-		// Information about the device itself (ID, name, type, vendor, etc)
-		VkPhysicalDeviceProperties deviceProperties;
-		vkGetPhysicalDeviceProperties(device, &deviceProperties);
-
-		// Information about what the device supports (geo shader, tess shader, wide lines, etc)
-		VkPhysicalDeviceFeatures deviceFeatures;
-		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+		/*
+				// Information about what the device supports (geo shader, tess shader, wide lines, etc)
+				VkPhysicalDeviceFeatures deviceFeatures;
+				vkGetPhysicalDeviceFeatures(device, &deviceFeatures);*/
 
 		FQueueFamilyIndices indices = getQueueFamilies(device);
 		if (!indices.IsValid())
@@ -965,24 +1178,34 @@ namespace VKE
 				...
 			*/
 
-			for (size_t j = 0; j <RenderList.size(); ++j)
+			for (size_t j = 0; j < RenderList.size(); ++j)
 			{
 
 				VkBuffer VertexBuffers[] = { RenderList[j]->GetVertexBuffer() };			// Buffers to bind
 				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
 
+				// Bind vertex data
 				vkCmdBindVertexBuffers(CommandBuffers[i], 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
 
 				// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
 				vkCmdBindIndexBuffer(CommandBuffers[i], RenderList[j]->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
+				// Dynamic Offset Amount
+				uint32_t DynamicOffset = static_cast<uint32_t>(DrawCallUniformAlignment) * j;
+
+				// Bind Descriptor sets
+				vkCmdBindDescriptorSets(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+					0, 1,						// One descriptor for each draw
+					&DescriptorSets[i],
+					1, &DynamicOffset					// Dynamic offsets
+				);
 				/*
 				vkCmdDraw(CommandBuffers[i],
 					Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
 					1,						// For drawing same object multiple times
 					0, 0);*/
 
-				// Index draw
+					// Execute pipeline, Index draw
 				vkCmdDrawIndexed(CommandBuffers[i], RenderList[j]->GetIndexCount(), 1, 0, 0, 0);
 			}
 
@@ -993,6 +1216,15 @@ namespace VKE
 			Result = vkEndCommandBuffer(CommandBuffers[i]);
 			RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", i);
 		}
+	}
+
+	void VKRenderer::allocateDynamicBufferTransferSpace()
+	{
+		// Calculate alignment of drawcall data
+		DrawCallUniformAlignment = (sizeof(BufferFormats::FDrawCall) + MinUniformBufferOffset) & ~(MinUniformBufferOffset - 1);
+
+		// Create space in memory to hold dynamic buffer that is aligned to our required alignment and holds MAX_OBJECTS
+		pDrawcallTransferSpace = reinterpret_cast<BufferFormats::FDrawCall*>(_aligned_malloc(DrawCallUniformAlignment * MAX_OBJECTS, DrawCallUniformAlignment));
 	}
 
 	FQueueFamilyIndices VKRenderer::getQueueFamilies(const VkPhysicalDevice& device)

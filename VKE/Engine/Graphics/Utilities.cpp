@@ -96,14 +96,14 @@ namespace VKE
 	bool CreateBufferAndAllocateMemory(FMainDevice MainDevice, VkDeviceSize BufferSize, VkBufferUsageFlags Flags, VkMemoryPropertyFlags Properties, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory)
 	{
 		// info to create vertex buffer, not assigning memory
-		VkBufferCreateInfo VertexBufferCreateInfo = {};
-		VertexBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		VertexBufferCreateInfo.size = BufferSize;
-		VertexBufferCreateInfo.usage = Flags;											// Multiple types of buffer possible, vertex buffer here
-		VertexBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;					// only one using in a time, similar to swap chain images
+		VkBufferCreateInfo BufferCreateInfo = {};
+		BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferCreateInfo.size = BufferSize;
+		BufferCreateInfo.usage = Flags;											// Multiple types of buffer possible, vertex buffer here
+		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;					// only one using in a time, similar to swap chain images
 
-		VkResult Result = vkCreateBuffer(MainDevice.LD, &VertexBufferCreateInfo, nullptr, &oBuffer);
-		RESULT_CHECK(Result, "Fail to create vertex buffer.");
+		VkResult Result = vkCreateBuffer(MainDevice.LD, &BufferCreateInfo, nullptr, &oBuffer);
+		RESULT_CHECK(Result, "Fail to create buffer.");
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -125,7 +125,7 @@ namespace VKE
 
 		// Allocate memory to VKDevieMemory
 		Result = vkAllocateMemory(MainDevice.LD, &MemAllocInfo, nullptr, &oBufferMemory);
-		RESULT_CHECK(Result, "Fail to allocate vertex buffer.");
+		RESULT_CHECK(Result, "Fail to allocate memory for buffer.");
 		if (Result != VK_SUCCESS)
 		{
 			return false;

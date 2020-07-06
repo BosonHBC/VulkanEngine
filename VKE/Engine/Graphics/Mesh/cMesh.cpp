@@ -11,7 +11,7 @@ namespace VKE
 		MainDevice = iMainDevice;
 		createVertexBuffer(iVertices, TransferQueue, TransferCommandPool);
 		createIndexBuffer(iIndices, TransferQueue, TransferCommandPool);
-
+		DrawCallData.ModelMatrix = glm::mat4(1.0f);
 	}
 
 	void cMesh::cleanUp()

@@ -31,6 +31,11 @@ namespace VKE
 
 	// Maximum 2 image on the queue
 	const int MAX_FRAME_DRAWS = 2;
+	// Max objects are allowed in the scene
+	const int MAX_OBJECTS = 2;
+
+	static VkDeviceSize MinUniformBufferOffset;
+	static size_t DrawCallUniformAlignment;
 
 	// =======================================
 	// =============== Structs =============== 

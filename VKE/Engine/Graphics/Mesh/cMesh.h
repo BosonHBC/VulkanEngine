@@ -3,11 +3,12 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 #include <vector>
-
+#include "../BufferFormats.h"
 #include "../Utilities.h"
 
 namespace VKE
 {
+
 	class cMesh
 	{
 	public:
@@ -27,6 +28,9 @@ namespace VKE
 
 		uint32_t GetIndexCount() const { return IndexBuffer.Count; }
 		VkBuffer GetIndexBuffer() const { return IndexBuffer.Buffer; }
+
+		void SetModel(glm::mat4 model) { DrawCallData = model; }
+		BufferFormats::FDrawCall GetDrawcall() const { return DrawCallData; }
 	private:
 		struct FMeshBuffer
 		{
@@ -35,6 +39,8 @@ namespace VKE
 			VkDeviceMemory DeviceMemory;
 		} VertexBuffer, IndexBuffer;
 		
+		BufferFormats::FDrawCall DrawCallData;
+
 		FMainDevice MainDevice;
 
 		bool createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);

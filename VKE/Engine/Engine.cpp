@@ -47,9 +47,17 @@ namespace VKE {
 			return;
 		}
 
+		double DeltaTime = 0.0f;
+		double LastTime = glfwGetTime();
+
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
+			double now = glfwGetTime();
+			DeltaTime = now - LastTime;
+			LastTime = now;
+
+			g_renderer->tick((float)DeltaTime);
 			g_renderer->draw();
 		}
 	}

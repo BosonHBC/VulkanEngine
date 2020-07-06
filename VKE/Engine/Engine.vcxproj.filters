@@ -25,6 +25,9 @@
     <Filter Include="Source Files\Graphics\Mesh">
       <UniqueIdentifier>{817e3c49-f8ec-4431-9f9d-7d1ace5a88c9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Transform">
+      <UniqueIdentifier>{77ac8f05-b43c-4c6b-9bf7-59a19186ed7d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -38,6 +41,9 @@
     </ClCompile>
     <ClCompile Include="Graphics\Mesh\cMesh.cpp">
       <Filter>Source Files\Graphics\Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform\Transform.cpp">
+      <Filter>Source Files\Transform</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -53,10 +59,11 @@
     <ClInclude Include="Graphics\Mesh\cMesh.h">
       <Filter>Source Files\Graphics\Mesh</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Content\Shaders\vert.glsl">
-      <Filter>Source Files\Content\Shaders</Filter>
-    </None>
+    <ClInclude Include="Transform\Transform.h">
+      <Filter>Source Files\Transform</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\BufferFormats.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
