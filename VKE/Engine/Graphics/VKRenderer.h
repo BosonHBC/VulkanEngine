@@ -62,6 +62,7 @@ namespace VKE
 
 		// - Descriptors
 		VkDescriptorSetLayout DescriptorSetLayout;
+		VkPushConstantRange PushConstantRange;
 		VkDescriptorPool DescriptorPool;
 		std::vector<VkDescriptorSet> DescriptorSets;
 
@@ -80,6 +81,7 @@ namespace VKE
 		void createSwapChain();
 		void createRenderPass();
 		void createDescriptorSetLayout();
+		void createPushConstantRange();
 		void createGraphicsPipeline();
 		void createFrameBuffer();
 		void createCommandPool();
@@ -102,7 +104,7 @@ namespace VKE
 		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
 
 		/** Record functions */
-		void recordCommands();
+		void recordCommands(uint32_t ImageIndex);
 
 		/** Allocation functions*/
 		void allocateDynamicBufferTransferSpace();

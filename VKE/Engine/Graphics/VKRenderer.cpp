@@ -48,6 +48,7 @@ namespace VKE
 			createSwapChain();
 			createRenderPass();
 			createDescriptorSetLayout();
+			createPushConstantRange();
 			createGraphicsPipeline();
 			createFrameBuffer();
 			createCommandPool();
@@ -71,7 +72,6 @@ namespace VKE
 				createDescriptorPool();
 				createDescriptorSets();
 			}
-			recordCommands();
 			createSynchronization();
 		}
 		catch (const std::runtime_error &e)
@@ -109,6 +109,8 @@ namespace VKE
 			VK_NULL_HANDLE,
 			&ImageIndex);
 
+		// Record commands
+		recordCommands(ImageIndex);
 		// Update uniform buffer
 		updateUniformBuffers(ImageIndex);
 
@@ -553,6 +555,14 @@ namespace VKE
 		RESULT_CHECK(Result, "Fail to create descriptor set layout.")
 	}
 
+	void VKRenderer::createPushConstantRange()
+	{
+		// Define push constant range, no need to create
+		PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		PushConstantRange.offset = 0;
+		PushConstantRange.size = sizeof(glm::mat4);		// Size of data being pass
+	}
+
 	void VKRenderer::createGraphicsPipeline()
 	{
 		// Read in SPIR-V code of shaders
@@ -725,8 +735,8 @@ namespace VKE
 				PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				PipelineLayoutCreateInfo.setLayoutCount = 1;
 				PipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
-				PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-				PipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+				PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+				PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstantRange;
 
 				// Create Pipeline layout
 				VkResult Result = vkCreatePipelineLayout(MainDevice.LD, &PipelineLayoutCreateInfo, nullptr, &PipelineLayout);
@@ -803,7 +813,8 @@ namespace VKE
 		VkCommandPoolCreateInfo CommandPoolCreateInfo;
 		CommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		CommandPoolCreateInfo.queueFamilyIndex = Indices.graphicFamily;					// Queue family type that buffers from this command pool will use
-		CommandPoolCreateInfo.flags = 0;
+		CommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;	// Allow reset so that we can re-record in run-time
+																						// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT makes vkBeginCommandBuffer(...) dump all previous commands
 
 		// Create a Graphics Queue Family Command Pool
 		VkResult Result = vkCreateCommandPool(MainDevice.LD, &CommandPoolCreateInfo, nullptr, &GraphicsCommandPool);
@@ -1136,8 +1147,9 @@ namespace VKE
 		return ImageView;
 	}
 
-	void VKRenderer::recordCommands()
+	void VKRenderer::recordCommands(uint32_t ImageIndex)
 	{
+		VkCommandBuffer& CB = CommandBuffers[ImageIndex];
 		// Begin info can be the same
 		VkCommandBufferBeginInfo BufferBeginInfo = {};
 		BufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1156,66 +1168,72 @@ namespace VKE
 		RenderPassBeginInfo.pClearValues = ClearValues;								// List of clear values (@TODO: Depth attachment clear value)
 		RenderPassBeginInfo.clearValueCount = ClearColorCount;
 
-		for (size_t i = 0; i < CommandBuffers.size(); ++i)
+
+		RenderPassBeginInfo.framebuffer = SwapChainFramebuffers[ImageIndex];
+
+		// Start recording commands to command buffer
+		VkResult Result = vkBeginCommandBuffer(CB, &BufferBeginInfo);
+		RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", ImageIndex);
+
+		/** Record part */
+		// Begin Render Pass
+		vkCmdBeginRenderPass(CB, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// Bind Pipeline to be used in render pass
+		vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicPipeline);
+		/*
+			Deferred shading example:
+			G-Buffer pipeline, stores all data to multiple attachments
+			Switch to another pipeline, do lighting
+			Switch to another pipeline, do HDR
+			...
+		*/
+
+		for (size_t j = 0; j < RenderList.size(); ++j)
 		{
-			RenderPassBeginInfo.framebuffer = SwapChainFramebuffers[i];
+			cMesh* Mesh = RenderList[j];
+			VkBuffer VertexBuffers[] = { Mesh->GetVertexBuffer() };			// Buffers to bind
+			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
 
-			// Start recording commands to command buffer
-			VkResult Result = vkBeginCommandBuffer(CommandBuffers[i], &BufferBeginInfo);
-			RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", i);
+			// Bind vertex data
+			vkCmdBindVertexBuffers(CB, 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
 
-			/** Record part */
-			// Begin Render Pass
-			vkCmdBeginRenderPass(CommandBuffers[i], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
+			vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-			// Bind Pipeline to be used in render pass
-			vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicPipeline);
+			// Dynamic Offset Amount
+			uint32_t DynamicOffset = static_cast<uint32_t>(DrawCallUniformAlignment) * j;
+
+			// Bind Descriptor sets
+			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+				0, 1,						// One descriptor for each draw
+				&DescriptorSets[ImageIndex],
+				1, &DynamicOffset					// Dynamic offsets
+			);
+
+			// Push constant to given shader stage directly (No Buffer)
+			glm::mat4 MVP = FrameData.PVMatrix * Mesh->GetDrawcall().ModelMatrix;
+			vkCmdPushConstants(CB, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+				0,
+				sizeof(glm::mat4),					// Size of data being pushed
+				&MVP);								// Actual data being pushed
 			/*
-				Deferred shading example:
-				G-Buffer pipeline, stores all data to multiple attachments
-				Switch to another pipeline, do lighting
-				Switch to another pipeline, do HDR
-				...
-			*/
+			vkCmdDraw(CB[i],
+				Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
+				1,						// For drawing same object multiple times
+				0, 0);*/
 
-			for (size_t j = 0; j < RenderList.size(); ++j)
-			{
-
-				VkBuffer VertexBuffers[] = { RenderList[j]->GetVertexBuffer() };			// Buffers to bind
-				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-
-				// Bind vertex data
-				vkCmdBindVertexBuffers(CommandBuffers[i], 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
-
-				// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
-				vkCmdBindIndexBuffer(CommandBuffers[i], RenderList[j]->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-				// Dynamic Offset Amount
-				uint32_t DynamicOffset = static_cast<uint32_t>(DrawCallUniformAlignment) * j;
-
-				// Bind Descriptor sets
-				vkCmdBindDescriptorSets(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-					0, 1,						// One descriptor for each draw
-					&DescriptorSets[i],
-					1, &DynamicOffset					// Dynamic offsets
-				);
-				/*
-				vkCmdDraw(CommandBuffers[i],
-					Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
-					1,						// For drawing same object multiple times
-					0, 0);*/
-
-					// Execute pipeline, Index draw
-				vkCmdDrawIndexed(CommandBuffers[i], RenderList[j]->GetIndexCount(), 1, 0, 0, 0);
-			}
-
-			// End Render Pass
-			vkCmdEndRenderPass(CommandBuffers[i]);
-
-
-			Result = vkEndCommandBuffer(CommandBuffers[i]);
-			RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", i);
+				// Execute pipeline, Index draw
+			vkCmdDrawIndexed(CB, Mesh->GetIndexCount(), 1, 0, 0, 0);
 		}
+
+		// End Render Pass
+		vkCmdEndRenderPass(CB);
+
+
+		Result = vkEndCommandBuffer(CB);
+		RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", ImageIndex);
+
 	}
 
 	void VKRenderer::allocateDynamicBufferTransferSpace()

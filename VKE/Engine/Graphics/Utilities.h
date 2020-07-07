@@ -4,7 +4,13 @@
 #include "GLFW/glfw3.h"
 #include "glm/glm.hpp"
 
+#ifdef _DEBUG
 #define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {throw std::runtime_error(Message);}
+#else
+#define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {printf(Message);}
+#endif // _DEBUG
+
+
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
 #define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
 

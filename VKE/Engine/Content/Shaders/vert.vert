@@ -17,10 +17,16 @@ layout(binding = 1) uniform sDrawcallData
 {
     mat4 ModelMatrix;
 };
+
+layout(push_constant) uniform sPushModel
+{
+    mat4 MVP;
+};
+
 layout (location = 0) out vec3 fragCol;
 
 void main()
 {
-    gl_Position = PVMatrix * ModelMatrix * vec4(pos, 1.0);
+    gl_Position = MVP * vec4(pos, 1.0);
     fragCol = col;
 }
