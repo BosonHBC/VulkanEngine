@@ -3,8 +3,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 #include <vector>
-#include "../BufferFormats.h"
-#include "../Utilities.h"
+#include "BufferFormats.h"
+#include "Utilities.h"
+#include "Buffer/Buffer.h"
 
 namespace VKE
 {
@@ -23,21 +24,18 @@ namespace VKE
 
 		void cleanUp();
 
-		uint32_t GetVertexCount() const { return VertexBuffer.Count; }
-		VkBuffer GetVertexBuffer() const { return VertexBuffer.Buffer; }
+		uint32_t GetVertexCount() const { return VertexCount; }
+		VkBuffer GetVertexBuffer() const { return VertexBuffer.GetBuffer(); }
 
-		uint32_t GetIndexCount() const { return IndexBuffer.Count; }
-		VkBuffer GetIndexBuffer() const { return IndexBuffer.Buffer; }
+		uint32_t GetIndexCount() const { return IndexCount; }
+		VkBuffer GetIndexBuffer() const { return IndexBuffer.GetBuffer(); }
 
 		void SetModel(glm::mat4 model) { DrawCallData = model; }
 		BufferFormats::FDrawCall GetDrawcall() const { return DrawCallData; }
 	private:
-		struct FMeshBuffer
-		{
-			uint32_t Count;
-			VkBuffer Buffer;
-			VkDeviceMemory DeviceMemory;
-		} VertexBuffer, IndexBuffer;
+
+		uint32_t VertexCount, IndexCount;
+		cBuffer VertexBuffer, IndexBuffer;
 		
 		BufferFormats::FDrawCall DrawCallData;
 

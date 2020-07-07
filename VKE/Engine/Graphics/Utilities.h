@@ -5,7 +5,14 @@
 #include "glm/glm.hpp"
 
 #ifdef _DEBUG
-#define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {throw std::runtime_error(Message);}
+#define RESULT_CHECK(Result, Message)					\
+{														\
+	if (Result != VK_SUCCESS)							\
+	{													\
+		throw std::runtime_error(Message);				\
+		assert(false);									\
+	}													\
+}
 #else
 #define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {printf(Message);}
 #endif // _DEBUG
@@ -30,7 +37,7 @@ namespace VKE
 	const bool EnableValidationLayers = true;
 #endif
 	// Device Extensions' name
-	const std::vector<const char*> DeviceExtensions = 
+	const std::vector<const char*> DeviceExtensions =
 	{
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
@@ -53,7 +60,7 @@ namespace VKE
 		glm::vec3 Position;		// Vertex Position (x,y,z)
 		glm::vec3 Color;
 	};
-	
+
 	struct FMainDevice
 	{
 		VkPhysicalDevice PD;		// Physical Device
@@ -95,7 +102,7 @@ namespace VKE
 		VkFormat ImageFormat;								// enum
 	};
 
-	struct FShaderModuleScopeGuard 
+	struct FShaderModuleScopeGuard
 	{
 		FShaderModuleScopeGuard() {};
 		FShaderModuleScopeGuard(const FShaderModuleScopeGuard& iOther) = delete;
@@ -111,11 +118,11 @@ namespace VKE
 	// ================================================
 	// =============== Global Functions =============== 
 	// ================================================
-	
+
 	// Create buffer and allocate memory for any specific usage type of buffer
 	bool CreateBufferAndAllocateMemory(FMainDevice MainDevice, VkDeviceSize BufferSize, VkBufferUsageFlags Flags, VkMemoryPropertyFlags Properties, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
 	// Find a valid memory type index
-	uint32_t FindMemoryTypeIndex(FMainDevice MainDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PD, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 	// Copy data from src buffer to dst buffer
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
 		VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize);

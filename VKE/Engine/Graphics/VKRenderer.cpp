@@ -896,11 +896,11 @@ namespace VKE
 		VkDescriptorPoolSize PoolSizes[PoolSizeCount] = {};
 		// Frame pool (Uniform buffer)
 		PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		PoolSizes[0].descriptorCount = static_cast<uint32_t>(UniformBuffers_Frame.size());
+		PoolSizes[0].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
 
 		// Drawcall pool (Dynamic uniform buffer)
 		PoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		PoolSizes[1].descriptorCount = static_cast<uint32_t>(DUniformBuffers_Drawcall.size());
+		PoolSizes[1].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -932,7 +932,7 @@ namespace VKE
 		for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 		{
 			const uint32_t DescriptorCount = 2;
-			// Data about connection between binding and buffer
+			// Data about connection between Descriptor and buffer
 			VkWriteDescriptorSet SetWrites[DescriptorCount] = {};
 
 			// FRAME DESCRIPTOR
@@ -1239,7 +1239,7 @@ namespace VKE
 	void VKRenderer::allocateDynamicBufferTransferSpace()
 	{
 		// Calculate alignment of drawcall data
-		DrawCallUniformAlignment = (sizeof(BufferFormats::FDrawCall) + MinUniformBufferOffset) & ~(MinUniformBufferOffset - 1);
+		DrawCallUniformAlignment = static_cast<size_t>((sizeof(BufferFormats::FDrawCall) + MinUniformBufferOffset) & ~(MinUniformBufferOffset - 1));
 
 		// Create space in memory to hold dynamic buffer that is aligned to our required alignment and holds MAX_OBJECTS
 		pDrawcallTransferSpace = reinterpret_cast<BufferFormats::FDrawCall*>(_aligned_malloc(DrawCallUniformAlignment * MAX_OBJECTS, DrawCallUniformAlignment));
