@@ -6,6 +6,7 @@
 
 namespace VKE
 {
+	VkDeviceSize MinUniformBufferOffset = 0;
 
 	VkSurfaceFormatKHR FSwapChainDetail::getSurfaceFormat() const
 	{
@@ -118,7 +119,7 @@ namespace VKE
 		MemAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		MemAllocInfo.allocationSize = MemRequirements.size;
 		MemAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(
-			MainDevice,
+			MainDevice.PD,
 			MemRequirements.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
 			Properties									// Memory property, is this local_bit or host_bit or others
 			);
@@ -137,11 +138,11 @@ namespace VKE
 		return true;
 	}
 
-	uint32_t FindMemoryTypeIndex(FMainDevice MainDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties)
+	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PD, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties)
 	{
 		// Get properties of physical device memory
 		VkPhysicalDeviceMemoryProperties MemProperties;
-		vkGetPhysicalDeviceMemoryProperties(MainDevice.PD, &MemProperties);
+		vkGetPhysicalDeviceMemoryProperties(PD, &MemProperties);
 
 		for (uint32_t i = 0; i < MemProperties.memoryTypeCount; ++i)
 		{
@@ -204,6 +205,16 @@ namespace VKE
 
 		// Free temporary command buffer back to pool
 		vkFreeCommandBuffers(LD, TransferCommandPool, 1, &TransferCommandBuffer);
+	}
+
+	void SetMinUniformOffsetAlignment(VkDeviceSize Size)
+	{
+		MinUniformBufferOffset = Size;
+	}
+
+	VkDeviceSize GetMinUniformOffsetAlignment()
+	{
+		return MinUniformBufferOffset;
 	}
 
 	namespace FileIO {

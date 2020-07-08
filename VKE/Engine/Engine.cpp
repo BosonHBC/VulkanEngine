@@ -28,13 +28,13 @@ namespace VKE {
 
 	int init()
 	{
-		int result = 0;
+		int result = EXIT_SUCCESS;
 		initGLFW();
 
 		g_renderer = new VKRenderer();
-		if (!(result = g_renderer->init(g_Window)))
+		if (g_renderer->init(g_Window) == EXIT_FAILURE)
 		{
-			return result;
+			return EXIT_FAILURE;
 		}
 		
 		return result;
