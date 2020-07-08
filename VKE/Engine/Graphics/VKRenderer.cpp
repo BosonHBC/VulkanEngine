@@ -47,8 +47,16 @@ namespace VKE
 			createLogicalDevice();
 			createSwapChain();
 			createRenderPass();
-			createDescriptorSetLayout();
-			createPushConstantRange();
+
+			// Descriptor set and push constant related
+			{
+				// fill the Descriptor list, this function should be call first
+				createUniformBuffer();
+				createDescriptorPool();
+				createDescriptorSetLayout();
+				createDescriptorSets();
+				createPushConstantRange();
+			}
 			createGraphicsPipeline();
 			createFrameBuffer();
 			createCommandPool();
@@ -65,13 +73,6 @@ namespace VKE
 			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices2, Indices));
 
 			createCommandBuffers();
-			// Descriptor set related
-			{
-				allocateDynamicBufferTransferSpace();
-				createUniformBuffer();
-				createDescriptorPool();
-				createDescriptorSets();
-			}
 			createSynchronization();
 		}
 		catch (const std::runtime_error &e)
@@ -158,8 +159,6 @@ namespace VKE
 		// wait until the device is not doing anything (nothing on any queue)
 		vkDeviceWaitIdle(MainDevice.LD);
 
-		_aligned_free(pDrawcallTransferSpace);
-
 		// Clean up render list
 		for (auto Mesh : RenderList)
 		{
@@ -187,10 +186,8 @@ namespace VKE
 
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
-				vkDestroyBuffer(MainDevice.LD, UniformBuffers_Frame[i], nullptr);
-				vkFreeMemory(MainDevice.LD, UniformBufferMemories_Frame[i], nullptr);
-				vkDestroyBuffer(MainDevice.LD, DUniformBuffers_Drawcall[i], nullptr);
-				vkFreeMemory(MainDevice.LD, DUniformBufferMemories_Drawcall[i], nullptr);
+				Descriptor_Frame[i].cleanUp();
+				Descriptor_Drawcall[i].cleanUp();
 
 			}
 		}
@@ -297,8 +294,8 @@ namespace VKE
 		// Information about the device itself (ID, name, type, vendor, etc)
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(MainDevice.PD, &deviceProperties);
-		MinUniformBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;
-
+		SetMinUniformOffsetAlignment(deviceProperties.limits.minUniformBufferOffsetAlignment);
+		printf("Min Uniform Buffer Offset Alignment: %d\n", static_cast<int>(GetMinUniformOffsetAlignment()));
 	}
 
 	void VKRenderer::createLogicalDevice()
@@ -531,18 +528,10 @@ namespace VKE
 		const uint32_t BindingCount = 2;
 		VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
 		// FrameData binding info
-		Bindings[0].binding = 0;											// binding in the uniform struct in shader
-		Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;		// Type of descriptor, Uniform, dynamic_uniform, image_sampler ...
-		Bindings[0].descriptorCount = 1;									// Number of descriptor for binding
-		Bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
-		Bindings[0].pImmutableSamplers = nullptr;							// for textures setting, if texture is immutable or not
+		Bindings[0] = Descriptor_Frame[0].ConstructDescriptorSetLayoutBinding();
 
 		// Drawcall data binding info
-		Bindings[1].binding = 1;
-		Bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		Bindings[1].descriptorCount = 1;
-		Bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		Bindings[1].pImmutableSamplers = nullptr;
+		Bindings[1] = Descriptor_Drawcall[0].ConstructDescriptorSetLayoutBinding();
 
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo;
 		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -869,44 +858,43 @@ namespace VKE
 
 	void VKRenderer::createUniformBuffer()
 	{
-		VkDeviceSize BufferSizeFrame = sizeof(BufferFormats::FFrame);
-		VkDeviceSize BufferSizeDrawcall = DrawCallUniformAlignment * MAX_OBJECTS;
-
 		// One uniform buffer for each image (and by extension, command buffer)
 		size_t Size = SwapChain.Images.size();
-		UniformBuffers_Frame.resize(Size);
-		UniformBufferMemories_Frame.resize(Size);
-		DUniformBuffers_Drawcall.resize(Size);
-		DUniformBufferMemories_Drawcall.resize(Size);
+		Descriptor_Frame.resize(Size);
+		Descriptor_Drawcall.resize(Size);
 
 		// Create UniformBuffers
 		for (size_t i = 0; i < Size; ++i)
 		{
-			CreateBufferAndAllocateMemory(MainDevice, BufferSizeFrame, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, UniformBuffers_Frame[i], UniformBufferMemories_Frame[i]);
-			CreateBufferAndAllocateMemory(MainDevice, BufferSizeDrawcall, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, DUniformBuffers_Drawcall[i], DUniformBufferMemories_Drawcall[i]);
+			// Only needs 1 FFrame per pass
+			Descriptor_Frame[i].SetDescriptorBufferRange(sizeof(BufferFormats::FFrame), 1);
+			Descriptor_Frame[i].CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, VK_SHADER_STAGE_VERTEX_BIT,
+				MainDevice.PD, MainDevice.LD);
+			
+			// Needs MAX_OBJECTS FDrawcall per pass
+			Descriptor_Drawcall[i].SetDescriptorBufferRange(sizeof(BufferFormats::FDrawCall), MAX_OBJECTS);
+			Descriptor_Drawcall[i].CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT,
+				MainDevice.PD, MainDevice.LD);
 		}
 	}
 
 	void VKRenderer::createDescriptorPool()
 	{
-		const uint32_t PoolSizeCount = 2;
 		// Type of descriptors + how many DESCRIPTORS, not DESCRIPTOR Sets (combined makes the pool size)
-		VkDescriptorPoolSize PoolSizes[PoolSizeCount] = {};
-		// Frame pool (Uniform buffer)
-		PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		PoolSizes[0].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
-
-		// Drawcall pool (Dynamic uniform buffer)
-		PoolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		PoolSizes[1].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
+		std::vector<VkDescriptorPoolSize> PoolSizes;
+		for (VkDescriptorType Type : cDescriptor::GetDescriptorTypeSet())
+		{
+			VkDescriptorPoolSize PoolSize = {};
+			PoolSize.type = Type;
+			PoolSize.descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
+			PoolSizes.push_back(PoolSize);
+		}
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size());
-		PoolCreateInfo.poolSizeCount = PoolSizeCount;
-		PoolCreateInfo.pPoolSizes = PoolSizes;
+		PoolCreateInfo.poolSizeCount = PoolSizes.size();
+		PoolCreateInfo.pPoolSizes = PoolSizes.data();
 
 		VkResult Result = vkCreateDescriptorPool(MainDevice.LD, &PoolCreateInfo, nullptr, &DescriptorPool);
 		RESULT_CHECK(Result, "Failed to create a Descriptor Pool");
@@ -936,40 +924,9 @@ namespace VKE
 			VkWriteDescriptorSet SetWrites[DescriptorCount] = {};
 
 			// FRAME DESCRIPTOR
-			{
-				// Info of the buffer this descriptor is trying connecting with 
-				VkDescriptorBufferInfo Frame_BufferInfo = {};
-				Frame_BufferInfo.buffer = UniformBuffers_Frame[i];					// Buffer to get data from
-				Frame_BufferInfo.offset = 0;										// offset of the data
-				Frame_BufferInfo.range = sizeof(BufferFormats::FFrame);				// Size of data
-
-				// Frame data write info
-				SetWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				SetWrites[0].dstSet = DescriptorSets[i];							// Descriptor set to update
-				SetWrites[0].dstBinding = 0;										// matches with binding on layout/shader
-				SetWrites[0].dstArrayElement = 0;									// Index in array to update
-				SetWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of the descriptor, should match the descriptor set type
-				SetWrites[0].descriptorCount = 1;									// Amount to update
-				SetWrites[0].pBufferInfo = &Frame_BufferInfo;						// Information about buffer data to bind
-			}
-
+			SetWrites[0] = Descriptor_Frame[i].ConstructDescriptorBindingInfo(DescriptorSets[i]);
 			// DRAWCALL DESCRIPTOR
-			{
-				// Info of the buffer this descriptor is trying connecting with 
-				VkDescriptorBufferInfo Drawcall_BufferInfo = {};
-				Drawcall_BufferInfo.buffer = DUniformBuffers_Drawcall[i];
-				Drawcall_BufferInfo.offset = 0;
-				Drawcall_BufferInfo.range = DrawCallUniformAlignment;				// Single piece of data, not the whole data
-
-				// Frame data write info
-				SetWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				SetWrites[1].dstSet = DescriptorSets[i];
-				SetWrites[1].dstBinding = 1;
-				SetWrites[1].dstArrayElement = 0;
-				SetWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-				SetWrites[1].descriptorCount = 1;
-				SetWrites[1].pBufferInfo = &Drawcall_BufferInfo;
-			}
+			SetWrites[1] = Descriptor_Drawcall[i].ConstructDescriptorBindingInfo(DescriptorSets[i]);
 
 			// Update the descriptor sets with new buffer / binding info
 			vkUpdateDescriptorSets(MainDevice.LD, DescriptorCount, SetWrites,
@@ -981,24 +938,19 @@ namespace VKE
 	void VKRenderer::updateUniformBuffers(uint32_t ImageIndex)
 	{
 		// Copy Frame data
-		void * Data = nullptr;
-		vkMapMemory(MainDevice.LD, UniformBufferMemories_Frame[ImageIndex], 0, sizeof(BufferFormats::FFrame), 0, &Data);
-		memcpy(Data, &FrameData, sizeof(BufferFormats::FFrame));
-		vkUnmapMemory(MainDevice.LD, UniformBufferMemories_Frame[ImageIndex]);
+		Descriptor_Frame[ImageIndex].UpdateBufferData(&FrameData);
 
 		// Update model data to pDrawcallTransferSpace
 		for (size_t i = 0; i < RenderList.size(); ++i)
 		{
 			using namespace BufferFormats;
-			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(pDrawcallTransferSpace) + (i * DrawCallUniformAlignment));
+			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[ImageIndex].GetAllocatedMemory()) + (i * Descriptor_Drawcall[ImageIndex].GetSlotSize()));
 			*Drawcall = RenderList[i]->GetDrawcall();
 		}
 		// Copy Model data
 		// Reuse void* Data
-		size_t DBufferSize = DrawCallUniformAlignment * RenderList.size();
-		vkMapMemory(MainDevice.LD, DUniformBufferMemories_Drawcall[ImageIndex], 0, DBufferSize, 0, &Data);
-		memcpy(Data, pDrawcallTransferSpace, DBufferSize);
-		vkUnmapMemory(MainDevice.LD, DUniformBufferMemories_Drawcall[ImageIndex]);
+		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[ImageIndex].GetSlotSize()) * RenderList.size();
+		Descriptor_Drawcall[ImageIndex].UpdatePartialData(Descriptor_Drawcall[ImageIndex].GetAllocatedMemory(), 0, DBufferSize);
 	}
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
@@ -1202,7 +1154,7 @@ namespace VKE
 			vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 			// Dynamic Offset Amount
-			uint32_t DynamicOffset = static_cast<uint32_t>(DrawCallUniformAlignment) * j;
+			uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[ImageIndex].GetSlotSize()) * j;
 
 			// Bind Descriptor sets
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
@@ -1236,14 +1188,6 @@ namespace VKE
 
 	}
 
-	void VKRenderer::allocateDynamicBufferTransferSpace()
-	{
-		// Calculate alignment of drawcall data
-		DrawCallUniformAlignment = static_cast<size_t>((sizeof(BufferFormats::FDrawCall) + MinUniformBufferOffset) & ~(MinUniformBufferOffset - 1));
-
-		// Create space in memory to hold dynamic buffer that is aligned to our required alignment and holds MAX_OBJECTS
-		pDrawcallTransferSpace = reinterpret_cast<BufferFormats::FDrawCall*>(_aligned_malloc(DrawCallUniformAlignment * MAX_OBJECTS, DrawCallUniformAlignment));
-	}
 
 	FQueueFamilyIndices VKRenderer::getQueueFamilies(const VkPhysicalDevice& device)
 	{

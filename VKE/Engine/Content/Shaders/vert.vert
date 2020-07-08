@@ -27,6 +27,6 @@ layout (location = 0) out vec3 fragCol;
 
 void main()
 {
-    gl_Position = MVP * vec4(pos, 1.0);
+    gl_Position = PVMatrix * ModelMatrix * vec4(pos, 1.0);
     fragCol = col;
 }

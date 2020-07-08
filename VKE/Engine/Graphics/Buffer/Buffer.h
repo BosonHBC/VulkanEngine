@@ -16,6 +16,7 @@ namespace VKE
 
 		const VkBuffer& GetBuffer() const { return Buffer; }
 		const VkBuffer& GetMemory() const { return Memory; }
+		const VkDevice& GetDevice() const { return LogicalDevice; }
 		VkDeviceSize BufferSize() const { return MemorySize; }
 
 	protected:

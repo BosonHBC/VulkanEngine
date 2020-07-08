@@ -1,7 +1,7 @@
 #pragma once
+#include <set>
 
 #include "Buffer/Buffer.h"
-#include <set>
 namespace VKE
 {
 	struct FDescriptorInfo
@@ -17,9 +17,10 @@ namespace VKE
 	public:
 		/** Static functions */
 		static const std::set<VkDescriptorType>& GetDescriptorTypeSet();
+		
 		/** Constructors */
 		cDescriptor() {};
-		~cDescriptor() {};
+		virtual ~cDescriptor() {};
 
 		/* Create Function */
 		// Store descriptor information, create buffer, allocate device memory
@@ -27,25 +28,40 @@ namespace VKE
 			VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,		// Properties of the descriptor
 			VkPhysicalDevice PD, VkDevice LD										// Properties for creating a buffer
 		);
+		
 		// Calculate the buffer size, different types of buffers should have different size calculations
-		virtual void SetDescriptorBufferRange(size_t BufferFormatSize, uint32_t ObjectCount);
+		virtual void SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount);
+		
+		/* Update Function */
+		// Update the full memory block
+		void UpdateBufferData(void* srcData);
+		void UpdatePartialData(void * srcData, VkDeviceSize Offset, VkDeviceSize Size);
 
 		/* Clean up Function */
 		virtual void cleanUp();
 
 		/** Getters */
 		const FDescriptorInfo& GetDescriptorInfo() const { return DescriptorInfo; }
-
-		// Helper function when creating descriptor set
+		const VkDeviceMemory& GetBufferMemory() const { return Buffer.GetMemory(); }
+		const VkDeviceSize& GetSlotSize() const { return BufferInfo.range; }
+		
+		// Helper function to get information when creating descriptor set
 		VkWriteDescriptorSet ConstructDescriptorBindingInfo(VkDescriptorSet DescriptorSet);
-
+		
+		// Helper function to get information when creating descriptor set layout
+		virtual VkDescriptorSetLayoutBinding ConstructDescriptorSetLayoutBinding();
+	
 	protected:
 		// Holding actual data of descriptor in GPU
 		cBuffer Buffer;
+		
+		// Information of this descriptor
 		FDescriptorInfo DescriptorInfo;
+		
+		// Info of the buffer this descriptor is trying connecting with 
+		// Buffer size: considering alignment, also used for allocating memory in both CPU and GPu
+		VkDescriptorBufferInfo BufferInfo;
 
-		// Buffer size considering alignment, also used for allocating memory in both CPU and GPu
-		VkDeviceSize BufferSize;
 		// Object count should be considered in allocating memory
 		uint32_t ObjectCount;
 

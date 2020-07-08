@@ -57,6 +57,9 @@
     <ClCompile Include="Graphics\Descriptors\Descriptor.cpp">
       <Filter>Source Files\Graphics\Descriptors</Filter>
     </ClCompile>
+    <ClCompile Include="Graphics\Descriptors\Descriptor_Dynamic.cpp">
+      <Filter>Source Files\Graphics\Descriptors</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h">
@@ -81,6 +84,9 @@
       <Filter>Source Files\Graphics\Buffer</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\Descriptors\Descriptor.h">
+      <Filter>Source Files\Graphics\Descriptors</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Descriptors\Descriptor_Dynamic.h">
       <Filter>Source Files\Graphics\Descriptors</Filter>
     </ClInclude>
   </ItemGroup>

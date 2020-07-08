@@ -6,6 +6,7 @@
 
 namespace VKE
 {
+	VkDeviceSize MinUniformBufferOffset = 0;
 
 	VkSurfaceFormatKHR FSwapChainDetail::getSurfaceFormat() const
 	{
@@ -204,6 +205,16 @@ namespace VKE
 
 		// Free temporary command buffer back to pool
 		vkFreeCommandBuffers(LD, TransferCommandPool, 1, &TransferCommandBuffer);
+	}
+
+	void SetMinUniformOffsetAlignment(VkDeviceSize Size)
+	{
+		MinUniformBufferOffset = Size;
+	}
+
+	VkDeviceSize GetMinUniformOffsetAlignment()
+	{
+		return MinUniformBufferOffset;
 	}
 
 	namespace FileIO {

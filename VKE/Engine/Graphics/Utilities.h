@@ -47,8 +47,7 @@ namespace VKE
 	// Max objects are allowed in the scene
 	const int MAX_OBJECTS = 2;
 
-	static VkDeviceSize MinUniformBufferOffset;
-	static size_t DrawCallUniformAlignment;
+	
 
 	// =======================================
 	// =============== Structs =============== 
@@ -126,6 +125,9 @@ namespace VKE
 	// Copy data from src buffer to dst buffer
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
 		VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize);
+
+	void SetMinUniformOffsetAlignment(VkDeviceSize Size);
+	VkDeviceSize GetMinUniformOffsetAlignment();
 	namespace FileIO
 	{
 		std::vector<char> ReadFile(const std::string& filename);

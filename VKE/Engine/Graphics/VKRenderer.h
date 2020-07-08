@@ -6,7 +6,7 @@
 #include <vector>
 #include "Utilities.h"
 #include "BufferFormats.h"
-
+#include "Descriptors/Descriptor_Dynamic.h"
 
 namespace VKE
 {
@@ -66,12 +66,8 @@ namespace VKE
 		VkDescriptorPool DescriptorPool;
 		std::vector<VkDescriptorSet> DescriptorSets;
 
-		std::vector<VkBuffer> UniformBuffers_Frame;
-		std::vector<VkDeviceMemory> UniformBufferMemories_Frame;
-
-		std::vector<VkBuffer> DUniformBuffers_Drawcall;					// D at the beginning stands for "Dynamic".
-		std::vector<VkDeviceMemory> DUniformBufferMemories_Drawcall;
-		BufferFormats::FDrawCall* pDrawcallTransferSpace;
+		std::vector<cDescriptor> Descriptor_Frame;
+		std::vector<cDescriptor_Dynamic> Descriptor_Drawcall;
 
 		/** Create functions */
 		void createInstance();
@@ -106,9 +102,6 @@ namespace VKE
 		/** Record functions */
 		void recordCommands(uint32_t ImageIndex);
 
-		/** Allocation functions*/
-		void allocateDynamicBufferTransferSpace();
-	
 		/** Getters */
 		FQueueFamilyIndices getQueueFamilies(const VkPhysicalDevice& device);
 		FSwapChainDetail getSwapChainDetail(const VkPhysicalDevice& device);

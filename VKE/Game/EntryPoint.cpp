@@ -8,6 +8,10 @@ int main()
 {
 	int exitCode = 0;
 	exitCode = VKE::init();
+	if (exitCode == EXIT_FAILURE) 
+	{
+		return exitCode;
+	}
 
 	VKE::run();
 
