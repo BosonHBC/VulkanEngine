@@ -35,7 +35,7 @@ namespace VKE
 	void cDescriptor_Dynamic::allocateDynamicBufferTransferSpace()
 	{
 		// Create space in memory to hold dynamic buffer that is aligned to our required alignment
-		pAllocatedTransferSpace = _aligned_malloc(BufferInfo.range * ObjectCount, BufferInfo.range);
+		pAllocatedTransferSpace = _aligned_malloc(static_cast<size_t>(BufferInfo.range * ObjectCount), static_cast<size_t>(BufferInfo.range));
 	}
 
 }
