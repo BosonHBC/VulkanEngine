@@ -47,6 +47,11 @@ namespace VKE
 		std::vector<VkFramebuffer> SwapChainFramebuffers;	
 		std::vector<VkCommandBuffer> CommandBuffers;		
 
+		VkFormat DepthFormat;
+		VkImage DepthBufferImage;
+		VkDeviceMemory DepthBufferImageMemory;
+		VkImageView DepthBufferImageView;
+
 		// -Pipeline
 		VkRenderPass RenderPass;
 		VkPipeline GraphicPipeline;
@@ -79,6 +84,7 @@ namespace VKE
 		void createDescriptorSetLayout();
 		void createPushConstantRange();
 		void createGraphicsPipeline();
+		void createDepthBufferImage();
 		void createFrameBuffer();
 		void createCommandPool();
 		void createCommandBuffers();
@@ -95,10 +101,10 @@ namespace VKE
 		bool checkValidationLayerSupport();
 		bool checkDeviceExtensionSupport(const VkPhysicalDevice& device);
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
-		
+		VkFormat chooseSupportedFormat(const std::vector<VkFormat>& Formats, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
 		/** -Component Create functions */
 		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
-
+		bool createImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
 		/** Record functions */
 		void recordCommands(uint32_t ImageIndex);
 
