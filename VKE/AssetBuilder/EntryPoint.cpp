@@ -37,10 +37,14 @@ bool CopyFile(const std::string& iFileName)
 	}
 	destFilePath += iFileName;
 	// Copy files
-	if (CopyFile(sourceFile.c_str(), destFilePath.c_str(), FALSE) == 0)
+	if (CopyFile(sourceFile.c_str(), destFilePath.c_str(), FALSE) == FALSE)
 	{
-		printf("Fail to copy file: %s", iFileName.c_str());
+		printf("Fail to copy file: %s\n", iFileName.c_str());
 		return false;
+	}
+	else
+	{
+		printf("File copied: %s\n", iFileName.c_str());
 	}
 	return true;
 	
@@ -48,7 +52,7 @@ bool CopyFile(const std::string& iFileName)
 
 int main(int argc, char *argv[])
 {
-	for (int i = 0; i < argc; ++i)
+	for (int i = 1; i < argc; ++i)
 	{
 		CopyFile(argv[i]);
 	}

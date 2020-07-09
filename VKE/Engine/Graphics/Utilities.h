@@ -32,7 +32,7 @@ namespace VKE
 	};
 
 #ifdef NDEBUG
-	const bool EnableValidationLayers = false;
+	const bool EnableValidationLayers = true;
 #else
 	const bool EnableValidationLayers = true;
 #endif
