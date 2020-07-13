@@ -1,7 +1,43 @@
-#include "cMesh.h"
+#include "Mesh.h"
+
+#include <map>
+
 
 namespace VKE
 {
+	std::map<std::string, std::shared_ptr<VKE::cMesh>> s_MeshContainer;
+	uint32_t s_CreatedResourcesCount = 0;
+	
+	std::shared_ptr<cMesh> cMesh::Load(const std::string& iMeshName, const FMainDevice& iMainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices)
+	{
+		// Not exist
+		if (s_MeshContainer.find(iMeshName) == s_MeshContainer.end())
+		{
+			auto newMesh = std::make_shared<cMesh>(iMainDevice, TransferQueue, TransferCommandPool, iVertices, iIndices);
+
+			s_MeshContainer.insert({ iMeshName, newMesh });
+			return newMesh;
+		}
+		else
+		{
+			return s_MeshContainer.at(iMeshName);
+		}
+	}
+
+	void cMesh::Free()
+	{
+		s_MeshContainer.clear();
+	}
+
+	cMesh::~cMesh()
+	{
+		--s_CreatedResourcesCount;
+		if (s_CreatedResourcesCount == 0)
+		{
+			printf("All mesh assets freed.\n");
+		}
+	}
+
 	cMesh::cMesh(const FMainDevice& iMainDevice,
 		VkQueue TransferQueue, VkCommandPool TransferCommandPool,
 		const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices)
@@ -11,7 +47,8 @@ namespace VKE
 		MainDevice = iMainDevice;
 		createVertexBuffer(iVertices, TransferQueue, TransferCommandPool);
 		createIndexBuffer(iIndices, TransferQueue, TransferCommandPool);
-		DrawCallData.ModelMatrix = glm::mat4(1.0f);
+
+		++s_CreatedResourcesCount;
 	}
 
 	void cMesh::cleanUp()

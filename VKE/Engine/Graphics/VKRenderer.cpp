@@ -1,7 +1,8 @@
 #include "VKRenderer.h"
 
-#include "Mesh/cMesh.h"
+#include "Mesh/Mesh.h"
 #include "../Transform/Transform.h"
+#include "Model/Model.h"
 
 #include <stdexcept>
 #include "stdlib.h"
@@ -10,32 +11,11 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "assimp/Importer.hpp"
+#include <assimp/scene.h>
+#include "assimp/postprocess.h"
 namespace VKE
 {
-	// Vertex data
-	std::vector<FVertex> Vertices1 =
-	{
-		{{-0.4, -0.2, 0.3}, {1.0, 0.0, 0.0}},		// 0
-		{{-0.4, 0.2, 0.3}, {0.0, 1.0, 0.0}},			// 1
-		{{-0.8, 0.2, 0.3}, {0.0, 0.0, 1.0}},		// 2
-		{{-0.8, -0.2, 0.3}, {1.0, 1.0, 0.0}},		// 3
-
-	};
-	std::vector<FVertex> Vertices2 =
-	{
-		{{0.8, -0.4, 0.0}, {1.0, 0.0, 0.0}},		// 0
-		{{0.8, 0.4, 0.0}, {0.0, 1.0, 0.0}},			// 1
-		{{0.2, 0.4, 0.0}, {0.0, 0.0, 1.0}},			// 2
-		{{0.2, -0.4, 0.0}, {1.0, 1.0, 0.0}},		// 3
-
-	};
-	// Index data
-	std::vector<uint32_t> Indices =
-	{
-		3, 0, 1,
-		1, 2, 3
-	};
-
 	int VKRenderer::init(GLFWwindow* iWindow)
 	{
 		window = iWindow;
@@ -57,22 +37,12 @@ namespace VKE
 				createDescriptorSets();
 				createPushConstantRange();
 			}
+
 			createGraphicsPipeline();
 
 			createFrameBuffer();
 			createCommandPool();
-
-			//set up MVP
-			glm::mat4 Projection = glm::perspective(glm::radians(45.f), (float)SwapChain.Extent.width / (float)SwapChain.Extent.height, 0.1f, 100.f);
-			Projection[1][1] *= -1;				// inverting Y axis since glm treats
-			FrameData = BufferFormats::FFrame(
-				Projection,
-				glm::lookAt(glm::vec3(3.f, 1.f, 2.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
-			);
-			// Create Mesh
-			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices1, Indices));
-			RenderList.push_back(new cMesh(MainDevice, graphicQueue, GraphicsCommandPool, Vertices2, Indices));
-
+			createTextureSampler();
 			createCommandBuffers();
 			createSynchronization();
 		}
@@ -82,16 +52,23 @@ namespace VKE
 			return EXIT_FAILURE;
 		}
 
+		//set up MVP
+		glm::mat4 Projection = glm::perspective(glm::radians(45.f), (float)SwapChain.Extent.width / (float)SwapChain.Extent.height, 0.1f, 100.f);
+		Projection[1][1] *= -1;				// inverting Y axis since glm treats
+		FrameData = BufferFormats::FFrame(
+			Projection,
+			glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
+		);
+
+		// Create Texture
+		createTexture("DefaultWhite.png");
 		return EXIT_SUCCESS;
 	}
 
-	cTransform tempTransform;
 	void VKRenderer::tick(float dt)
 	{
-		tempTransform.gRotate(cTransform::WorldForward, 5 * dt);
-		tempTransform.Update();
-
-		RenderList[0]->SetModel(tempTransform.M());
+		RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
+		RenderList[0]->Transform.Update();
 	}
 
 	void VKRenderer::draw()
@@ -160,13 +137,26 @@ namespace VKE
 		// wait until the device is not doing anything (nothing on any queue)
 		vkDeviceWaitIdle(MainDevice.LD);
 
-		// Clean up render list
-		for (auto Mesh : RenderList)
+		vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
+		vkDestroyDescriptorSetLayout(MainDevice.LD, SamplerSetLayout, nullptr);
+
+		vkDestroySampler(MainDevice.LD, TextureSampler, nullptr);
+		for (size_t i = 0; i < TextureImages.size(); ++i)
 		{
-			Mesh->cleanUp();
-			safe_delete(Mesh);
+			vkDestroyImageView(MainDevice.LD, TextureImageViews[i], nullptr);
+			vkDestroyImage(MainDevice.LD, TextureImages[i], nullptr);
+			vkFreeMemory(MainDevice.LD, TextureImageMemories[i], nullptr);
+		}
+
+		// Clean up render list
+		for (auto Model : RenderList)
+		{
+			Model->cleanUp();
+			safe_delete(Model);
 		}
 		RenderList.clear();
+		// Clear all mesh assets
+		cMesh::Free();
 
 		for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 		{
@@ -338,6 +328,7 @@ namespace VKE
 		// Physical Device Features the Logical Device will use
 		VkPhysicalDeviceFeatures PDFeatures = {};
 		PDFeatures.depthClamp = VK_TRUE;
+		PDFeatures.samplerAnisotropy = VK_TRUE;
 
 		DeviceCreateInfo.pEnabledFeatures = &PDFeatures;
 
@@ -493,10 +484,10 @@ namespace VKE
 
 		ColorAttachmentReferences[0].attachment = 0;										// It can refer to the same attachment, but with different layout
 		ColorAttachmentReferences[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;	// optimal layout for color attachment
-		
+
 		VkAttachmentReference DepthAttachmentReference = {};
-		DepthAttachmentReference.attachment = 1;										
-		DepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;	
+		DepthAttachmentReference.attachment = 1;
+		DepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		// 2. Create sub-passes
 		VkSubpassDescription Subpass = {};
@@ -548,23 +539,48 @@ namespace VKE
 
 	void VKRenderer::createDescriptorSetLayout()
 	{
-		const uint32_t BindingCount = 2;
-		VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
-		// FrameData binding info
-		Bindings[0] = Descriptor_Frame[0].ConstructDescriptorSetLayoutBinding();
+		// UNIFORM DESCRIPTOR SET LAYOUT
+		{
+			const uint32_t BindingCount = 2;
+			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
+			// FrameData binding info
+			Bindings[0] = Descriptor_Frame[0].ConstructDescriptorSetLayoutBinding();
 
-		// Drawcall data binding info
-		Bindings[1] = Descriptor_Drawcall[0].ConstructDescriptorSetLayoutBinding();
+			// Drawcall data binding info
+			Bindings[1] = Descriptor_Drawcall[0].ConstructDescriptorSetLayoutBinding();
 
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo;
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = BindingCount;
-		LayoutCreateInfo.pBindings = Bindings;
-		LayoutCreateInfo.pNext = nullptr;
-		LayoutCreateInfo.flags = 0;
+			VkDescriptorSetLayoutCreateInfo LayoutCreateInfo;
+			LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			LayoutCreateInfo.bindingCount = BindingCount;
+			LayoutCreateInfo.pBindings = Bindings;
+			LayoutCreateInfo.pNext = nullptr;
+			LayoutCreateInfo.flags = 0;
 
-		VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &LayoutCreateInfo, nullptr, &DescriptorSetLayout);
-		RESULT_CHECK(Result, "Fail to create descriptor set layout.")
+			VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &LayoutCreateInfo, nullptr, &DescriptorSetLayout);
+			RESULT_CHECK(Result, "Fail to create descriptor set layout.")
+		}
+
+		// SAMPLER DESCRIPTOR LAYOUT
+		{
+			const uint32_t BindingCount = 1;
+			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
+
+			Bindings[0].binding = 0;
+			Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			Bindings[0].descriptorCount = 1;
+			Bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			Bindings[0].pImmutableSamplers = nullptr;
+
+			VkDescriptorSetLayoutCreateInfo TextureLayoutCreateInfo = {};
+			TextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			TextureLayoutCreateInfo.bindingCount = BindingCount;
+			TextureLayoutCreateInfo.pBindings = Bindings;
+			TextureLayoutCreateInfo.pNext = nullptr;
+			TextureLayoutCreateInfo.flags = 0;
+
+			VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &TextureLayoutCreateInfo, nullptr, &SamplerSetLayout);
+			RESULT_CHECK(Result, "Fail to create sampler descriptor set layout.")
+		}
 	}
 
 	void VKRenderer::createPushConstantRange()
@@ -621,7 +637,7 @@ namespace VKE
 																					// VK_VERTEX_INPUT_RATE_INSTANCE : Move to a vertex for the next instance
 
 			// How the data for an attribute is defined within a vertex
-			const uint32_t AttrubuteDescriptionCount = 2;
+			const uint32_t AttrubuteDescriptionCount = 3;
 			VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
 
 			// Position attribute
@@ -634,6 +650,11 @@ namespace VKE
 			AttributeDescriptions[1].location = 1;
 			AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 			AttributeDescriptions[1].offset = offsetof(FVertex, Color);
+			// texture coordinate attribute
+			AttributeDescriptions[2].binding = 0;
+			AttributeDescriptions[2].location = 2;
+			AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+			AttributeDescriptions[2].offset = offsetof(FVertex, TexCoord);
 
 			VertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 			VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
@@ -708,6 +729,8 @@ namespace VKE
 			MSCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 			MSCreateInfo.pNext = nullptr;
 			MSCreateInfo.sampleShadingEnable = VK_FALSE;						// Enable Multi-sampling or not
+			MSCreateInfo.alphaToCoverageEnable = VK_FALSE;						// 
+			MSCreateInfo.alphaToOneEnable = VK_FALSE;							//
 			MSCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;			// Number of samples to use per fragment
 			MSCreateInfo.pSampleMask = nullptr;
 			MSCreateInfo.flags = 0;
@@ -744,9 +767,12 @@ namespace VKE
 			// === Pipeline layout ===
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 
+			const uint32_t SetLayoutCount = 2;
+			VkDescriptorSetLayout Layouts[SetLayoutCount] = { DescriptorSetLayout, SamplerSetLayout };
+
 			PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			PipelineLayoutCreateInfo.setLayoutCount = 1;
-			PipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
+			PipelineLayoutCreateInfo.setLayoutCount = SetLayoutCount;
+			PipelineLayoutCreateInfo.pSetLayouts = Layouts;
 			PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstantRange;
 
@@ -802,7 +828,7 @@ namespace VKE
 				VK_FORMAT_D32_SFLOAT,			// If stencil buffer is not available
 				VK_FORMAT_D24_UNORM_S8_UINT,	// 24 unsigned normalized Depth	
 			},
-			VK_IMAGE_TILING_OPTIMAL, 
+			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 		if (!createImage(SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
@@ -853,6 +879,7 @@ namespace VKE
 
 		VkCommandPoolCreateInfo CommandPoolCreateInfo;
 		CommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		CommandPoolCreateInfo.pNext = nullptr;
 		CommandPoolCreateInfo.queueFamilyIndex = Indices.graphicFamily;					// Queue family type that buffers from this command pool will use
 		CommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;	// Allow reset so that we can re-record in run-time
 																						// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT makes vkBeginCommandBuffer(...) dump all previous commands
@@ -908,6 +935,28 @@ namespace VKE
 		}
 	}
 
+	void VKRenderer::createTextureSampler()
+	{
+		VkSamplerCreateInfo SamplerCreateInfo = {};
+		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// magnified filtering
+		SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// minified filtering
+		SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in U (x) direction
+		SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in V (y) direction
+		SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in W (z) direction
+		SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border is black
+		SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Normalized coordinate, the value of the coordinate is (0, 1), if true, (0, image size)
+		SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap filtering
+		SamplerCreateInfo.mipLodBias = 0.0f;								// LOD Bias for mipmap
+		SamplerCreateInfo.minLod = 0.0f;									// Min / Max LOD to pick mip-level
+		SamplerCreateInfo.maxLod = 0.0f;
+		SamplerCreateInfo.anisotropyEnable = VK_TRUE;						// Anisotropy filtering enable, anti-aliasing technique
+		SamplerCreateInfo.maxAnisotropy = 16;								// Anisotropy sample level
+
+		VkResult Result = vkCreateSampler(MainDevice.LD, &SamplerCreateInfo, nullptr, &TextureSampler);
+		RESULT_CHECK(Result, "Fail to create sampler.");
+	}
+
 	void VKRenderer::createUniformBuffer()
 	{
 		// One uniform buffer for each image (and by extension, command buffer)
@@ -950,6 +999,21 @@ namespace VKE
 
 		VkResult Result = vkCreateDescriptorPool(MainDevice.LD, &PoolCreateInfo, nullptr, &DescriptorPool);
 		RESULT_CHECK(Result, "Failed to create a Descriptor Pool");
+
+		// CREATE SAMPLER DESCRIPTOR POOL
+		VkDescriptorPoolSize SamplerPoolSize = {};
+		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		SamplerPoolSize.descriptorCount = MAX_OBJECTS;		// Not optimal setup
+
+		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
+		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		SamplerPoolCreateInfo.maxSets = MAX_OBJECTS;
+		SamplerPoolCreateInfo.poolSizeCount = 1;
+		SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
+
+		Result = vkCreateDescriptorPool(MainDevice.LD, &SamplerPoolCreateInfo, nullptr, &SamplerDescriptorPool);
+		RESULT_CHECK(Result, "Failed to create a Sampler Descriptor Pool");
+
 	}
 
 	void VKRenderer::createDescriptorSets()
@@ -997,7 +1061,7 @@ namespace VKE
 		{
 			using namespace BufferFormats;
 			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[ImageIndex].GetAllocatedMemory()) + (i * Descriptor_Drawcall[ImageIndex].GetSlotSize()));
-			*Drawcall = RenderList[i]->GetDrawcall();
+			*Drawcall = RenderList[i]->Transform.M();
 		}
 		// Copy Model data
 		// Reuse void* Data
@@ -1101,17 +1165,20 @@ namespace VKE
 
 	bool VKRenderer::checkDeviceSuitable(const VkPhysicalDevice& device)
 	{
-		/*
-				// Information about what the device supports (geo shader, tess shader, wide lines, etc)
-				VkPhysicalDeviceFeatures deviceFeatures;
-				vkGetPhysicalDeviceFeatures(device, &deviceFeatures);*/
+
+		// Information about what the device supports (geo shader, tess shader, wide lines, etc)
+		VkPhysicalDeviceFeatures deviceFeatures;
+		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
 		FQueueFamilyIndices indices = getQueueFamilies(device);
 		if (!indices.IsValid())
 		{
 			return false;
 		}
-
+		if (!deviceFeatures.samplerAnisotropy)
+		{
+			return false;
+		}
 		if (!checkDeviceExtensionSupport(device))
 		{
 			return false;
@@ -1228,6 +1295,165 @@ namespace VKE
 		return true;
 	}
 
+	int VKRenderer::createTextureImage(const std::string& fileName)
+	{
+		// Load image file
+		int Width, Height;
+		VkDeviceSize ImageSize;
+
+		unsigned char* ImageData = FileIO::LoadTextureFile(fileName, Width, Height, ImageSize);
+		if (!ImageData)
+		{
+			return -1;
+		}
+
+		// Create staging buffer to hold loaded data, ready to copy to device
+		cBuffer StagingBuffer;
+		if (!StagingBuffer.CreateBufferAndAllocateMemory(MainDevice.PD, MainDevice.LD, ImageSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+		)) return false;
+
+		// Map memory to the staging buffer
+		void * pData = nullptr;
+		vkMapMemory(MainDevice.LD, StagingBuffer.GetMemory(), 0, ImageSize, 0, &pData);
+		memcpy(pData, ImageData, static_cast<size_t>(ImageSize));
+		vkUnmapMemory(MainDevice.LD, StagingBuffer.GetMemory());
+
+		// Free allocated memory for loading textures
+		FileIO::freeLoadedTextureData(ImageData);
+
+		// 1. Create image to hold final texture
+		VkImage TextureImage;
+		VkDeviceMemory TexImageMemory;
+
+		if (!createImage(Width, Height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,								// Destination of transfer, and also a texture sampler
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			TextureImage, TexImageMemory))
+		{
+			return -1;
+		}
+
+		// 2. COPY DATA TO THE IMAGE
+		// Transition image to be DST for copy operation
+		TransitionImageLayout(MainDevice.LD, graphicQueue, GraphicsCommandPool, TextureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+		// Actual copy command
+		CopyImageBuffer(MainDevice.LD, graphicQueue, GraphicsCommandPool, StagingBuffer.GetBuffer(), TextureImage, Width, Height);
+
+		// Transition image to be shader readable for shader usage
+		TransitionImageLayout(MainDevice.LD, graphicQueue, GraphicsCommandPool, TextureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		// 3. Store the reference
+		TextureImages.push_back(TextureImage);
+		TextureImageMemories.push_back(TexImageMemory);
+
+		// 4. Clean up staging buffer parts
+		StagingBuffer.cleanUp();
+
+		return TextureImages.size() - 1;
+	}
+
+	int VKRenderer::createTexture(const std::string& fileName)
+	{
+		// Create texture image and get its location
+		int textureImageLoc = createTextureImage(fileName);
+		VkImageView ImgVeiw = CreateImageViewFromImage(TextureImages[textureImageLoc], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		TextureImageViews.push_back(ImgVeiw);
+
+		// Create Descriptor Set Here
+		int descriptorLoc = createTextureDescriptor(ImgVeiw);
+
+		return descriptorLoc;
+	}
+
+	int VKRenderer::createTextureDescriptor(VkImageView TextureImage)
+	{
+		VkDescriptorSet DescriptorSet;
+		
+		// Allocate memory for descriptor
+		VkDescriptorSetAllocateInfo SetAllocInfo = {};
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = SamplerDescriptorPool;
+		SetAllocInfo.pSetLayouts = &SamplerSetLayout;
+		SetAllocInfo.descriptorSetCount = 1;			// Can create multiple at one time if multiple images are loaded
+
+		VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &SetAllocInfo, &DescriptorSet);
+		RESULT_CHECK(Result, " Fail to Allocate Texture Descriptor Set");
+	
+		VkDescriptorImageInfo ImageInfo = {};
+		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
+		ImageInfo.imageView = TextureImage;
+		ImageInfo.sampler = TextureSampler;
+
+		// Descriptor write info
+		VkWriteDescriptorSet DescriptorWrite = {};
+		DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrite.dstSet = DescriptorSet;
+		DescriptorWrite.dstBinding = 0;
+		DescriptorWrite.dstArrayElement = 0;
+		DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrite.descriptorCount = 1;
+		DescriptorWrite.pImageInfo = &ImageInfo;
+
+		// Update new descriptor set
+		vkUpdateDescriptorSets(MainDevice.LD, 1, &DescriptorWrite, 0, nullptr);
+
+		SamplerDescriptorSets.push_back(DescriptorSet);
+
+		return SamplerDescriptorSets.size() - 1;
+	}
+	bool VKRenderer::CreateModel(const std::string& ifileName, cModel*& oModel)
+	{
+		// Import model "scene"
+		Assimp::Importer Importer;
+		std::string FileLoc = "Content/Models/" + ifileName;
+		const aiScene* scene = Importer.ReadFile(FileLoc, aiProcess_Triangulate
+			| aiProcess_FlipUVs
+			| aiProcess_GenSmoothNormals
+			| aiProcess_JoinIdenticalVertices
+			| aiProcess_CalcTangentSpace
+			| aiProcess_GenBoundingBoxes);
+
+		if (!scene)
+		{
+			throw std::runtime_error("Fail to load model! (" + FileLoc + ")");
+			return false;
+		}
+
+		// get vector of all materials with 1:1 ID placement
+		std::vector<std::string> TextureNames = cModel::LoadMaterials(scene);
+
+		// Conversion from the materials list IDs to our Descriptor Array IDs
+		std::vector<int> MatToTex(TextureNames.size());
+
+		// Loop over texture names and create texture for them
+		for (size_t i = 0; i < MatToTex.size(); ++i)
+		{
+			// texture 0 will be reserved for default texture
+			if (TextureNames[i].empty())
+			{
+				MatToTex[i] = 0;
+			}
+			else
+			{
+				// Set value to index of new texture
+				MatToTex[i] = createTexture(TextureNames[i]);
+			}
+		}
+
+		std::vector<std::shared_ptr<cMesh>> Meshes = cModel::LoadNode(ifileName, MainDevice, graphicQueue, GraphicsCommandPool, scene->mRootNode, scene, MatToTex);
+
+		oModel = DBG_NEW cModel(Meshes);
+		
+		return true;
+	}
+
+	
+
+
 	void VKRenderer::recordCommands(uint32_t ImageIndex)
 	{
 		VkCommandBuffer& CB = CommandBuffers[ImageIndex];
@@ -1242,12 +1468,12 @@ namespace VKE
 		RenderPassBeginInfo.renderPass = RenderPass;								// Render pass to begin
 		RenderPassBeginInfo.renderArea.offset = { 0,0 };							// Start point of render pass in pixels
 		RenderPassBeginInfo.renderArea.extent = SwapChain.Extent;					// Size of region to run render pass on starting at offset
-		
+
 		const uint32_t ClearColorCount = 2;
 		VkClearValue ClearValues[2] = {};
 		ClearValues[0].color = { 0.4f, 0.4f, 0.4f, 1.0f };							// Binds to first attachments
 		ClearValues[1].depthStencil.depth = 1.0f;									// Depth attachment clear value
-		
+
 		RenderPassBeginInfo.pClearValues = ClearValues;								// List of clear values 
 		RenderPassBeginInfo.clearValueCount = ClearColorCount;
 
@@ -1273,40 +1499,49 @@ namespace VKE
 
 		for (size_t j = 0; j < RenderList.size(); ++j)
 		{
-			cMesh* Mesh = RenderList[j];
-			VkBuffer VertexBuffers[] = { Mesh->GetVertexBuffer() };			// Buffers to bind
-			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-
-			// Bind vertex data
-			vkCmdBindVertexBuffers(CB, 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
-
-			// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
-			vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-			// Dynamic Offset Amount
-			uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[ImageIndex].GetSlotSize()) * j;
-
-			// Bind Descriptor sets
-			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-				0, 1,						// One descriptor for each draw
-				&DescriptorSets[ImageIndex],
-				1, &DynamicOffset					// Dynamic offsets
-			);
-
+		
 			// Push constant to given shader stage directly (No Buffer)
-			glm::mat4 MVP = FrameData.PVMatrix * Mesh->GetDrawcall().ModelMatrix;
+			glm::mat4 MVP = FrameData.PVMatrix * RenderList[j]->Transform.M();
 			vkCmdPushConstants(CB, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0,
 				sizeof(glm::mat4),					// Size of data being pushed
 				&MVP);								// Actual data being pushed
-			/*
-			vkCmdDraw(CB[i],
-				Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
-				1,						// For drawing same object multiple times
-				0, 0);*/
 
-				// Execute pipeline, Index draw
-			vkCmdDrawIndexed(CB, Mesh->GetIndexCount(), 1, 0, 0, 0);
+
+			for (size_t k = 0; k < RenderList[j]->GetMeshCount(); ++k)
+			{
+				auto Mesh = RenderList[j]->GetMesh(k);
+				VkBuffer VertexBuffers[] = { Mesh->GetVertexBuffer() };			// Buffers to bind
+				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
+
+				// Bind vertex data
+				vkCmdBindVertexBuffers(CB, 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
+
+				// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
+				vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+				// Dynamic Offset Amount
+				uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[ImageIndex].GetSlotSize()) * j;
+
+				const uint32_t DescriptorSetCount = 2;
+				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[ImageIndex], SamplerDescriptorSets[Mesh->GetTextureID()] };
+
+				// Bind Descriptor sets for Projection / View / Model matrix
+				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+					0, DescriptorSetCount,						// One descriptor for each draw
+					DescriptorSetGroup,
+					1, &DynamicOffset							// Dynamic offsets
+				);
+				/*
+				vkCmdDraw(CB[i],
+					Mesh->GetVertexCount(),	// vertexCount, indicates how many times the pipeline will call
+					1,						// For drawing same object multiple times
+					0, 0);*/
+
+					// Execute pipeline, Index draw
+				vkCmdDrawIndexed(CB, Mesh->GetIndexCount(), 1, 0, 0, 0);
+			}
+			
 		}
 
 		// End Render Pass
@@ -1345,13 +1580,18 @@ namespace VKE
 			{
 				indices.presentationFamily = i;
 			}
+			// If both graphic family and presentation family are found, no need to keep going
+			if (indices.graphicFamily >= 0 && indices.graphicFamily >= 0)
+			{
+				break;
+			}
 			++i;
 		}
 
 		return indices;
 	}
 
-	VKE::FSwapChainDetail VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)
+	FSwapChainDetail VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)
 	{
 		FSwapChainDetail SwapChainDetails;
 

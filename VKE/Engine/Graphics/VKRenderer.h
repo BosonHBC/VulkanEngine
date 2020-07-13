@@ -7,10 +7,11 @@
 #include "Utilities.h"
 #include "BufferFormats.h"
 #include "Descriptors/Descriptor_Dynamic.h"
+#include "Mesh/Mesh.h"
 
 namespace VKE
 {
-	class cMesh;
+	class cModel;
 	class VKRenderer
 	{
 	public:
@@ -25,14 +26,14 @@ namespace VKE
 		void draw();
 		void cleanUp();
 
+		bool CreateModel(const std::string& ifileName, cModel*& oModel);
+		// Scene Objects
+		std::vector<cModel*> RenderList;
+		BufferFormats::FFrame FrameData;
 	private:
 		GLFWwindow* window;
 
 		uint64_t ElapsedFrame = 0;
-		// Scene Objects
-		std::vector<cMesh*> RenderList;
-		BufferFormats::FFrame FrameData;
-
 
 		// Vulkan Components
 		// - Main Components
@@ -51,6 +52,8 @@ namespace VKE
 		VkImage DepthBufferImage;
 		VkDeviceMemory DepthBufferImageMemory;
 		VkImageView DepthBufferImageView;
+		
+		VkSampler TextureSampler;
 
 		// -Pipeline
 		VkRenderPass RenderPass;
@@ -66,13 +69,24 @@ namespace VKE
 		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself
 
 		// - Descriptors
+#pragma region Uniform Buffer / Dynamic Descripotor set
 		VkDescriptorSetLayout DescriptorSetLayout;
-		VkPushConstantRange PushConstantRange;
 		VkDescriptorPool DescriptorPool;
 		std::vector<VkDescriptorSet> DescriptorSets;
-
 		std::vector<cDescriptor> Descriptor_Frame;
 		std::vector<cDescriptor_Dynamic> Descriptor_Drawcall;
+#pragma endregion
+		// -- Push Constant
+		VkPushConstantRange PushConstantRange;
+		// -- Sampler Descriptor Set
+		VkDescriptorSetLayout SamplerSetLayout;
+		VkDescriptorPool SamplerDescriptorPool;
+
+		// - Assets
+		std::vector<VkImage> TextureImages;
+		std::vector<VkDeviceMemory> TextureImageMemories;					// All texture should be in one memory with offset, but simplicity, multiple memories are used here
+		std::vector<VkImageView> TextureImageViews;
+		std::vector<VkDescriptorSet> SamplerDescriptorSets;					// Each image needs a descriptor (sampler)
 
 		/** Create functions */
 		void createInstance();
@@ -89,6 +103,7 @@ namespace VKE
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSynchronization();
+		void createTextureSampler();
 		
 		void createUniformBuffer();
 		void createDescriptorPool();
@@ -105,6 +120,10 @@ namespace VKE
 		/** -Component Create functions */
 		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
 		bool createImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
+		int createTextureImage(const std::string& fileName);
+		int createTexture(const std::string& fileName);
+		int createTextureDescriptor(VkImageView TextureImage);
+
 		/** Record functions */
 		void recordCommands(uint32_t ImageIndex);
 

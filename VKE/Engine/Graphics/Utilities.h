@@ -17,6 +17,17 @@
 #define RESULT_CHECK(Result, Message) if(Result != VK_SUCCESS) {printf(Message);}
 #endif // _DEBUG
 
+#define _CRTDBG_MAP_ALLOC
+#include <cstdlib>
+#include <crtdbg.h>
+
+#ifdef _DEBUG
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+// Replace _NORMAL_BLOCK with _CLIENT_BLOCK if you want the
+// allocations to be of _CLIENT_BLOCK type
+#else
+#define DBG_NEW new
+#endif
 
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
 #define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
@@ -45,8 +56,7 @@ namespace VKE
 	// Maximum 2 image on the queue
 	const int MAX_FRAME_DRAWS = 2;
 	// Max objects are allowed in the scene
-	const int MAX_OBJECTS = 2;
-
+	const int MAX_OBJECTS = 20;
 	
 
 	// =======================================
@@ -57,7 +67,8 @@ namespace VKE
 	struct FVertex
 	{
 		glm::vec3 Position;		// Vertex Position (x,y,z)
-		glm::vec3 Color;
+		glm::vec3 Color;		// Vertex color
+		glm::vec2 TexCoord;		// Texture coordinate
 	};
 
 	struct FMainDevice
@@ -122,15 +133,27 @@ namespace VKE
 	bool CreateBufferAndAllocateMemory(FMainDevice MainDevice, VkDeviceSize BufferSize, VkBufferUsageFlags Flags, VkMemoryPropertyFlags Properties, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
 	// Find a valid memory type index
 	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PD, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+	
 	// Copy data from src buffer to dst buffer
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
 		VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize);
 
+	// Copy Image buffer
+	void CopyImageBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
+		VkBuffer SrcBuffer, VkImage DstImage, uint32_t Width, uint32_t Height);
+
+	// Getter and setter for MinUniformOffsetAlignment
 	void SetMinUniformOffsetAlignment(VkDeviceSize Size);
 	VkDeviceSize GetMinUniformOffsetAlignment();
+
+	void TransitionImageLayout(VkDevice LD, VkQueue Queue, VkCommandPool CommandPool, VkImage Image, VkImageLayout CurrentLayout, VkImageLayout NewLayout);
+
 	namespace FileIO
 	{
 		std::vector<char> ReadFile(const std::string& filename);
 		std::string RelativePathToAbsolutePath(const std::string& iReleative);
+
+		unsigned char* LoadTextureFile(const std::string& fileName, int& oWidth, int& oHeight, VkDeviceSize& oImageSize);
+		void freeLoadedTextureData(unsigned char* Data);
 	}
 }

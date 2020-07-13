@@ -3,7 +3,7 @@
 #include "../Engine.h"
 #include <algorithm>
 #include <fstream>
-
+#include "stb_image.h"
 namespace VKE
 {
 	VkDeviceSize MinUniformBufferOffset = 0;
@@ -155,28 +155,60 @@ namespace VKE
 		}
 		return static_cast<uint32_t>(-1);
 	}
+	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool);
+	void EndCommandBuffer(VkCommandBuffer CommandBuffer, VkDevice LD, VkQueue Queue, VkCommandPool CommandPool);
 
-	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize)
+	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool)
 	{
 		// Get a command buffer from command buffer pool
-		VkCommandBuffer TransferCommandBuffer = {};
+		VkCommandBuffer CommandBuffer = {};
 
 		VkCommandBufferAllocateInfo AllocInfo = {};
 		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = TransferCommandPool;
+		AllocInfo.commandPool = CommandPool;
 		AllocInfo.commandBufferCount = 1;										// Only one command buffer needed
 
-		vkAllocateCommandBuffers(LD, &AllocInfo, &TransferCommandBuffer);
+		vkAllocateCommandBuffers(LD, &AllocInfo, &CommandBuffer);
 
 		// Record command in command buffer
 		VkCommandBufferBeginInfo CommandBeginInfo = {};
 		CommandBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		CommandBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;		// We're only using the command buffer once, so set up for one time transfer
-		
+
 		// Begin recording
-		vkBeginCommandBuffer(TransferCommandBuffer, &CommandBeginInfo);
-		
+		vkBeginCommandBuffer(CommandBuffer, &CommandBeginInfo);
+
+		return CommandBuffer;
+	}
+
+	void EndCommandBuffer(VkCommandBuffer CommandBuffer, VkDevice LD, VkQueue Queue, VkCommandPool CommandPool)
+	{
+		// End Recording
+		vkEndCommandBuffer(CommandBuffer);
+
+		// Queue submission information
+		VkSubmitInfo SubmitInfo = {};
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &CommandBuffer;
+
+		VkResult Result = vkQueueSubmit(Queue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		RESULT_CHECK(Result, "Fail to submit transfer command buffer to transfer queue");
+
+		// Prevent submitting multiple transfer command buffers to a same queue,
+		// Sometime when there are tons of meshes loading in one time, this way can prevent crashing easily,
+		// But optimal way is using synchronization to load files at the same time.
+		vkQueueWaitIdle(Queue);
+
+		// Free temporary command buffer back to pool
+		vkFreeCommandBuffers(LD, CommandPool, 1, &CommandBuffer);
+	}
+
+	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize)
+	{
+		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
+
 		// Region of data to copy from and to, allows copy multiple regions of data
 		VkBufferCopy BufferCopyRegion = {};
 		BufferCopyRegion.srcOffset = 0;
@@ -185,26 +217,31 @@ namespace VKE
 
 		// Command to copy src buffer to dst buffer
 		vkCmdCopyBuffer(TransferCommandBuffer, SrcBuffer, DstBuffer, 1, &BufferCopyRegion);
-		
-		// End Recording
-		vkEndCommandBuffer(TransferCommandBuffer);
 
-		// Queue submission information
-		VkSubmitInfo SubmitInfo = {};
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
+		EndCommandBuffer(TransferCommandBuffer, LD, TransferQueue, TransferCommandPool);
+	}
 
-		VkResult Result = vkQueueSubmit(TransferQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		RESULT_CHECK(Result, "Fail to submit transfer command buffer to transfer queue");
-		
-		// Prevent submitting multiple transfer command buffers to a same queue,
-		// Sometime when there are tons of meshes loading in one time, this way can prevent crashing easily,
-		// But optimal way is using synchronization to load files at the same time.
-		vkQueueWaitIdle(TransferQueue);
+	void CopyImageBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkImage DstImage, uint32_t Width, uint32_t Height)
+	{
+		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
 
-		// Free temporary command buffer back to pool
-		vkFreeCommandBuffers(LD, TransferCommandPool, 1, &TransferCommandBuffer);
+		// Region of data to copy from and to, allows copy multiple regions of data
+		VkBufferImageCopy ImageCopyRegion = {};
+		ImageCopyRegion.bufferOffset = 0;
+		ImageCopyRegion.bufferRowLength = 0;										// for calculating data spacing, like calculating i, j for loop
+		ImageCopyRegion.bufferImageHeight = 0;										// the same calculating data spacing, means don't want to skip any pixel while reading
+		ImageCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Which aspect of image to copy
+		ImageCopyRegion.imageSubresource.mipLevel = 0;								// Mipmap level to copy
+		ImageCopyRegion.imageSubresource.baseArrayLayer = 0;						// Starting array layer
+		ImageCopyRegion.imageSubresource.layerCount = 1;							// Number of layers to copy starting at baseArrayLayer
+		ImageCopyRegion.imageOffset = { 0,0,0 };									// Offset into image (as opposed to raw data in buffer offset), start at the beginning
+		ImageCopyRegion.imageExtent = { Width, Height, 1 };							// Size of region to copy as (x,y,z) values
+
+
+		// Command to copy src buffer to dst buffer
+		vkCmdCopyBufferToImage(TransferCommandBuffer, SrcBuffer, DstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1, &ImageCopyRegion);
+
+		EndCommandBuffer(TransferCommandBuffer, LD, TransferQueue, TransferCommandPool);
 	}
 
 	void SetMinUniformOffsetAlignment(VkDeviceSize Size)
@@ -215,6 +252,56 @@ namespace VKE
 	VkDeviceSize GetMinUniformOffsetAlignment()
 	{
 		return MinUniformBufferOffset;
+	}
+
+	void TransitionImageLayout(VkDevice LD, VkQueue Queue, VkCommandPool CommandPool, VkImage Image, VkImageLayout CurrentLayout, VkImageLayout NewLayout)
+	{
+		VkCommandBuffer CommandBuffer = BeginCommandBuffer(LD, CommandPool);
+
+		// Pipeline barrier - Image memory barrier
+		VkImageMemoryBarrier ImageMemoryBarrier = {};
+		ImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		ImageMemoryBarrier.oldLayout = CurrentLayout;
+		ImageMemoryBarrier.newLayout = NewLayout;
+		ImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Don't bother transferring between queues
+		ImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ImageMemoryBarrier.image = Image;											// Image being accessed and modified as part of barrier
+		ImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
+		ImageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+		ImageMemoryBarrier.subresourceRange.levelCount = 1;							// Number of mip-map levels to alter starting from base level
+		ImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;						// Number of layers to alter starting from baseArrayLayer
+		ImageMemoryBarrier.subresourceRange.layerCount = 1;
+
+		VkPipelineStageFlags SrcStage = 0, DstStage = 0;
+
+
+		// If transitioning from new image ready to receive data...
+		if(CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		{
+			ImageMemoryBarrier.srcAccessMask = 0;									// Memory access stage transition must happen after: From the very start
+			ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must happen before: transfer write stage
+			
+			SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;							// On top of any stage
+			DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;								
+		}
+		// If transitioning from transfer destination to shader readable...
+		else if (CurrentLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		{
+			ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must happen after: Finish doing the transfer (from host_visible to local_bit)
+			ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;			// Memory access stage transition must happen before: the shader starts to read it
+
+			SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;						// Should be ready before fragment shader reading the texture
+		}
+		vkCmdPipelineBarrier(CommandBuffer,
+			SrcStage, DstStage,		// Pipeline stages (match to src and dst access masks)
+			0, 						// Dependency flags
+			0, nullptr,				// Global Memory Barrier count + data
+			0, nullptr,				// Buffer Memory barrier count + data
+			1, &ImageMemoryBarrier	// Image Memory Barrier count + data
+		);
+
+		EndCommandBuffer(CommandBuffer, LD, Queue, CommandPool);
 	}
 
 	namespace FileIO {
@@ -254,6 +341,33 @@ namespace VKE
 			std::string result = std::string(_OUT_DIR) + iReleative.c_str();
 			return result;
 		}
+
+		unsigned char* LoadTextureFile(const std::string& fileName, int& oWidth, int& oHeight, VkDeviceSize& oImageSize)
+		{
+			// Number of channel image uses
+			int channels = 0;
+
+			std::string fileLoc = "Content/Textures/" + fileName;
+			// Make sure always has 4 channels
+			stbi_uc* Data = stbi_load(fileLoc.c_str(), &oWidth, &oHeight, &channels, STBI_rgb_alpha);
+
+			if (!Data)
+			{
+				std::string ErrorMsg = "Fail to load texture[" + fileLoc + "]." + stbi_failure_reason();
+				printf(ErrorMsg.c_str());
+				throw std::runtime_error(ErrorMsg);
+				return nullptr;
+			}
+			// Calculate image size
+			oImageSize = oWidth * oHeight * 4;
+			return Data;
+		}
+
+		void freeLoadedTextureData(unsigned char* Data)
+		{
+			stbi_image_free(Data);
+		}
+
 	}
 
 

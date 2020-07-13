@@ -8,12 +8,12 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)Plugins\glfw\include;$(VULKAN_SDK)/Include/;$(SolutionDir)Plugins/;$(SolutionDir)Engine/Graphics/;$(SolutionDir)Engine/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Plugins/assimp/include;$(SolutionDir)Plugins\glfw\include;$(VULKAN_SDK)/Include/;$(SolutionDir)Plugins/;$(SolutionDir)Engine/Graphics/;$(SolutionDir)Engine/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_OUT_DIR=R"($(OutDir))";SOLUTION_DIR=R"($(SolutionDir))";_CONFIGURATION=R"($(Configuration)/)";_PLATFORM=R"($(Platform)/)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Plugins\glfw\lib-vc2017;$(VULKAN_SDK)\Lib32</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Plugins/assimp/lib/Release;$(SolutionDir)Plugins\glfw\lib-vc2017;$(VULKAN_SDK)\Lib32</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;vulkan-1.lib;assimp-vc141-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup />

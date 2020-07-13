@@ -163,7 +163,8 @@
     <ClCompile Include="Graphics\Buffer\Buffer.cpp" />
     <ClCompile Include="Graphics\Descriptors\Descriptor.cpp" />
     <ClCompile Include="Graphics\Descriptors\Descriptor_Dynamic.cpp" />
-    <ClCompile Include="Graphics\Mesh\cMesh.cpp" />
+    <ClCompile Include="Graphics\Mesh\Mesh.cpp" />
+    <ClCompile Include="Graphics\Model\Model.cpp" />
     <ClCompile Include="Graphics\Utilities.cpp" />
     <ClCompile Include="Graphics\VKRenderer.cpp" />
     <ClCompile Include="Transform\Transform.cpp" />
@@ -174,7 +175,9 @@
     <ClInclude Include="Graphics\Buffer\Buffer.h" />
     <ClInclude Include="Graphics\Descriptors\Descriptor.h" />
     <ClInclude Include="Graphics\Descriptors\Descriptor_Dynamic.h" />
-    <ClInclude Include="Graphics\Mesh\cMesh.h" />
+    <ClInclude Include="Graphics\Mesh\Mesh.h" />
+    <ClInclude Include="Graphics\Model\Model.h" />
+    <ClInclude Include="Graphics\stb_image.h" />
     <ClInclude Include="Graphics\Utilities.h" />
     <ClInclude Include="Graphics\VKRenderer.h" />
     <ClInclude Include="Transform\Transform.h" />

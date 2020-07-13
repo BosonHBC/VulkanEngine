@@ -6,6 +6,7 @@
 #include "BufferFormats.h"
 #include "Utilities.h"
 #include "Buffer/Buffer.h"
+#include <memory>
 
 namespace VKE
 {
@@ -13,10 +14,17 @@ namespace VKE
 	class cMesh
 	{
 	public:
+		// Load asset
+		static std::shared_ptr<cMesh> Load(const std::string& iMeshName, const FMainDevice& iMainDevice,
+			VkQueue TransferQueue, VkCommandPool TransferCommandPool,
+			const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices);
+		// Free all assets
+		static void Free();
+
 		cMesh() = delete;
 		cMesh(const cMesh& i_other) = delete;
 		cMesh& operator = (const cMesh& i_other) = delete;
-		~cMesh() {}
+		~cMesh();
 
 		cMesh(const FMainDevice& iMainDevice, 
 			VkQueue TransferQueue, VkCommandPool TransferCommandPool,
@@ -30,15 +38,15 @@ namespace VKE
 		uint32_t GetIndexCount() const { return IndexCount; }
 		VkBuffer GetIndexBuffer() const { return IndexBuffer.GetBuffer(); }
 
-		void SetModel(glm::mat4 model) { DrawCallData = model; }
-		BufferFormats::FDrawCall GetDrawcall() const { return DrawCallData; }
-	private:
 
+		void SetTextureID(int TexID) { TextureID = TexID; }
+		int GetTextureID() const {	return TextureID; }
+	private:
+		int TextureID = 0;
+		
 		uint32_t VertexCount, IndexCount;
 		cBuffer VertexBuffer, IndexBuffer;
 		
-		BufferFormats::FDrawCall DrawCallData;
-
 		FMainDevice MainDevice;
 
 		bool createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);
