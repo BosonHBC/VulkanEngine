@@ -62,6 +62,9 @@ namespace VKE
 
 		// Create Texture
 		createTexture("DefaultWhite.png");
+		createTexture("brick.png");
+		createTexture("panda.jpg");
+		createTexture("teapot.png");
 		return EXIT_SUCCESS;
 	}
 
@@ -1001,18 +1004,20 @@ namespace VKE
 		RESULT_CHECK(Result, "Failed to create a Descriptor Pool");
 
 		// CREATE SAMPLER DESCRIPTOR POOL
-		VkDescriptorPoolSize SamplerPoolSize = {};
-		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SamplerPoolSize.descriptorCount = MAX_OBJECTS;		// Not optimal setup
+		{
+			VkDescriptorPoolSize SamplerPoolSize = {};
+			SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			SamplerPoolSize.descriptorCount = MAX_OBJECTS;		// Not optimal setup
 
-		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
-		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		SamplerPoolCreateInfo.maxSets = MAX_OBJECTS;
-		SamplerPoolCreateInfo.poolSizeCount = 1;
-		SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
+			VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
+			SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			SamplerPoolCreateInfo.maxSets = MAX_OBJECTS;
+			SamplerPoolCreateInfo.poolSizeCount = 1;
+			SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
 
-		Result = vkCreateDescriptorPool(MainDevice.LD, &SamplerPoolCreateInfo, nullptr, &SamplerDescriptorPool);
-		RESULT_CHECK(Result, "Failed to create a Sampler Descriptor Pool");
+			Result = vkCreateDescriptorPool(MainDevice.LD, &SamplerPoolCreateInfo, nullptr, &SamplerDescriptorPool);
+			RESULT_CHECK(Result, "Failed to create a Sampler Descriptor Pool");
+		}
 
 	}
 

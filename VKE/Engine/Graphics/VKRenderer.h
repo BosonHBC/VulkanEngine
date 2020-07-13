@@ -53,8 +53,6 @@ namespace VKE
 		VkDeviceMemory DepthBufferImageMemory;
 		VkImageView DepthBufferImageView;
 		
-		VkSampler TextureSampler;
-
 		// -Pipeline
 		VkRenderPass RenderPass;
 		VkPipeline GraphicPipeline;
@@ -81,6 +79,7 @@ namespace VKE
 		// -- Sampler Descriptor Set
 		VkDescriptorSetLayout SamplerSetLayout;
 		VkDescriptorPool SamplerDescriptorPool;
+		VkSampler TextureSampler;
 
 		// - Assets
 		std::vector<VkImage> TextureImages;
