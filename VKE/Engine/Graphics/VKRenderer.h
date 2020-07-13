@@ -121,7 +121,7 @@ namespace VKE
 		bool createImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
 		int createTextureImage(const std::string& fileName);
 		int createTexture(const std::string& fileName);
-		int createTextureDescriptor(VkImageView TextureImage);
+		int createTextureDescriptor(VkImageView TextureImage, VkImageView NormalImage);
 
 		/** Record functions */
 		void recordCommands(uint32_t ImageIndex);

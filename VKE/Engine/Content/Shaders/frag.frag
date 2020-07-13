@@ -6,8 +6,12 @@ layout (location = 0) in vec3 fragCol;
 layout (location = 1) in vec2 fragTexCoord;
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler;
+layout(set = 1, binding = 1) uniform sampler2D NormalSampler;
 
 void main()
 {
-    outColor = vec4(texture(TextureSampler, fragTexCoord).rgb, 1.0);
+    vec3 albedo = texture(TextureSampler, fragTexCoord).rgb;
+    vec3 normal = texture(NormalSampler, fragTexCoord).rgb;
+
+    outColor = vec4((albedo - normal / 2.f), 1.0);
 }

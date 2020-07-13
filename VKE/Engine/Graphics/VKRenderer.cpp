@@ -565,14 +565,22 @@ namespace VKE
 
 		// SAMPLER DESCRIPTOR LAYOUT
 		{
-			const uint32_t BindingCount = 1;
+			const uint32_t BindingCount = 2;
 			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
 
+			// Albedo map
 			Bindings[0].binding = 0;
 			Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			Bindings[0].descriptorCount = 1;
 			Bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			Bindings[0].pImmutableSamplers = nullptr;
+
+			// Normal map
+			Bindings[1].binding = 1;
+			Bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			Bindings[1].descriptorCount = 1;
+			Bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			Bindings[1].pImmutableSamplers = nullptr;
 
 			VkDescriptorSetLayoutCreateInfo TextureLayoutCreateInfo = {};
 			TextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1007,11 +1015,11 @@ namespace VKE
 		{
 			VkDescriptorPoolSize SamplerPoolSize = {};
 			SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			SamplerPoolSize.descriptorCount = MAX_OBJECTS;		// Not optimal setup
+			SamplerPoolSize.descriptorCount = MAX_OBJECTS * 2;		// Not optimal setup, one image binds to one descriptor
 
 			VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
 			SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			SamplerPoolCreateInfo.maxSets = MAX_OBJECTS;
+			SamplerPoolCreateInfo.maxSets = MAX_OBJECTS;			// One object binds to one descriptor sets
 			SamplerPoolCreateInfo.poolSizeCount = 1;
 			SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
 
@@ -1369,12 +1377,12 @@ namespace VKE
 		TextureImageViews.push_back(ImgVeiw);
 
 		// Create Descriptor Set Here
-		int descriptorLoc = createTextureDescriptor(ImgVeiw);
+		int descriptorLoc = createTextureDescriptor(ImgVeiw, ImgVeiw);
 
 		return descriptorLoc;
 	}
 
-	int VKRenderer::createTextureDescriptor(VkImageView TextureImage)
+	int VKRenderer::createTextureDescriptor(VkImageView TextureImage, VkImageView NormalImage)
 	{
 		VkDescriptorSet DescriptorSet;
 		
@@ -1388,23 +1396,35 @@ namespace VKE
 		VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &SetAllocInfo, &DescriptorSet);
 		RESULT_CHECK(Result, " Fail to Allocate Texture Descriptor Set");
 	
-		VkDescriptorImageInfo ImageInfo = {};
-		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
-		ImageInfo.imageView = TextureImage;
-		ImageInfo.sampler = TextureSampler;
+		VkDescriptorImageInfo ImageInfos[2] = {};
+		ImageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
+		ImageInfos[0].imageView = TextureImage;
+		ImageInfos[0].sampler = TextureSampler;
+		
+		ImageInfos[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
+		ImageInfos[1].imageView = NormalImage;
+		ImageInfos[1].sampler = TextureSampler;
 
 		// Descriptor write info
-		VkWriteDescriptorSet DescriptorWrite = {};
-		DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescriptorWrite.dstSet = DescriptorSet;
-		DescriptorWrite.dstBinding = 0;
-		DescriptorWrite.dstArrayElement = 0;
-		DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		DescriptorWrite.descriptorCount = 1;
-		DescriptorWrite.pImageInfo = &ImageInfo;
+		VkWriteDescriptorSet DescriptorWrites[2] = {};
+		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[0].dstSet = DescriptorSet;
+		DescriptorWrites[0].dstBinding = 0;
+		DescriptorWrites[0].dstArrayElement = 0;
+		DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[0].descriptorCount = 1;
+		DescriptorWrites[0].pImageInfo = &ImageInfos[0];
+
+		DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrites[1].dstSet = DescriptorSet;
+		DescriptorWrites[1].dstBinding = 1;
+		DescriptorWrites[1].dstArrayElement = 0;
+		DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrites[1].descriptorCount = 1;
+		DescriptorWrites[1].pImageInfo = &ImageInfos[1];
 
 		// Update new descriptor set
-		vkUpdateDescriptorSets(MainDevice.LD, 1, &DescriptorWrite, 0, nullptr);
+		vkUpdateDescriptorSets(MainDevice.LD, 2, DescriptorWrites, 0, nullptr);
 
 		SamplerDescriptorSets.push_back(DescriptorSet);
 
