@@ -65,6 +65,15 @@ namespace VKE
 	}
 
 	
+	void FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
+	{
+		vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
+			std::numeric_limits<uint64_t>::max(),						// never timeout
+			PresentCompleteSemaphore,								// Signal us when that image is available to use
+			VK_NULL_HANDLE,
+			&ImageIndex);
+	}
+
 	FShaderModuleScopeGuard::~FShaderModuleScopeGuard()
 	{
 		// Destroy Shader Modules when the scoped is expired
@@ -252,6 +261,88 @@ namespace VKE
 	VkDeviceSize GetMinUniformOffsetAlignment()
 	{
 		return MinUniformBufferOffset;
+	}
+
+	VkImageView CreateImageViewFromImage(FMainDevice* iMainDevice, const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags)
+	{
+		VkImageViewCreateInfo ViewCreateInfo = {};
+		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		ViewCreateInfo.image = iImage;
+		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;						// Type of image (e.g. 2D, 3D, cubemap)
+		ViewCreateInfo.format = iFormat;										// Format of the image (e.g. R8G8B8)
+		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;			// Allows remapping rgba components to other rgba values
+		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		// SubResources allows the view to view only a part of am image
+		ViewCreateInfo.subresourceRange.aspectMask = iAspectFlags;				// Which aspect of image to view (e.g. VK_IMAGE_ASPECT_COLOR_BIT for view)
+		ViewCreateInfo.subresourceRange.baseMipLevel = 0;						// Start mipmap level to view from
+		ViewCreateInfo.subresourceRange.levelCount = 1;							// Number of mipmap levels to view
+		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;						// Start array level to view from
+		ViewCreateInfo.subresourceRange.layerCount = 1;							// Number of array levels to view 
+
+		// Create Image view and return it
+		VkImageView ImageView;
+		VkResult Result = vkCreateImageView(iMainDevice->LD, &ViewCreateInfo, nullptr, &ImageView);
+		RESULT_CHECK(Result, "Fail to create an Image View");
+
+		return ImageView;
+	}
+
+	bool CreateImage(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory)
+	{
+		// CREATE IMAGE
+		VkImageCreateInfo ImgCreateInfo = {};
+		ImgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ImgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ImgCreateInfo.usage = UseFlags;
+		ImgCreateInfo.format = Format;
+		ImgCreateInfo.tiling = Tiling;								// How image data should be "tiled" (arranged for optimal)
+		ImgCreateInfo.extent.width = Width;
+		ImgCreateInfo.extent.height = Height;
+		ImgCreateInfo.extent.depth = 1;								// No 3D aspect
+		ImgCreateInfo.mipLevels = 1;								// LOD
+		ImgCreateInfo.arrayLayers = 1;								// Use for cubemap
+		ImgCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;	// Initial layout of image data on creation
+		ImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;				// For multi-sampling
+		ImgCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;		// whether image can be shared between queues
+
+		VkResult Result = vkCreateImage(iMainDevice->LD, &ImgCreateInfo, nullptr, &oImage);
+		RESULT_CHECK(Result, "Fail to create an Image.");
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+		// Get memory requirements for a type of image
+		VkMemoryRequirements MemoryRequireMents;
+		vkGetImageMemoryRequirements(iMainDevice->LD, oImage, &MemoryRequireMents);
+
+		// CREATE MEMORY FOR IMAGE
+		// Allocate memory to buffer
+		VkMemoryAllocateInfo MemAllocInfo = {};
+		MemAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		MemAllocInfo.allocationSize = MemoryRequireMents.size;
+		MemAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(iMainDevice->PD,
+			MemoryRequireMents.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
+			PropFlags										// Memory property, is this local_bit or host_bit or others
+		);
+
+		// Allocate memory to VKDevieMemory
+		Result = vkAllocateMemory(iMainDevice->LD, &MemAllocInfo, nullptr, &oImageMemory);
+		RESULT_CHECK(Result, "Fail to allocate memory for image.");
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		Result = vkBindImageMemory(iMainDevice->LD, oImage, oImageMemory, 0);
+		RESULT_CHECK(Result, "Fail to bind image with memory.");
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+		return true;
 	}
 
 	void TransitionImageLayout(VkDevice LD, VkQueue Queue, VkCommandPool CommandPool, VkImage Image, VkImageLayout CurrentLayout, VkImageLayout NewLayout)

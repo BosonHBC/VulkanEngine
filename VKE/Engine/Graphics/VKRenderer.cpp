@@ -1,6 +1,7 @@
 #include "VKRenderer.h"
 
 #include "Mesh/Mesh.h"
+#include "Texture/Texture.h"
 #include "../Transform/Transform.h"
 #include "Model/Model.h"
 
@@ -42,7 +43,6 @@ namespace VKE
 
 			createFrameBuffer();
 			createCommandPool();
-			createTextureSampler();
 			createCommandBuffers();
 			createSynchronization();
 		}
@@ -61,10 +61,10 @@ namespace VKE
 		);
 
 		// Create Texture
-		createTexture("DefaultWhite.png");
-		createTexture("brick.png");
-		createTexture("panda.jpg");
-		createTexture("teapot.png");
+		cTexture::Load("DefaultWhite.png", MainDevice);
+		cTexture::Load("brick.png", MainDevice);
+		cTexture::Load("panda.jpg", MainDevice);
+		cTexture::Load("teapot.png", MainDevice);
 		return EXIT_SUCCESS;
 	}
 
@@ -74,7 +74,8 @@ namespace VKE
 		RenderList[0]->Transform.Update();
 	}
 
-	void VKRenderer::draw()
+
+	void VKRenderer::prepareForDraw()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		// Wait for given fence to be opened from last draw before continuing
@@ -84,17 +85,32 @@ namespace VKE
 		vkResetFences(MainDevice.LD, 1, &DrawFences[CurrentFrame]);		// Need to close(reset) this fence manually
 
 		/** I. get the next available image to draw to and signal(semaphore1) when we're finished with the image */
-		uint32_t ImageIndex;											// Index of next image to be drawn 
-		vkAcquireNextImageKHR(MainDevice.LD, SwapChain.SwapChain,
-			std::numeric_limits<uint64_t>::max(),						// never timeout
-			OnImageAvailables[CurrentFrame],							// Signal us when that image is available to use
-			VK_NULL_HANDLE,
-			&ImageIndex);
+		SwapChain.acquireNextImage(MainDevice, OnImageAvailables[CurrentFrame]);
+	}
 
+	void VKRenderer::presentFrame()
+	{
+		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		VkPresentInfoKHR PresentInfo = {};
+		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		PresentInfo.waitSemaphoreCount = 1;
+		PresentInfo.pWaitSemaphores = &OnRenderFinisheds[CurrentFrame];	// Semaphores to wait on
+		PresentInfo.swapchainCount = 1;									// Number of swap chains to present to
+		PresentInfo.pSwapchains = &SwapChain.SwapChain;					// Swap chains to present image to
+		PresentInfo.pImageIndices = &SwapChain.ImageIndex;				// Index of images in swap chains to present
+
+		VkResult Result = vkQueuePresentKHR(MainDevice.presentationQueue, &PresentInfo);
+		RESULT_CHECK(Result, "Fail to Present Image");
+	}
+
+	void VKRenderer::draw()
+	{
+		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		prepareForDraw();
 		// Record commands
-		recordCommands(ImageIndex);
+		recordCommands();
 		// Update uniform buffer
-		updateUniformBuffers(ImageIndex);
+		updateUniformBuffers();
 
 		/** II. submit command buffer to queue (graphic queue) for execution, make sure it waits for the image to be signaled as available before drawing,
 		 and signals (semaphore2) when it has finished rendering.*/
@@ -109,27 +125,17 @@ namespace VKE
 		};
 		SubmitInfo.pWaitDstStageMask = WaitStages;						// Stages to check semaphores at
 		SubmitInfo.commandBufferCount = 1;								// Number of command buffers to submit, only submit to one frame once
-		SubmitInfo.pCommandBuffers = &CommandBuffers[ImageIndex];		// Command buffer to submit
+		SubmitInfo.pCommandBuffers = &CommandBuffers[SwapChain.ImageIndex];		// Command buffer to submit
 		SubmitInfo.signalSemaphoreCount = 1;							// Number of Semaphores to signal before the command buffer has finished
 		SubmitInfo.pSignalSemaphores = &OnRenderFinisheds[CurrentFrame];// When the command buffer is finished, these semaphores will be signaled
 
 		// This is the execute function also because the queue will execute commands automatically
 		// When finish those commands, open(signal) this fence
-		VkResult Result = vkQueueSubmit(graphicQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
+		VkResult Result = vkQueueSubmit(MainDevice.graphicQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
 		RESULT_CHECK(Result, "Fail to submit command buffers to graphic queue");
 
-
 		/** III. present image to screen when it has signaled finished rendering */
-		VkPresentInfoKHR PresentInfo = {};
-		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		PresentInfo.waitSemaphoreCount = 1;
-		PresentInfo.pWaitSemaphores = &OnRenderFinisheds[CurrentFrame];	// Semaphores to wait on
-		PresentInfo.swapchainCount = 1;									// Number of swap chains to present to
-		PresentInfo.pSwapchains = &SwapChain.SwapChain;					// Swap chains to present image to
-		PresentInfo.pImageIndices = &ImageIndex;						// Index of images in swap chains to present
-
-		Result = vkQueuePresentKHR(presentationQueue, &PresentInfo);
-		RESULT_CHECK(Result, "Fail to Present Image");
+		presentFrame();
 
 		// Increment Elapsed Frame
 		++ElapsedFrame;
@@ -143,13 +149,7 @@ namespace VKE
 		vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(MainDevice.LD, SamplerSetLayout, nullptr);
 
-		vkDestroySampler(MainDevice.LD, TextureSampler, nullptr);
-		for (size_t i = 0; i < TextureImages.size(); ++i)
-		{
-			vkDestroyImageView(MainDevice.LD, TextureImageViews[i], nullptr);
-			vkDestroyImage(MainDevice.LD, TextureImages[i], nullptr);
-			vkFreeMemory(MainDevice.LD, TextureImageMemories[i], nullptr);
-		}
+		cTexture::Free();
 
 		// Clean up render list
 		for (auto Model : RenderList)
@@ -167,7 +167,7 @@ namespace VKE
 			vkDestroySemaphore(MainDevice.LD, OnImageAvailables[i], nullptr);
 			vkDestroyFence(MainDevice.LD, DrawFences[i], nullptr);
 		}
-		vkDestroyCommandPool(MainDevice.LD, GraphicsCommandPool, nullptr);
+		vkDestroyCommandPool(MainDevice.LD, MainDevice.GraphicsCommandPool, nullptr);
 		for (auto& FrameBuffer : SwapChainFramebuffers)
 		{
 			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
@@ -300,14 +300,11 @@ namespace VKE
 
 	void VKRenderer::createLogicalDevice()
 	{
-		// Get the queue family indices for the chosen PD
-		FQueueFamilyIndices indieces = getQueueFamilies(MainDevice.PD);
-
 		// Queue is needed to create a logical device,
 		// vector for queue create information
 		std::vector< VkDeviceQueueCreateInfo> queueCreateInfos;
 		// set of queue family indices, prevent duplication
-		std::set<int> queueFamilyIndices = { indieces.graphicFamily, indieces.presentationFamily };
+		std::set<int> queueFamilyIndices = { QueueFamilies.graphicFamily, QueueFamilies.presentationFamily };
 		for (auto& queueFamilyIdx : queueFamilyIndices)
 		{
 			VkDeviceQueueCreateInfo queueCreateInfo = {};
@@ -341,10 +338,10 @@ namespace VKE
 		// After LD is created, queues should be created too, Save the queues
 		vkGetDeviceQueue(
 			/*From given LD*/MainDevice.LD,
-			/*given queue family*/ indieces.graphicFamily,
+			/*given queue family*/ QueueFamilies.graphicFamily,
 			/*given queue index(0 only one queue)*/ 0,
-			/*Out queue*/ &graphicQueue);
-		vkGetDeviceQueue(MainDevice.LD, indieces.presentationFamily, 0, &presentationQueue);
+			/*Out queue*/ &MainDevice.graphicQueue);
+		vkGetDeviceQueue(MainDevice.LD, QueueFamilies.presentationFamily, 0, &MainDevice.presentationQueue);
 	}
 
 	void VKRenderer::createSurface()
@@ -398,16 +395,13 @@ namespace VKE
 		SwapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;						// How to handle blending image with external graphics (e.g. other window)
 		SwapChainCreateInfo.clipped = VK_TRUE;														// Whether to clip parts of image not in view (e.g. behind another window)
 
-		// Get queue family indices
-		FQueueFamilyIndices Indices = getQueueFamilies(MainDevice.PD);
-
 		// Images are sharing between two queues
-		if (Indices.graphicFamily != Indices.presentationFamily)
+		if (QueueFamilies.graphicFamily != QueueFamilies.presentationFamily)
 		{
 			uint32_t QueueFamilyIndices[] =
 			{
-				static_cast<uint32_t>(Indices.graphicFamily),
-				static_cast<uint32_t>(Indices.presentationFamily),
+				static_cast<uint32_t>(QueueFamilies.graphicFamily),
+				static_cast<uint32_t>(QueueFamilies.presentationFamily),
 			};
 			SwapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;						// Image share handling
 			SwapChainCreateInfo.queueFamilyIndexCount = 2;											// Number of queues sharing image between
@@ -441,7 +435,7 @@ namespace VKE
 		{
 			FSwapChainImage SwapChainImage = {};
 			SwapChainImage.Image = Image;
-			SwapChainImage.ImgView = CreateImageViewFromImage(Image, SwapChain.ImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			SwapChainImage.ImgView = CreateImageViewFromImage(&MainDevice, Image, SwapChain.ImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
 			SwapChain.Images.push_back(SwapChainImage);
 		}
@@ -842,7 +836,7 @@ namespace VKE
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-		if (!createImage(SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
+		if (!CreateImage(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DepthBufferImage, DepthBufferImageMemory))
 		{
@@ -851,7 +845,7 @@ namespace VKE
 		}
 
 		// Create depth buffer image view
-		DepthBufferImageView = CreateImageViewFromImage(DepthBufferImage, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+		DepthBufferImageView = CreateImageViewFromImage(&MainDevice, DepthBufferImage, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 	}
 
 	void VKRenderer::createFrameBuffer()
@@ -886,17 +880,15 @@ namespace VKE
 
 	void VKRenderer::createCommandPool()
 	{
-		FQueueFamilyIndices Indices = getQueueFamilies(MainDevice.PD);
-
 		VkCommandPoolCreateInfo CommandPoolCreateInfo;
 		CommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		CommandPoolCreateInfo.pNext = nullptr;
-		CommandPoolCreateInfo.queueFamilyIndex = Indices.graphicFamily;					// Queue family type that buffers from this command pool will use
+		CommandPoolCreateInfo.queueFamilyIndex = QueueFamilies.graphicFamily;					// Queue family type that buffers from this command pool will use
 		CommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;	// Allow reset so that we can re-record in run-time
 																						// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT makes vkBeginCommandBuffer(...) dump all previous commands
 
 		// Create a Graphics Queue Family Command Pool
-		VkResult Result = vkCreateCommandPool(MainDevice.LD, &CommandPoolCreateInfo, nullptr, &GraphicsCommandPool);
+		VkResult Result = vkCreateCommandPool(MainDevice.LD, &CommandPoolCreateInfo, nullptr, &MainDevice.GraphicsCommandPool);
 		RESULT_CHECK(Result, "Fail to create a command pool.");
 	}
 
@@ -907,7 +899,7 @@ namespace VKE
 
 		VkCommandBufferAllocateInfo cbAllocInfo = {};						// Memory exists already, only get it from the pool
 		cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		cbAllocInfo.commandPool = GraphicsCommandPool;						// Only works for graphics command pool
+		cbAllocInfo.commandPool = MainDevice.GraphicsCommandPool;						// Only works for graphics command pool
 		cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;				// VK_COMMAND_BUFFER_LEVEL_PRIMARY: Submitted directly to queue, can not be called by another command buffer
 																			// VK_COMMAND_BUFFER_LEVEL_SECONDARY: Command buffer within a command buffer e.g. VkCmdExecuteCommands(another command buffer)
 		cbAllocInfo.commandBufferCount = static_cast<uint32_t>(CommandBuffers.size());		// Allows allocating multiple command buffers at the same time
@@ -946,27 +938,7 @@ namespace VKE
 		}
 	}
 
-	void VKRenderer::createTextureSampler()
-	{
-		VkSamplerCreateInfo SamplerCreateInfo = {};
-		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// magnified filtering
-		SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// minified filtering
-		SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in U (x) direction
-		SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in V (y) direction
-		SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in W (z) direction
-		SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border is black
-		SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Normalized coordinate, the value of the coordinate is (0, 1), if true, (0, image size)
-		SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap filtering
-		SamplerCreateInfo.mipLodBias = 0.0f;								// LOD Bias for mipmap
-		SamplerCreateInfo.minLod = 0.0f;									// Min / Max LOD to pick mip-level
-		SamplerCreateInfo.maxLod = 0.0f;
-		SamplerCreateInfo.anisotropyEnable = VK_TRUE;						// Anisotropy filtering enable, anti-aliasing technique
-		SamplerCreateInfo.maxAnisotropy = 16;								// Anisotropy sample level
 
-		VkResult Result = vkCreateSampler(MainDevice.LD, &SamplerCreateInfo, nullptr, &TextureSampler);
-		RESULT_CHECK(Result, "Fail to create sampler.");
-	}
 
 	void VKRenderer::createUniformBuffer()
 	{
@@ -1064,23 +1036,24 @@ namespace VKE
 		}
 	}
 
-	void VKRenderer::updateUniformBuffers(uint32_t ImageIndex)
+	void VKRenderer::updateUniformBuffers()
 	{
 		// Copy Frame data
-		Descriptor_Frame[ImageIndex].UpdateBufferData(&FrameData);
+		Descriptor_Frame[SwapChain.ImageIndex].UpdateBufferData(&FrameData);
 
 		// Update model data to pDrawcallTransferSpace
 		for (size_t i = 0; i < RenderList.size(); ++i)
 		{
 			using namespace BufferFormats;
-			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[ImageIndex].GetAllocatedMemory()) + (i * Descriptor_Drawcall[ImageIndex].GetSlotSize()));
+			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetAllocatedMemory()) + (i * Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()));
 			*Drawcall = RenderList[i]->Transform.M();
 		}
 		// Copy Model data
 		// Reuse void* Data
-		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[ImageIndex].GetSlotSize()) * RenderList.size();
-		Descriptor_Drawcall[ImageIndex].UpdatePartialData(Descriptor_Drawcall[ImageIndex].GetAllocatedMemory(), 0, DBufferSize);
+		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * RenderList.size();
+		Descriptor_Drawcall[SwapChain.ImageIndex].UpdatePartialData(Descriptor_Drawcall[SwapChain.ImageIndex].GetAllocatedMemory(), 0, DBufferSize);
 	}
+
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
 	{
@@ -1178,13 +1151,12 @@ namespace VKE
 
 	bool VKRenderer::checkDeviceSuitable(const VkPhysicalDevice& device)
 	{
-
+		getQueueFamilies(device);
 		// Information about what the device supports (geo shader, tess shader, wide lines, etc)
 		VkPhysicalDeviceFeatures deviceFeatures;
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-		FQueueFamilyIndices indices = getQueueFamilies(device);
-		if (!indices.IsValid())
+		if (!QueueFamilies.IsValid())
 		{
 			return false;
 		}
@@ -1226,210 +1198,6 @@ namespace VKE
 		throw std::runtime_error("Fail to find a matching format!");
 	}
 
-	VkImageView VKRenderer::CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags)
-	{
-		VkImageViewCreateInfo ViewCreateInfo = {};
-		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		ViewCreateInfo.image = iImage;
-		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;						// Type of image (e.g. 2D, 3D, cubemap)
-		ViewCreateInfo.format = iFormat;										// Format of the image (e.g. R8G8B8)
-		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;			// Allows remapping rgba components to other rgba values
-		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		// SubResources allows the view to view only a part of am image
-		ViewCreateInfo.subresourceRange.aspectMask = iAspectFlags;				// Which aspect of image to view (e.g. VK_IMAGE_ASPECT_COLOR_BIT for view)
-		ViewCreateInfo.subresourceRange.baseMipLevel = 0;						// Start mipmap level to view from
-		ViewCreateInfo.subresourceRange.levelCount = 1;							// Number of mipmap levels to view
-		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;						// Start array level to view from
-		ViewCreateInfo.subresourceRange.layerCount = 1;							// Number of array levels to view 
-
-		// Create Image view and return it
-		VkImageView ImageView;
-		VkResult Result = vkCreateImageView(MainDevice.LD, &ViewCreateInfo, nullptr, &ImageView);
-		RESULT_CHECK(Result, "Fail to create an Image View");
-
-		return ImageView;
-	}
-
-	bool VKRenderer::createImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory)
-	{
-		// CREATE IMAGE
-		VkImageCreateInfo ImgCreateInfo = {};
-		ImgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		ImgCreateInfo.usage = UseFlags;
-		ImgCreateInfo.format = Format;
-		ImgCreateInfo.tiling = Tiling;								// How image data should be "tiled" (arranged for optimal)
-		ImgCreateInfo.extent.width = Width;
-		ImgCreateInfo.extent.height = Height;
-		ImgCreateInfo.extent.depth = 1;								// No 3D aspect
-		ImgCreateInfo.mipLevels = 1;								// LOD
-		ImgCreateInfo.arrayLayers = 1;								// Use for cubemap
-		ImgCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;	// Initial layout of image data on creation
-		ImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;				// For multi-sampling
-		ImgCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;		// whether image can be shared between queues
-
-		VkResult Result = vkCreateImage(MainDevice.LD, &ImgCreateInfo, nullptr, &oImage);
-		RESULT_CHECK(Result, "Fail to create an Image.");
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-		// Get memory requirements for a type of image
-		VkMemoryRequirements MemoryRequireMents;
-		vkGetImageMemoryRequirements(MainDevice.LD, oImage, &MemoryRequireMents);
-
-		// CREATE MEMORY FOR IMAGE
-		// Allocate memory to buffer
-		VkMemoryAllocateInfo MemAllocInfo = {};
-		MemAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemAllocInfo.allocationSize = MemoryRequireMents.size;
-		MemAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(MainDevice.PD,
-			MemoryRequireMents.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
-			PropFlags										// Memory property, is this local_bit or host_bit or others
-		);
-
-		// Allocate memory to VKDevieMemory
-		Result = vkAllocateMemory(MainDevice.LD, &MemAllocInfo, nullptr, &oImageMemory);
-		RESULT_CHECK(Result, "Fail to allocate memory for image.");
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-
-		Result = vkBindImageMemory(MainDevice.LD, oImage, oImageMemory, 0);
-		RESULT_CHECK(Result, "Fail to bind image with memory.");
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-		return true;
-	}
-
-	int VKRenderer::createTextureImage(const std::string& fileName)
-	{
-		// Load image file
-		int Width, Height;
-		VkDeviceSize ImageSize;
-
-		unsigned char* ImageData = FileIO::LoadTextureFile(fileName, Width, Height, ImageSize);
-		if (!ImageData)
-		{
-			return -1;
-		}
-
-		// Create staging buffer to hold loaded data, ready to copy to device
-		cBuffer StagingBuffer;
-		if (!StagingBuffer.CreateBufferAndAllocateMemory(MainDevice.PD, MainDevice.LD, ImageSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-		)) return false;
-
-		// Map memory to the staging buffer
-		void * pData = nullptr;
-		vkMapMemory(MainDevice.LD, StagingBuffer.GetMemory(), 0, ImageSize, 0, &pData);
-		memcpy(pData, ImageData, static_cast<size_t>(ImageSize));
-		vkUnmapMemory(MainDevice.LD, StagingBuffer.GetMemory());
-
-		// Free allocated memory for loading textures
-		FileIO::freeLoadedTextureData(ImageData);
-
-		// 1. Create image to hold final texture
-		VkImage TextureImage;
-		VkDeviceMemory TexImageMemory;
-
-		if (!createImage(Width, Height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,								// Destination of transfer, and also a texture sampler
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			TextureImage, TexImageMemory))
-		{
-			return -1;
-		}
-
-		// 2. COPY DATA TO THE IMAGE
-		// Transition image to be DST for copy operation
-		TransitionImageLayout(MainDevice.LD, graphicQueue, GraphicsCommandPool, TextureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-		// Actual copy command
-		CopyImageBuffer(MainDevice.LD, graphicQueue, GraphicsCommandPool, StagingBuffer.GetBuffer(), TextureImage, Width, Height);
-
-		// Transition image to be shader readable for shader usage
-		TransitionImageLayout(MainDevice.LD, graphicQueue, GraphicsCommandPool, TextureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-		// 3. Store the reference
-		TextureImages.push_back(TextureImage);
-		TextureImageMemories.push_back(TexImageMemory);
-
-		// 4. Clean up staging buffer parts
-		StagingBuffer.cleanUp();
-
-		return TextureImages.size() - 1;
-	}
-
-	int VKRenderer::createTexture(const std::string& fileName)
-	{
-		// Create texture image and get its location
-		int textureImageLoc = createTextureImage(fileName);
-		VkImageView ImgVeiw = CreateImageViewFromImage(TextureImages[textureImageLoc], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-		TextureImageViews.push_back(ImgVeiw);
-
-		// Create Descriptor Set Here
-		int descriptorLoc = createTextureDescriptor(ImgVeiw, ImgVeiw);
-
-		return descriptorLoc;
-	}
-
-	int VKRenderer::createTextureDescriptor(VkImageView TextureImage, VkImageView NormalImage)
-	{
-		VkDescriptorSet DescriptorSet;
-		
-		// Allocate memory for descriptor
-		VkDescriptorSetAllocateInfo SetAllocInfo = {};
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = SamplerDescriptorPool;
-		SetAllocInfo.pSetLayouts = &SamplerSetLayout;
-		SetAllocInfo.descriptorSetCount = 1;			// Can create multiple at one time if multiple images are loaded
-
-		VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &SetAllocInfo, &DescriptorSet);
-		RESULT_CHECK(Result, " Fail to Allocate Texture Descriptor Set");
-	
-		VkDescriptorImageInfo ImageInfos[2] = {};
-		ImageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
-		ImageInfos[0].imageView = TextureImage;
-		ImageInfos[0].sampler = TextureSampler;
-		
-		ImageInfos[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
-		ImageInfos[1].imageView = NormalImage;
-		ImageInfos[1].sampler = TextureSampler;
-
-		// Descriptor write info
-		VkWriteDescriptorSet DescriptorWrites[2] = {};
-		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescriptorWrites[0].dstSet = DescriptorSet;
-		DescriptorWrites[0].dstBinding = 0;
-		DescriptorWrites[0].dstArrayElement = 0;
-		DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		DescriptorWrites[0].descriptorCount = 1;
-		DescriptorWrites[0].pImageInfo = &ImageInfos[0];
-
-		DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescriptorWrites[1].dstSet = DescriptorSet;
-		DescriptorWrites[1].dstBinding = 1;
-		DescriptorWrites[1].dstArrayElement = 0;
-		DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		DescriptorWrites[1].descriptorCount = 1;
-		DescriptorWrites[1].pImageInfo = &ImageInfos[1];
-
-		// Update new descriptor set
-		vkUpdateDescriptorSets(MainDevice.LD, 2, DescriptorWrites, 0, nullptr);
-
-		SamplerDescriptorSets.push_back(DescriptorSet);
-
-		return SamplerDescriptorSets.size() - 1;
-	}
 	bool VKRenderer::CreateModel(const std::string& ifileName, cModel*& oModel)
 	{
 		// Import model "scene"
@@ -1464,24 +1232,25 @@ namespace VKE
 			}
 			else
 			{
+				auto newTex = cTexture::Load(TextureNames[i], MainDevice, VK_FORMAT_R8G8B8A8_UNORM);
 				// Set value to index of new texture
-				MatToTex[i] = createTexture(TextureNames[i]);
+				MatToTex[i] = newTex->GetID();
 			}
 		}
 
-		std::vector<std::shared_ptr<cMesh>> Meshes = cModel::LoadNode(ifileName, MainDevice, graphicQueue, GraphicsCommandPool, scene->mRootNode, scene, MatToTex);
-
+		std::vector<std::shared_ptr<cMesh>> Meshes = cModel::LoadNode(ifileName, MainDevice, MainDevice.graphicQueue, MainDevice.GraphicsCommandPool, scene->mRootNode, scene, MatToTex);
+		for (auto& Mesh : Meshes)
+		{
+			Mesh->CreateDescriptorSet(SamplerSetLayout, SamplerDescriptorPool);
+		}
 		oModel = DBG_NEW cModel(Meshes);
-		
+
 		return true;
 	}
 
-	
-
-
-	void VKRenderer::recordCommands(uint32_t ImageIndex)
+	void VKRenderer::recordCommands()
 	{
-		VkCommandBuffer& CB = CommandBuffers[ImageIndex];
+		VkCommandBuffer& CB = CommandBuffers[SwapChain.ImageIndex];
 		// Begin info can be the same
 		VkCommandBufferBeginInfo BufferBeginInfo = {};
 		BufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1502,11 +1271,11 @@ namespace VKE
 		RenderPassBeginInfo.pClearValues = ClearValues;								// List of clear values 
 		RenderPassBeginInfo.clearValueCount = ClearColorCount;
 
-		RenderPassBeginInfo.framebuffer = SwapChainFramebuffers[ImageIndex];
+		RenderPassBeginInfo.framebuffer = SwapChainFramebuffers[SwapChain.ImageIndex];
 
 		// Start recording commands to command buffer
 		VkResult Result = vkBeginCommandBuffer(CB, &BufferBeginInfo);
-		RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", ImageIndex);
+		RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", SwapChain.ImageIndex);
 
 		/** Record part */
 		// Begin Render Pass
@@ -1524,7 +1293,7 @@ namespace VKE
 
 		for (size_t j = 0; j < RenderList.size(); ++j)
 		{
-		
+
 			// Push constant to given shader stage directly (No Buffer)
 			glm::mat4 MVP = FrameData.PVMatrix * RenderList[j]->Transform.M();
 			vkCmdPushConstants(CB, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
@@ -1546,10 +1315,10 @@ namespace VKE
 				vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 				// Dynamic Offset Amount
-				uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[ImageIndex].GetSlotSize()) * j;
+				uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * j;
 
 				const uint32_t DescriptorSetCount = 2;
-				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[ImageIndex], SamplerDescriptorSets[Mesh->GetTextureID()] };
+				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex], Mesh->GetDescriptorSet()};
 
 				// Bind Descriptor sets for Projection / View / Model matrix
 				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
@@ -1563,10 +1332,10 @@ namespace VKE
 					1,						// For drawing same object multiple times
 					0, 0);*/
 
-					// Execute pipeline, Index draw
+				// Execute pipeline, Index draw
 				vkCmdDrawIndexed(CB, Mesh->GetIndexCount(), 1, 0, 0, 0);
 			}
-			
+
 		}
 
 		// End Render Pass
@@ -1574,15 +1343,13 @@ namespace VKE
 
 
 		Result = vkEndCommandBuffer(CB);
-		RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", ImageIndex);
+		RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", SwapChain.ImageIndex);
 
 	}
 
 
-	FQueueFamilyIndices VKRenderer::getQueueFamilies(const VkPhysicalDevice& device)
+	void VKRenderer::getQueueFamilies(const VkPhysicalDevice& device)
 	{
-		FQueueFamilyIndices indices;
-
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
@@ -1596,24 +1363,23 @@ namespace VKE
 			// At least one queue and it has graphic queue family (a queue could be multiple types)
 			if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
 			{
-				indices.graphicFamily = i;
+				QueueFamilies.graphicFamily = i;
 			}
 			VkBool32 presentationSuppot = false;
 			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Surface, &presentationSuppot);
 			// Check if queue is presentation type (can be both graphics and presentations)
 			if (queueFamily.queueCount > 0 && presentationSuppot)
 			{
-				indices.presentationFamily = i;
+				QueueFamilies.presentationFamily = i;
 			}
 			// If both graphic family and presentation family are found, no need to keep going
-			if (indices.graphicFamily >= 0 && indices.graphicFamily >= 0)
+			if (QueueFamilies.graphicFamily >= 0 && QueueFamilies.presentationFamily >= 0)
 			{
 				break;
 			}
 			++i;
 		}
 
-		return indices;
 	}
 
 	FSwapChainDetail VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)

@@ -32,7 +32,6 @@
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
 #define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
 
-// Indices (location) of Queue Families (if they exist at all)
 namespace VKE
 {
 	// ================================================
@@ -73,10 +72,15 @@ namespace VKE
 
 	struct FMainDevice
 	{
-		VkPhysicalDevice PD;		// Physical Device
-		VkDevice LD;				// Logical Device
+		VkPhysicalDevice PD;					// Physical Device
+		VkDevice LD;							// Logical Device
+		VkQueue graphicQueue;					// Graphic Queue,also transfer queue
+		VkQueue presentationQueue;				// Presentation Queue
+
+		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
 	};
 
+	// Indices (location) of Queue Families (if they exist at all)
 	struct FQueueFamilyIndices
 	{
 		int graphicFamily = -1;			// Location of Graphics Queue Family
@@ -91,6 +95,7 @@ namespace VKE
 		std::vector< VkSurfaceFormatKHR> ImgFormats;			// Image formats, e.g. rgb, rgba, r16g16b16a16
 		std::vector<VkPresentModeKHR> PresentationModes;		// How image should be presented to screen
 
+
 		bool IsValid() const { return ImgFormats.size() > 0 && PresentationModes.size() > 0; }
 		VkSurfaceFormatKHR getSurfaceFormat() const;
 		VkPresentModeKHR getPresentationMode() const;
@@ -103,13 +108,15 @@ namespace VKE
 		VkImageView ImgView;								// Describes how to read an image (2D or 3D addresses), and what part of the image to read (color channels, mipmap levels, etc.)
 	};
 
-
 	struct FSwapChainData
 	{
 		std::vector<FSwapChainImage> Images;		// Array of uint64_t * 2
 		VkSwapchainKHR SwapChain;							// uint64_t
 		VkExtent2D Extent;									// uint32_t* 2
 		VkFormat ImageFormat;								// enum
+		uint32_t ImageIndex;						// current updating framebuffer index, also the index of next image to be drawn
+
+		void acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore);
 	};
 
 	struct FShaderModuleScopeGuard
@@ -145,6 +152,10 @@ namespace VKE
 	// Getter and setter for MinUniformOffsetAlignment
 	void SetMinUniformOffsetAlignment(VkDeviceSize Size);
 	VkDeviceSize GetMinUniformOffsetAlignment();
+
+	// Image creation related
+	VkImageView CreateImageViewFromImage(FMainDevice* iMainDevice, const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
+	bool CreateImage(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
 
 	void TransitionImageLayout(VkDevice LD, VkQueue Queue, VkCommandPool CommandPool, VkImage Image, VkImageLayout CurrentLayout, VkImageLayout NewLayout);
 

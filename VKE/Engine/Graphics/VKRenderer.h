@@ -39,10 +39,8 @@ namespace VKE
 		// - Main Components
 		FMainDevice MainDevice;
 		VkInstance vkInstance;
-		VkQueue graphicQueue;
-		VkQueue presentationQueue;
 		VkSurfaceKHR Surface;								// KHR extension required
-
+		FQueueFamilyIndices QueueFamilies;					// Queue families
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
 		FSwapChainData SwapChain;							// SwapChain data group
 		std::vector<VkFramebuffer> SwapChainFramebuffers;	
@@ -57,9 +55,6 @@ namespace VKE
 		VkRenderPass RenderPass;
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
-
-		// -Pools
-		VkCommandPool GraphicsCommandPool;					// Command Pool only used for graphic command
 
 		// -Synchronization
 		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage
@@ -79,7 +74,6 @@ namespace VKE
 		// -- Sampler Descriptor Set
 		VkDescriptorSetLayout SamplerSetLayout;
 		VkDescriptorPool SamplerDescriptorPool;
-		VkSampler TextureSampler;
 
 		// - Assets
 		std::vector<VkImage> TextureImages;
@@ -91,6 +85,7 @@ namespace VKE
 		void createInstance();
 		void getPhysicalDevice();
 		void createLogicalDevice();
+
 		void createSurface();
 		void createSwapChain();
 		void createRenderPass();
@@ -102,13 +97,16 @@ namespace VKE
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSynchronization();
-		void createTextureSampler();
 		
 		void createUniformBuffer();
 		void createDescriptorPool();
 		void createDescriptorSets();
 
-		void updateUniformBuffers(uint32_t ImageIndex);
+		/** intermediate functions */
+		void prepareForDraw();
+		void recordCommands();
+		void updateUniformBuffers();
+		void presentFrame();
 
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
@@ -117,17 +115,11 @@ namespace VKE
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
 		VkFormat chooseSupportedFormat(const std::vector<VkFormat>& Formats, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
 		/** -Component Create functions */
-		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
-		bool createImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
-		int createTextureImage(const std::string& fileName);
-		int createTexture(const std::string& fileName);
+
 		int createTextureDescriptor(VkImageView TextureImage, VkImageView NormalImage);
 
-		/** Record functions */
-		void recordCommands(uint32_t ImageIndex);
-
 		/** Getters */
-		FQueueFamilyIndices getQueueFamilies(const VkPhysicalDevice& device);
+		void getQueueFamilies(const VkPhysicalDevice& device);
 		FSwapChainDetail getSwapChainDetail(const VkPhysicalDevice& device);
 	};
 

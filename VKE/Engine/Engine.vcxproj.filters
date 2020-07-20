@@ -37,6 +37,9 @@
     <Filter Include="Source Files\Graphics\Model">
       <UniqueIdentifier>{e92c7115-4590-400d-9723-3034e6a27ed1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Graphics\Texture">
+      <UniqueIdentifier>{a52b2ace-5685-4a43-86c9-7029cc85af33}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -65,6 +68,9 @@
     </ClCompile>
     <ClCompile Include="Graphics\Mesh\Mesh.cpp">
       <Filter>Source Files\Graphics\Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Texture\Texture.cpp">
+      <Filter>Source Files\Graphics\Texture</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -100,6 +106,9 @@
     </ClInclude>
     <ClInclude Include="Graphics\Mesh\Mesh.h">
       <Filter>Source Files\Graphics\Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Texture\Texture.h">
+      <Filter>Source Files\Graphics\Texture</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
