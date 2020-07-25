@@ -76,9 +76,6 @@ namespace VKE
 		VkDescriptorPool SamplerDescriptorPool;
 
 		// - Assets
-		std::vector<VkImage> TextureImages;
-		std::vector<VkDeviceMemory> TextureImageMemories;					// All texture should be in one memory with offset, but simplicity, multiple memories are used here
-		std::vector<VkImageView> TextureImageViews;
 		std::vector<VkDescriptorSet> SamplerDescriptorSets;					// Each image needs a descriptor (sampler)
 
 		/** Create functions */
