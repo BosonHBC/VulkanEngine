@@ -7,10 +7,11 @@
 #include "Utilities.h"
 #include "BufferFormats.h"
 #include "Descriptors/Descriptor_Dynamic.h"
+#include "Mesh/Mesh.h"
 
 namespace VKE
 {
-	class cMesh;
+	class cModel;
 	class VKRenderer
 	{
 	public:
@@ -25,23 +26,21 @@ namespace VKE
 		void draw();
 		void cleanUp();
 
+		bool CreateModel(const std::string& ifileName, cModel*& oModel);
+		// Scene Objects
+		std::vector<cModel*> RenderList;
+		BufferFormats::FFrame FrameData;
 	private:
 		GLFWwindow* window;
 
 		uint64_t ElapsedFrame = 0;
-		// Scene Objects
-		std::vector<cMesh*> RenderList;
-		BufferFormats::FFrame FrameData;
-
 
 		// Vulkan Components
 		// - Main Components
 		FMainDevice MainDevice;
 		VkInstance vkInstance;
-		VkQueue graphicQueue;
-		VkQueue presentationQueue;
 		VkSurfaceKHR Surface;								// KHR extension required
-
+		FQueueFamilyIndices QueueFamilies;					// Queue families
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
 		FSwapChainData SwapChain;							// SwapChain data group
 		std::vector<VkFramebuffer> SwapChainFramebuffers;	
@@ -51,14 +50,11 @@ namespace VKE
 		VkImage DepthBufferImage;
 		VkDeviceMemory DepthBufferImageMemory;
 		VkImageView DepthBufferImageView;
-
+		
 		// -Pipeline
 		VkRenderPass RenderPass;
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
-
-		// -Pools
-		VkCommandPool GraphicsCommandPool;					// Command Pool only used for graphic command
 
 		// -Synchronization
 		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage
@@ -66,18 +62,27 @@ namespace VKE
 		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself
 
 		// - Descriptors
+#pragma region Uniform Buffer / Dynamic Descripotor set
 		VkDescriptorSetLayout DescriptorSetLayout;
-		VkPushConstantRange PushConstantRange;
 		VkDescriptorPool DescriptorPool;
 		std::vector<VkDescriptorSet> DescriptorSets;
-
 		std::vector<cDescriptor> Descriptor_Frame;
 		std::vector<cDescriptor_Dynamic> Descriptor_Drawcall;
+#pragma endregion
+		// -- Push Constant
+		VkPushConstantRange PushConstantRange;
+		// -- Sampler Descriptor Set
+		VkDescriptorSetLayout SamplerSetLayout;
+		VkDescriptorPool SamplerDescriptorPool;
+
+		// - Assets
+		std::vector<VkDescriptorSet> SamplerDescriptorSets;					// Each image needs a descriptor (sampler)
 
 		/** Create functions */
 		void createInstance();
 		void getPhysicalDevice();
 		void createLogicalDevice();
+
 		void createSurface();
 		void createSwapChain();
 		void createRenderPass();
@@ -94,7 +99,11 @@ namespace VKE
 		void createDescriptorPool();
 		void createDescriptorSets();
 
-		void updateUniformBuffers(uint32_t ImageIndex);
+		/** intermediate functions */
+		void prepareForDraw();
+		void recordCommands();
+		void updateUniformBuffers();
+		void presentFrame();
 
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
@@ -103,13 +112,11 @@ namespace VKE
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
 		VkFormat chooseSupportedFormat(const std::vector<VkFormat>& Formats, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
 		/** -Component Create functions */
-		VkImageView CreateImageViewFromImage(const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
-		bool createImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
-		/** Record functions */
-		void recordCommands(uint32_t ImageIndex);
+
+		int createTextureDescriptor(VkImageView TextureImage, VkImageView NormalImage);
 
 		/** Getters */
-		FQueueFamilyIndices getQueueFamilies(const VkPhysicalDevice& device);
+		void getQueueFamilies(const VkPhysicalDevice& device);
 		FSwapChainDetail getSwapChainDetail(const VkPhysicalDevice& device);
 	};
 

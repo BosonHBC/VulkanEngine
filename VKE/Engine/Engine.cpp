@@ -9,6 +9,7 @@
 // Systems
 #include "stdio.h"
 #include <string>
+#include "Model/Model.h"
 
 namespace VKE {
 	//=================== Parameters =================== 
@@ -29,12 +30,22 @@ namespace VKE {
 		int result = EXIT_SUCCESS;
 		initGLFW();
 
-		g_renderer = new VKRenderer();
+		g_renderer = DBG_NEW VKRenderer();
 		if (g_renderer->init(g_Window) == EXIT_FAILURE)
 		{
 			return EXIT_FAILURE;
 		}
 		
+		// Create Mesh
+		cModel* pContainerModel = nullptr;
+
+		g_renderer->CreateModel("Container.obj", pContainerModel);
+		g_renderer->RenderList.push_back(pContainerModel);
+
+		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
+		pContainerModel->Transform.gRotate(glm::vec3(0, 1, 0), 45);
+		pContainerModel->Transform.Update();
+
 		return result;
 	}
 
