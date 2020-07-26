@@ -20,7 +20,7 @@ namespace VKE
 			}
 		}
 
-		void FUserInput::AddAxisKeyPairToMap(const char* i_axisName,const FAxisBrother& i_keycodes)
+		void FUserInput::AddAxisKeyPairToMap(const char* i_axisName, const FAxisBrother& i_keycodes)
 		{
 			m_axisKeyMap.insert(
 				{
@@ -65,6 +65,13 @@ namespace VKE
 
 		void FUserInput::UpdateInput()
 		{
+			// Don't want the app update input while the app is not in focus
+			if (!bAppInFocus)
+			{
+				MouseDelta.x = 0;
+				MouseDelta.y = 0;
+				return;
+			}
 			// iterate through all action bindings
 			{
 				for (auto it = m_actionBindings.begin(); it != m_actionBindings.end(); ++it)
@@ -75,17 +82,17 @@ namespace VKE
 					// According to the input event type to do input check
 					switch (it->GetInputType())
 					{
-					case IT_OnPressed:
+					case EIT_OnPressed:
 						if (isKeyDown && !m_keyStatusMap[key]) {
 							it->Execute();
 						}
 						break;
-					case IT_OnReleased:
+					case EIT_OnReleased:
 						if (!isKeyDown && m_keyStatusMap[key]) {
 							it->Execute();
 						}
 						break;
-					case IT_OnHold:
+					case EIT_OnHold:
 						if (isKeyDown) {
 							it->Execute();
 						}
@@ -122,6 +129,16 @@ namespace VKE
 			{
 				it->second = IsKeyDown(it->first);
 			}
+			POINT p;
+			if (GetCursorPos(&p))
+			{
+				//cursor position now in p.x and p.y
+				MouseDelta.x = p.x - MousePos.x;
+				MouseDelta.y = p.y - MousePos.y;
+
+				MousePos.x = static_cast<float>(p.x);
+				MousePos.y = static_cast<float>(p.y);
+			}
 		}
 
 		bool FUserInput::IsActionNameValid(const char* i_actionName)
@@ -152,6 +169,7 @@ namespace VKE
 			m_boundKeyCode[1] = i_axisKeyMap.at(i_axisName).positive_key;
 			m_boundDelegate = nullptr;
 		}
+
 	}
 }
 

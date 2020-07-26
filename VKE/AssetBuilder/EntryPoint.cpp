@@ -26,14 +26,14 @@ bool CopyFile(const std::string& iFileName)
 	std::string sourceFile = SOLUTION_DIR + SRC_PATH + iFileName;
 	std::string destFilePath = SOLUTION_DIR + DEST_PATH_PREFIX;// + _PLATFORM + _CONFIGURATION;
 
-	std::vector<const char*> Folders = { "Content", "Shaders" };
+	std::vector<std::string> Folders = { "Content", "Shaders" };
 	size_t lastFolderIdx = 0;
 	for (size_t i = 0; i < iFileName.length(); ++i)
 	{
 		if (iFileName[i] == '/')
 		{
 			auto substr = iFileName.substr(lastFolderIdx, i - lastFolderIdx);
-			Folders.push_back(substr.c_str());
+			Folders.push_back(substr);
 			lastFolderIdx = i + 1;
 		}
 	}

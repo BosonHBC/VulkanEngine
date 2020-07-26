@@ -3,12 +3,14 @@
 //#define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
-#include <vector>
+#include "Engine.h"
 #include "Utilities.h"
+
 #include "BufferFormats.h"
 #include "Descriptors/Descriptor_Dynamic.h"
 #include "Mesh/Mesh.h"
 
+#include <vector>
 namespace VKE
 {
 	class cModel;
@@ -29,7 +31,6 @@ namespace VKE
 		bool CreateModel(const std::string& ifileName, cModel*& oModel);
 		// Scene Objects
 		std::vector<cModel*> RenderList;
-		BufferFormats::FFrame FrameData;
 	private:
 		GLFWwindow* window;
 

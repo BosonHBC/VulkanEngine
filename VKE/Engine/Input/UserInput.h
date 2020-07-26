@@ -2,16 +2,17 @@
 #include <vector>
 #include <map>
 #include "InputDelegate.h"
-
-#define IT_OnPressed 1
-#define IT_OnReleased 2
-#define IT_OnHold 3
+#include "glm/glm.hpp"
 
 struct GLFWwindow;
 namespace VKE {
 	namespace UserInput {
 		enum EKeyCode
 		{
+			LMB = 0x01,	// left mouse
+			RMB = 0x02,	// right mouse
+			MMB = 0x04,	// middle mouse
+
 			Left = 0x25,
 			Up = 0x26,
 			Right = 0x27,
@@ -86,7 +87,7 @@ namespace VKE {
 		// -------------------------------
 		// Input Type
 		// 5 common Input types for keyboard
-		enum EInputType
+		enum EInputType : uint8_t
 		{
 			EIT_OnPressed = 1,
 			EIT_OnReleased = 2,
@@ -101,7 +102,7 @@ namespace VKE {
 		public:
 			/** Constructor for FActionBinding struct*/
 			FActionBinding()
-				:m_boundKeyCode(), m_InputType(IT_OnPressed), m_boundDelegate(nullptr)
+				:m_boundKeyCode(), m_InputType(EIT_OnPressed), m_boundDelegate(nullptr)
 			{}
 
 			FActionBinding(const char* i_actionName, const std::map<std::string, EKeyCode>& i_actionKeyMap, InputType i_inputType);
@@ -172,13 +173,18 @@ namespace VKE {
 			/** Core update function to check and update binding maps. Should be called in a Tick function*/
 			void UpdateInput();
 
+			bool bAppInFocus = true;
+
+			glm::vec2 GetMousePosition() { return MousePos; }
+			glm::vec2 GetMouseDelta() { return MouseDelta; }
+
 #pragma region BindAction
 			/** Bind an action to a [void] static / global function with no input parameter
 			* i_actionName: the name of the action in data table
 			* i_inputType: the input event
 			* i_func: function to bound
 			*/
-			bool BindAction(const char* i_actionName, const InputType i_inputType, void(*i_func)())
+			bool BindAction(const char* i_actionName, const EInputType i_inputType, void(*i_func)())
 			{
 				bool result = true;
 				if (!(result = IsActionNameValid(i_actionName) ? true : false)) {
@@ -201,13 +207,19 @@ namespace VKE {
 			* i_func: function to bound
 			*/
 			template<class T>
-			bool BindAction(const char* i_actionName, const InputType i_inputType, T* i_ptr, void(T::* i_func)())
+			bool BindAction(const char* i_actionName, const EInputType i_inputType, T* i_ptr, void(T::* i_func)())
 			{
 				bool result = true;
 				if (!(result = IsActionNameValid(i_actionName) ? true : false)) {
 					// Invalid action name
 					result = false;
 					printf("The action name: [%s] doesn't exist in the data", i_actionName);
+					return result;
+				}
+				if (i_ptr == nullptr)
+				{
+					result = false;
+					printf("Bound object is nullptr\n");
 					return result;
 				}
 				FActionBinding newActionBinding = FActionBinding(i_actionName, m_actionKeyMap, i_inputType);
@@ -251,7 +263,13 @@ namespace VKE {
 				if (!(result = IsAxisNameValid(i_axisName) ? true : false)) {
 					// Invalid axis name
 					result = false;
-					printf("The axis name: [%s] doesn't exist in the data", i_axisName);
+					printf("The axis name: [%s] doesn't exist in the data\n", i_axisName);
+					return result;
+				}
+				if (i_ptr == nullptr)
+				{
+					result = false;
+					printf("Bound object is nullptr\n");
 					return result;
 				}
 				FAxisBinding newAxisBinding = FAxisBinding(i_axisName, m_axisKeyMap);
@@ -292,6 +310,10 @@ namespace VKE {
 
 			/** record the outdated key code status map, true -> keyDown*/
 			std::map< EKeyCode, bool> m_keyStatusMap;
+
+			// Mouse related data
+			glm::vec2 MousePos;
+			glm::vec2 MouseDelta;
 		};
 
 	}

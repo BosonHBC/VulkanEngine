@@ -1,8 +1,9 @@
 #include "VKRenderer.h"
 
+#include "Camera.h"
 #include "Mesh/Mesh.h"
 #include "Texture/Texture.h"
-#include "../Transform/Transform.h"
+#include "Transform/Transform.h"
 #include "Model/Model.h"
 
 #include <stdexcept>
@@ -51,14 +52,6 @@ namespace VKE
 			printf("ERROR: %s \n", e.what());
 			return EXIT_FAILURE;
 		}
-
-		//set up MVP
-		glm::mat4 Projection = glm::perspective(glm::radians(45.f), (float)SwapChain.Extent.width / (float)SwapChain.Extent.height, 0.1f, 100.f);
-		Projection[1][1] *= -1;				// inverting Y axis since glm treats
-		FrameData = BufferFormats::FFrame(
-			Projection,
-			glm::lookAt(glm::vec3(0.f, 3.f, 1.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
-		);
 
 		// Create Texture
 		cTexture::Load("DefaultWhite.png", MainDevice);
@@ -1038,9 +1031,10 @@ namespace VKE
 
 	void VKRenderer::updateUniformBuffers()
 	{
+
 		int idx = SwapChain.ImageIndex;
 		// Copy Frame data
-		Descriptor_Frame[idx].UpdateBufferData(&FrameData);
+		Descriptor_Frame[idx].UpdateBufferData(&GetCurrentCamera()->GetFrameData());
 
 		// Update model data to pDrawcallTransferSpace
 		for (size_t i = 0; i < RenderList.size(); ++i)
@@ -1296,7 +1290,7 @@ namespace VKE
 		{
 
 			// Push constant to given shader stage directly (No Buffer)
-			glm::mat4 MVP = FrameData.PVMatrix * RenderList[j]->Transform.M();
+			glm::mat4 MVP = GetCurrentCamera()->GetFrameData().PVMatrix * RenderList[j]->Transform.M();
 			vkCmdPushConstants(CB, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0,
 				sizeof(glm::mat4),					// Size of data being pushed
