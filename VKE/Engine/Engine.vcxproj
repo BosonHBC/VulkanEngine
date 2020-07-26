@@ -168,6 +168,8 @@
     <ClCompile Include="Graphics\Texture\Texture.cpp" />
     <ClCompile Include="Graphics\Utilities.cpp" />
     <ClCompile Include="Graphics\VKRenderer.cpp" />
+    <ClCompile Include="Input\InputDelegate.cpp" />
+    <ClCompile Include="Input\UserInput.cpp" />
     <ClCompile Include="Transform\Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -182,6 +184,8 @@
     <ClInclude Include="Graphics\Texture\Texture.h" />
     <ClInclude Include="Graphics\Utilities.h" />
     <ClInclude Include="Graphics\VKRenderer.h" />
+    <ClInclude Include="Input\InputDelegate.h" />
+    <ClInclude Include="Input\UserInput.h" />
     <ClInclude Include="Transform\Transform.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

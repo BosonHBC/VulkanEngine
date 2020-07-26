@@ -111,9 +111,6 @@ namespace VKE
 		bool checkDeviceExtensionSupport(const VkPhysicalDevice& device);
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);
 		VkFormat chooseSupportedFormat(const std::vector<VkFormat>& Formats, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
-		/** -Component Create functions */
-
-		int createTextureDescriptor(VkImageView TextureImage, VkImageView NormalImage);
 
 		/** Getters */
 		void getQueueFamilies(const VkPhysicalDevice& device);

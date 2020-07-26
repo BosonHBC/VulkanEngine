@@ -2,7 +2,7 @@
 #include "Engine.h"
 
 #include "Graphics/VKRenderer.h"
-
+#include "Input/UserInput.h"
 
 #include "glm/glm.hpp"
 #include "glm/mat4x4.hpp"
@@ -15,6 +15,7 @@ namespace VKE {
 	//=================== Parameters =================== 
 	GLFWwindow* g_Window;
 	VKRenderer* g_renderer;
+	UserInput::FUserInput* g_Input;
 	const GLuint WIDTH = 800, HEIGHT = 600;
 	const std::string WINDOW_NAME = "Default";
 
@@ -23,12 +24,15 @@ namespace VKE {
 	// GLFW
 	void initGLFW();
 	void cleanupGLFW();
-	
+	// Input
+	void initInput();
+	void cleanupInput();
 
 	int init()
 	{
 		int result = EXIT_SUCCESS;
 		initGLFW();
+		initInput();
 
 		g_renderer = DBG_NEW VKRenderer();
 		if (g_renderer->init(g_Window) == EXIT_FAILURE)
@@ -38,14 +42,17 @@ namespace VKE {
 		
 		// Create Mesh
 		cModel* pContainerModel = nullptr;
+		cModel* pPlaneModel = nullptr;
 
 		g_renderer->CreateModel("Container.obj", pContainerModel);
 		g_renderer->RenderList.push_back(pContainerModel);
 
-		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
-		pContainerModel->Transform.gRotate(glm::vec3(0, 1, 0), 45);
-		pContainerModel->Transform.Update();
+		g_renderer->CreateModel("Plane.obj", pPlaneModel);
+		g_renderer->RenderList.push_back(pPlaneModel);
 
+		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
+
+		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25,25,25));
 		return result;
 	}
 
@@ -62,6 +69,8 @@ namespace VKE {
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
+			g_Input->UpdateInput();
+
 			double now = glfwGetTime();
 			DeltaTime = now - LastTime;
 			LastTime = now;
@@ -76,6 +85,7 @@ namespace VKE {
 		g_renderer->cleanUp();
 		safe_delete(g_renderer);
 
+		cleanupInput();
 		cleanupGLFW();
 	}
 
@@ -94,7 +104,6 @@ namespace VKE {
 		glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 		g_Window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
-
 	}
 	void cleanupGLFW()
 	{
@@ -103,7 +112,28 @@ namespace VKE {
 		glfwTerminate();
 	}
 
+	void testDeleSpace()
+	{
+		printf("Space pressed\n");
+	}
+	void testAxis(float value)
+	{
+		printf("Axis value: %.2f\n", value);
+	}
+	void initInput()
+	{
+		using namespace UserInput;
+		g_Input = DBG_NEW UserInput::FUserInput();
+		g_Input->AddActionKeyPairToMap("Jump", EKeyCode::Space);
+		g_Input->BindAction("Jump", IT_OnPressed, &testDeleSpace);
 
+		g_Input->AddAxisKeyPairToMap("Horizontal", { EKeyCode::A,EKeyCode::D });
+		g_Input->BindAxis("Horizontal", &testAxis);
+	}
 
+	void cleanupInput()
+	{
+		delete g_Input;
+	}
 
 }

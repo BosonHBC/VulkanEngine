@@ -57,7 +57,7 @@ namespace VKE
 		Projection[1][1] *= -1;				// inverting Y axis since glm treats
 		FrameData = BufferFormats::FFrame(
 			Projection,
-			glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
+			glm::lookAt(glm::vec3(0.f, 3.f, 1.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
 		);
 
 		// Create Texture
@@ -1038,20 +1038,21 @@ namespace VKE
 
 	void VKRenderer::updateUniformBuffers()
 	{
+		int idx = SwapChain.ImageIndex;
 		// Copy Frame data
-		Descriptor_Frame[SwapChain.ImageIndex].UpdateBufferData(&FrameData);
+		Descriptor_Frame[idx].UpdateBufferData(&FrameData);
 
 		// Update model data to pDrawcallTransferSpace
 		for (size_t i = 0; i < RenderList.size(); ++i)
 		{
 			using namespace BufferFormats;
-			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetAllocatedMemory()) + (i * Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()));
+			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[idx].GetAllocatedMemory()) + (i * Descriptor_Drawcall[idx].GetSlotSize()));
 			*Drawcall = RenderList[i]->Transform.M();
 		}
 		// Copy Model data
 		// Reuse void* Data
-		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * RenderList.size();
-		Descriptor_Drawcall[SwapChain.ImageIndex].UpdatePartialData(Descriptor_Drawcall[SwapChain.ImageIndex].GetAllocatedMemory(), 0, DBufferSize);
+		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[idx].GetSlotSize()) * RenderList.size();
+		Descriptor_Drawcall[idx].UpdatePartialData(Descriptor_Drawcall[idx].GetAllocatedMemory(), 0, DBufferSize);
 	}
 
 
