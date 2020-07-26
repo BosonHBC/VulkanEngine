@@ -86,7 +86,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>$(OutDir)AssetBuilder.exe "vert.spv" "frag.spv"</Command>
+      <Command>$(OutDir)AssetBuilder.exe "vert.spv" "frag.spv" "particle/particle.frag.spv" "particle/particle.vert.spv" "particle/particle.comp.spv"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -101,7 +101,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>$(OutDir)AssetBuilder.exe "vert.spv" "frag.spv"</Command>
+      <Command>$(OutDir)AssetBuilder.exe "vert.spv" "frag.spv" "particle/particle.frag.spv" "particle/particle.vert.spv" "particle/particle.comp.spv"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
