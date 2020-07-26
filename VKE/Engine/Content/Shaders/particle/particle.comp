@@ -1,0 +1,91 @@
+#version 450
+
+const vec3 g = vec3( 0., -90.8, 0. );
+const float dt = 0.01;
+const float groundY = -5.f;
+const float firctionCoefficient = 0.5f;
+#define DAMPING -0.1f
+
+struct sParticle
+{
+	vec4 Pos;
+	vec4 Vel;
+};
+
+// Binding 0 : Position storage buffer
+layout(std140, binding = 0) buffer s_Particle 
+{
+   sParticle Particles[ ];
+};
+
+// A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
+uint hash( uint x ) {
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+// Compound versions of the hashing algorithm I whipped together.
+uint hash( uvec2 v ) { return hash( v.x ^ hash(v.y)                         ); }
+uint hash( uvec3 v ) { return hash( v.x ^ hash(v.y) ^ hash(v.z)             ); }
+uint hash( uvec4 v ) { return hash( v.x ^ hash(v.y) ^ hash(v.z) ^ hash(v.w) ); }
+
+// Construct a float with half-open range [0:1] using low 23 bits.
+// All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+float floatConstruct( uint m ) {
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+}
+
+// Pseudo-random value in half-open range [0:1].
+float random( float x ) { return floatConstruct(hash(floatBitsToUint(x))); }
+float random( vec2  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+
+float randomRange(float min, float max, float rnd)
+{
+	return rnd * (max - min) + min;
+}
+
+layout( local_size_x = 256 ) in;
+
+void main()
+{
+	uint gid = gl_GlobalInvocationID.x; // the .y and .z are both 1 in this case
+	vec3 p = Particles[ gid ].Pos.xyz;
+	vec3 v = Particles[ gid ].Vel.xyz;
+
+	vec3 a = DAMPING * v;
+	if(p.y > groundY)
+	{
+		a += g;
+	}
+	else
+	{
+		// ground friction
+		a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
+	}
+	vec3 pp = p + v*dt + 0.5*dt*dt*a;
+	vec3 vp = v + a * dt;
+
+	if(pp.y <= groundY)
+	{
+		pp.y = groundY;
+		vp.y = abs(vp.y) * 0.5f;
+		if(vp.y <= 1.f)
+			vp.y = 0;
+	}
+
+	Particles[ gid ].Pos.xyz = pp;
+	Particles[ gid ].Vel.xyz = vp;
+}

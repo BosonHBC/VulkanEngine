@@ -23,6 +23,13 @@ namespace VKE
 				InvProj = glm::inverse(i_projectionMatrix);
 			}
 
+			void Update()
+			{
+				PVMatrix = ProjectionMatrix * ViewMatrix;
+				InvView = glm::inverse(ViewMatrix);
+				InvProj = glm::inverse(ProjectionMatrix);
+			}
+
 			glm::vec3 GetViewPosition() const {
 				return glm::vec3(InvView[3][0], InvView[3][1], InvView[3][2]);
 			}

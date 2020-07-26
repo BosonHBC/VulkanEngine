@@ -2,7 +2,8 @@
 #include "Engine.h"
 
 #include "Graphics/VKRenderer.h"
-
+#include "Input/UserInput.h"
+#include "Camera.h"
 
 #include "glm/glm.hpp"
 #include "glm/mat4x4.hpp"
@@ -12,40 +13,57 @@
 #include "Model/Model.h"
 
 namespace VKE {
-	//=================== Parameters =================== 
-	GLFWwindow* g_Window;
-	VKRenderer* g_renderer;
 	const GLuint WIDTH = 800, HEIGHT = 600;
 	const std::string WINDOW_NAME = "Default";
+
+	//=================== Parameters =================== 
+	GLFWwindow* g_Window;
+	VKRenderer* g_Renderer;
+	double g_deltaTime;
+	UserInput::FUserInput* g_Input;
+	cCamera* g_Camera;
 
 	//=================== Function declarations =================== 
 	
 	// GLFW
 	void initGLFW();
 	void cleanupGLFW();
-	
+	// Input
+	void initInput();
+	void window_focus_callback(GLFWwindow* window, int focused);
+	void cleanupInput();
+	void quitApp();
+
+	// Camera
+	void initCamera();
+	void cleanupCamera();
 
 	int init()
 	{
 		int result = EXIT_SUCCESS;
 		initGLFW();
+		initInput();
+		initCamera();
 
-		g_renderer = DBG_NEW VKRenderer();
-		if (g_renderer->init(g_Window) == EXIT_FAILURE)
+		g_Renderer = DBG_NEW VKRenderer();
+		if (g_Renderer->init(g_Window) == EXIT_FAILURE)
 		{
 			return EXIT_FAILURE;
 		}
 		
 		// Create Mesh
 		cModel* pContainerModel = nullptr;
+		cModel* pPlaneModel = nullptr;
 
-		g_renderer->CreateModel("Container.obj", pContainerModel);
-		g_renderer->RenderList.push_back(pContainerModel);
+		g_Renderer->CreateModel("Container.obj", pContainerModel);
+		g_Renderer->RenderList.push_back(pContainerModel);
+
+		g_Renderer->CreateModel("Plane.obj", pPlaneModel);
+		g_Renderer->RenderList.push_back(pPlaneModel);
 
 		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
-		pContainerModel->Transform.gRotate(glm::vec3(0, 1, 0), 45);
-		pContainerModel->Transform.Update();
 
+		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25,25,25));
 		return result;
 	}
 
@@ -56,26 +74,30 @@ namespace VKE {
 			return;
 		}
 
-		double DeltaTime = 0.0f;
 		double LastTime = glfwGetTime();
 
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
+			g_Input->UpdateInput();
+			g_Camera->Update();
+
 			double now = glfwGetTime();
-			DeltaTime = now - LastTime;
+			g_deltaTime = now - LastTime;
 			LastTime = now;
 
-			g_renderer->tick((float)DeltaTime);
-			g_renderer->draw();
+			g_Renderer->tick((float)g_deltaTime);
+			g_Renderer->draw();
 		}
 	}
 
 	void cleanup()
 	{
-		g_renderer->cleanUp();
-		safe_delete(g_renderer);
+		g_Renderer->cleanUp();
+		safe_delete(g_Renderer);
 
+		cleanupCamera();
+		cleanupInput();
 		cleanupGLFW();
 	}
 
@@ -83,6 +105,25 @@ namespace VKE {
 	GLFWwindow* GetGLFWWindow()
 	{
 		return g_Window;
+	}
+
+	cCamera* GetCurrentCamera()
+	{
+		return g_Camera;
+	}
+
+	double dt()
+	{
+		return g_deltaTime;
+	}
+
+	glm::vec2 GetMouseDelta()
+	{
+		if (g_Input)
+		{
+			return g_Input->GetMouseDelta();
+		}
+		return glm::vec2(0.0f);
 	}
 
 	void initGLFW()
@@ -95,6 +136,7 @@ namespace VKE {
 
 		g_Window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
 
+		glfwSetWindowFocusCallback(g_Window, window_focus_callback);
 	}
 	void cleanupGLFW()
 	{
@@ -103,7 +145,53 @@ namespace VKE {
 		glfwTerminate();
 	}
 
+	void initInput()
+	{
+		using namespace UserInput;
+		g_Input = DBG_NEW UserInput::FUserInput();
+		g_Input->AddActionKeyPairToMap("Escape", EKeyCode::Escape);
+		g_Input->BindAction("Escape", EIT_OnPressed, &quitApp);
 
+		g_Input->AddActionKeyPairToMap("TurnCamera", EKeyCode::LMB);
+		g_Input->AddActionKeyPairToMap("ZoomCamera", EKeyCode::RMB);
 
+		g_Input->AddAxisKeyPairToMap("MoveRight", { EKeyCode::A,EKeyCode::D });
+		g_Input->AddAxisKeyPairToMap("MoveForward", { EKeyCode::S,EKeyCode::W });
+		g_Input->AddAxisKeyPairToMap("MoveUp", { EKeyCode::Control,EKeyCode::Space });
 
+	}
+	void window_focus_callback(GLFWwindow* window, int focused)
+	{
+		if (g_Input)
+		{
+			g_Input->bAppInFocus = focused;
+		}
+	}
+	void quitApp()
+	{
+		glfwSetWindowShouldClose(g_Window, true);
+	}
+	void cleanupInput()
+	{
+		safe_delete(g_Input);
+	}
+
+	void initCamera()
+	{
+		g_Camera = DBG_NEW cCamera(glm::vec3(0,2,2), 45.f, 0.0f, 2.0f, 0.1f);
+		g_Camera->UpdateProjectionMatrix(glm::radians(45.f), (float)WIDTH / (float)HEIGHT);
+		g_Camera->Update();
+
+		g_Input->BindAction("TurnCamera",UserInput::EIT_OnHold, g_Camera, &cCamera::TurnCamera);
+		g_Input->BindAction("ZoomCamera", UserInput::EIT_OnHold, g_Camera, &cCamera::ZoomCamera);
+
+		g_Input->BindAxis("MoveRight", g_Camera, &cCamera::MoveRight);
+		g_Input->BindAxis("MoveForward", g_Camera, &cCamera::MoveForward);
+		g_Input->BindAxis("MoveUp", g_Camera, &cCamera::MoveUp);
+
+	}
+	void cleanupCamera()
+	{
+		safe_delete(g_Camera);
+	}
 }

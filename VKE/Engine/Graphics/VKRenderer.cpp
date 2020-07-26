@@ -1,8 +1,9 @@
 #include "VKRenderer.h"
 
+#include "Camera.h"
 #include "Mesh/Mesh.h"
 #include "Texture/Texture.h"
-#include "../Transform/Transform.h"
+#include "Transform/Transform.h"
 #include "Model/Model.h"
 
 #include <stdexcept>
@@ -51,14 +52,6 @@ namespace VKE
 			printf("ERROR: %s \n", e.what());
 			return EXIT_FAILURE;
 		}
-
-		//set up MVP
-		glm::mat4 Projection = glm::perspective(glm::radians(45.f), (float)SwapChain.Extent.width / (float)SwapChain.Extent.height, 0.1f, 100.f);
-		Projection[1][1] *= -1;				// inverting Y axis since glm treats
-		FrameData = BufferFormats::FFrame(
-			Projection,
-			glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, 0.f), cTransform::WorldUp)
-		);
 
 		// Create Texture
 		cTexture::Load("DefaultWhite.png", MainDevice);
@@ -1038,20 +1031,22 @@ namespace VKE
 
 	void VKRenderer::updateUniformBuffers()
 	{
+
+		int idx = SwapChain.ImageIndex;
 		// Copy Frame data
-		Descriptor_Frame[SwapChain.ImageIndex].UpdateBufferData(&FrameData);
+		Descriptor_Frame[idx].UpdateBufferData(&GetCurrentCamera()->GetFrameData());
 
 		// Update model data to pDrawcallTransferSpace
 		for (size_t i = 0; i < RenderList.size(); ++i)
 		{
 			using namespace BufferFormats;
-			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetAllocatedMemory()) + (i * Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()));
+			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[idx].GetAllocatedMemory()) + (i * Descriptor_Drawcall[idx].GetSlotSize()));
 			*Drawcall = RenderList[i]->Transform.M();
 		}
 		// Copy Model data
 		// Reuse void* Data
-		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * RenderList.size();
-		Descriptor_Drawcall[SwapChain.ImageIndex].UpdatePartialData(Descriptor_Drawcall[SwapChain.ImageIndex].GetAllocatedMemory(), 0, DBufferSize);
+		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[idx].GetSlotSize()) * RenderList.size();
+		Descriptor_Drawcall[idx].UpdatePartialData(Descriptor_Drawcall[idx].GetAllocatedMemory(), 0, DBufferSize);
 	}
 
 
@@ -1295,7 +1290,7 @@ namespace VKE
 		{
 
 			// Push constant to given shader stage directly (No Buffer)
-			glm::mat4 MVP = FrameData.PVMatrix * RenderList[j]->Transform.M();
+			glm::mat4 MVP = GetCurrentCamera()->GetFrameData().PVMatrix * RenderList[j]->Transform.M();
 			vkCmdPushConstants(CB, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0,
 				sizeof(glm::mat4),					// Size of data being pushed
