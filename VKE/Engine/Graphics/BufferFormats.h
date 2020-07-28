@@ -46,5 +46,18 @@ namespace VKE
 				ModelMatrix = i_model;
 			}
 		};
+
+		// Particle Data
+		struct FParticle
+		{
+			glm::vec4 Pos;
+			glm::vec4 Vel;
+		};
+
+		// Support data for particles
+		struct FParticleSupportData
+		{
+			float dt;
+		};
 	}
 }

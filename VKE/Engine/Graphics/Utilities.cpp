@@ -64,7 +64,7 @@ namespace VKE
 		}
 	}
 
-	
+
 	void FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
 	{
 		vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
@@ -81,7 +81,7 @@ namespace VKE
 		{
 			vkDestroyShaderModule(LogicDevice, ShaderModule, nullptr);
 		}
-		
+
 	}
 
 	bool FShaderModuleScopeGuard::CreateShaderModule(const VkDevice& LD, const std::vector<char>& iShaderCode)
@@ -131,7 +131,7 @@ namespace VKE
 			MainDevice.PD,
 			MemRequirements.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
 			Properties									// Memory property, is this local_bit or host_bit or others
-			);
+		);
 
 		// Allocate memory to VKDevieMemory
 		Result = vkAllocateMemory(MainDevice.LD, &MemAllocInfo, nullptr, &oBufferMemory);
@@ -164,8 +164,6 @@ namespace VKE
 		}
 		return static_cast<uint32_t>(-1);
 	}
-	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool);
-	void EndCommandBuffer(VkCommandBuffer CommandBuffer, VkDevice LD, VkQueue Queue, VkCommandPool CommandPool);
 
 	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool)
 	{
@@ -196,26 +194,39 @@ namespace VKE
 		// End Recording
 		vkEndCommandBuffer(CommandBuffer);
 
+		// Create fence to ensure that the command buffer has finished executing
+
+		VkFenceCreateInfo FenceCreateInfo = {};
+		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		FenceCreateInfo.flags = 0;
+		VkFence Fence;
+		VkResult Result = vkCreateFence(LD, &FenceCreateInfo, nullptr, &Fence);
+		RESULT_CHECK(Result, "Fail to create fence for executing transfer command");
+
 		// Queue submission information
 		VkSubmitInfo SubmitInfo = {};
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.commandBufferCount = 1;
 		SubmitInfo.pCommandBuffers = &CommandBuffer;
 
-		VkResult Result = vkQueueSubmit(Queue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		Result = vkQueueSubmit(Queue, 1, &SubmitInfo, Fence);
 		RESULT_CHECK(Result, "Fail to submit transfer command buffer to transfer queue");
 
-		// Prevent submitting multiple transfer command buffers to a same queue,
+		// Use fence to prevent submitting multiple transfer command buffers to a same queue,
 		// Sometime when there are tons of meshes loading in one time, this way can prevent crashing easily,
 		// But optimal way is using synchronization to load files at the same time.
-		vkQueueWaitIdle(Queue);
-
+		Result = vkWaitForFences(LD, 1, &Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+		RESULT_CHECK(Result, "Fail to wait for fence");
+		
+		// Free temp fence
+		vkDestroyFence(LD, Fence, nullptr);
 		// Free temporary command buffer back to pool
 		vkFreeCommandBuffers(LD, CommandPool, 1, &CommandBuffer);
 	}
 
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize)
 	{
+		// Allocate the transfer command buffer
 		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
 
 		// Region of data to copy from and to, allows copy multiple regions of data
@@ -227,6 +238,7 @@ namespace VKE
 		// Command to copy src buffer to dst buffer
 		vkCmdCopyBuffer(TransferCommandBuffer, SrcBuffer, DstBuffer, 1, &BufferCopyRegion);
 
+		// Stop the command and submit it to the queue, wait until it finish execution
 		EndCommandBuffer(TransferCommandBuffer, LD, TransferQueue, TransferCommandPool);
 	}
 
@@ -248,7 +260,7 @@ namespace VKE
 
 
 		// Command to copy src buffer to dst buffer
-		vkCmdCopyBufferToImage(TransferCommandBuffer, SrcBuffer, DstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1, &ImageCopyRegion);
+		vkCmdCopyBufferToImage(TransferCommandBuffer, SrcBuffer, DstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageCopyRegion);
 
 		EndCommandBuffer(TransferCommandBuffer, LD, TransferQueue, TransferCommandPool);
 	}
@@ -367,13 +379,13 @@ namespace VKE
 
 
 		// If transitioning from new image ready to receive data...
-		if(CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		if (CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
 		{
 			ImageMemoryBarrier.srcAccessMask = 0;									// Memory access stage transition must happen after: From the very start
 			ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must happen before: transfer write stage
-			
+
 			SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;							// On top of any stage
-			DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;								
+			DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		}
 		// If transitioning from transfer destination to shader readable...
 		else if (CurrentLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
@@ -393,6 +405,17 @@ namespace VKE
 		);
 
 		EndCommandBuffer(CommandBuffer, LD, Queue, CommandPool);
+	}
+
+	float RandRange(float min, float max)
+	{
+		double zeroToOne = ((double)rand() / (RAND_MAX));
+		return static_cast<float>((zeroToOne * (max - min) + min));
+	}
+
+	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max)
+	{
+		return glm::vec3(RandRange(min.x, max.x), RandRange(min.y, max.y), RandRange(min.z, max.z));
 	}
 
 	namespace FileIO {

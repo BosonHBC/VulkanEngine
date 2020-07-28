@@ -41,7 +41,7 @@ namespace VKE
 		FMainDevice MainDevice;
 		VkInstance vkInstance;
 		VkSurfaceKHR Surface;								// KHR extension required
-		FQueueFamilyIndices QueueFamilies;					// Queue families
+
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
 		FSwapChainData SwapChain;							// SwapChain data group
 		std::vector<VkFramebuffer> SwapChainFramebuffers;	
@@ -98,7 +98,7 @@ namespace VKE
 		
 		void createUniformBuffer();
 		void createDescriptorPool();
-		void createDescriptorSets();
+		void updateDescriptorSetWrites();
 
 		/** intermediate functions */
 		void prepareForDraw();

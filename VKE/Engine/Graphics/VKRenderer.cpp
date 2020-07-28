@@ -36,7 +36,7 @@ namespace VKE
 				createUniformBuffer();
 				createDescriptorPool();
 				createDescriptorSetLayout();
-				createDescriptorSets();
+				updateDescriptorSetWrites();
 				createPushConstantRange();
 			}
 
@@ -297,7 +297,7 @@ namespace VKE
 		// vector for queue create information
 		std::vector< VkDeviceQueueCreateInfo> queueCreateInfos;
 		// set of queue family indices, prevent duplication
-		std::set<int> queueFamilyIndices = { QueueFamilies.graphicFamily, QueueFamilies.presentationFamily };
+		std::set<int> queueFamilyIndices = { MainDevice.QueueFamilyIndices.graphicFamily, MainDevice.QueueFamilyIndices.presentationFamily };
 		for (auto& queueFamilyIdx : queueFamilyIndices)
 		{
 			VkDeviceQueueCreateInfo queueCreateInfo = {};
@@ -331,10 +331,10 @@ namespace VKE
 		// After LD is created, queues should be created too, Save the queues
 		vkGetDeviceQueue(
 			/*From given LD*/MainDevice.LD,
-			/*given queue family*/ QueueFamilies.graphicFamily,
+			/*given queue family*/ MainDevice.QueueFamilyIndices.graphicFamily,
 			/*given queue index(0 only one queue)*/ 0,
 			/*Out queue*/ &MainDevice.graphicQueue);
-		vkGetDeviceQueue(MainDevice.LD, QueueFamilies.presentationFamily, 0, &MainDevice.presentationQueue);
+		vkGetDeviceQueue(MainDevice.LD, MainDevice.QueueFamilyIndices.presentationFamily, 0, &MainDevice.presentationQueue);
 	}
 
 	void VKRenderer::createSurface()
@@ -389,12 +389,12 @@ namespace VKE
 		SwapChainCreateInfo.clipped = VK_TRUE;														// Whether to clip parts of image not in view (e.g. behind another window)
 
 		// Images are sharing between two queues
-		if (QueueFamilies.graphicFamily != QueueFamilies.presentationFamily)
+		if (MainDevice.QueueFamilyIndices.graphicFamily != MainDevice.QueueFamilyIndices.presentationFamily)
 		{
 			uint32_t QueueFamilyIndices[] =
 			{
-				static_cast<uint32_t>(QueueFamilies.graphicFamily),
-				static_cast<uint32_t>(QueueFamilies.presentationFamily),
+				static_cast<uint32_t>(MainDevice.QueueFamilyIndices.graphicFamily),
+				static_cast<uint32_t>(MainDevice.QueueFamilyIndices.presentationFamily),
 			};
 			SwapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;						// Image share handling
 			SwapChainCreateInfo.queueFamilyIndexCount = 2;											// Number of queues sharing image between
@@ -876,7 +876,7 @@ namespace VKE
 		VkCommandPoolCreateInfo CommandPoolCreateInfo;
 		CommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		CommandPoolCreateInfo.pNext = nullptr;
-		CommandPoolCreateInfo.queueFamilyIndex = QueueFamilies.graphicFamily;					// Queue family type that buffers from this command pool will use
+		CommandPoolCreateInfo.queueFamilyIndex = MainDevice.QueueFamilyIndices.graphicFamily;					// Queue family type that buffers from this command pool will use
 		CommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;	// Allow reset so that we can re-record in run-time
 																						// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT makes vkBeginCommandBuffer(...) dump all previous commands
 
@@ -958,20 +958,18 @@ namespace VKE
 	void VKRenderer::createDescriptorPool()
 	{
 		// Type of descriptors + how many DESCRIPTORS, not DESCRIPTOR Sets (combined makes the pool size)
-		std::vector<VkDescriptorPoolSize> PoolSizes;
-		for (VkDescriptorType Type : cDescriptor::GetDescriptorTypeSet())
-		{
-			VkDescriptorPoolSize PoolSize = {};
-			PoolSize.type = Type;
-			PoolSize.descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
-			PoolSizes.push_back(PoolSize);
-		}
+		const uint32_t DescriptorTypeCount = 2;
+		VkDescriptorPoolSize PoolSize[DescriptorTypeCount] = {};
+		PoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		PoolSize[0].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
+		PoolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		PoolSize[1].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size());
-		PoolCreateInfo.poolSizeCount = PoolSizes.size();
-		PoolCreateInfo.pPoolSizes = PoolSizes.data();
+		PoolCreateInfo.poolSizeCount = DescriptorTypeCount;
+		PoolCreateInfo.pPoolSizes = PoolSize;
 
 		VkResult Result = vkCreateDescriptorPool(MainDevice.LD, &PoolCreateInfo, nullptr, &DescriptorPool);
 		RESULT_CHECK(Result, "Failed to create a Descriptor Pool");
@@ -994,33 +992,37 @@ namespace VKE
 
 	}
 
-	void VKRenderer::createDescriptorSets()
+	void VKRenderer::updateDescriptorSetWrites()
 	{
 		DescriptorSets.resize(SwapChain.Images.size());
 
 		std::vector<VkDescriptorSetLayout> SetLayouts(SwapChain.Images.size(), DescriptorSetLayout);
 
+		// Allocate descriptor set from the pool
 		VkDescriptorSetAllocateInfo SetAllocInfo = {};
 		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		SetAllocInfo.descriptorPool = DescriptorPool;													// Pool to allocate descriptor set from
 		SetAllocInfo.descriptorSetCount = static_cast<uint32_t>(SwapChain.Images.size());				// Number of sets to allocate
-		SetAllocInfo.pSetLayouts = SetLayouts.data();													// Layouts to use to allocate sets (1:1 relationship)
+		SetAllocInfo.pSetLayouts = SetLayouts.data();
 
 		// Allocate descriptor sets (multiple)
 		VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &SetAllocInfo, DescriptorSets.data());
-		RESULT_CHECK(Result, "Fail to ALlocate Descriptor Sets!");
+		RESULT_CHECK(Result, "Fail to Allocate Descriptor Set!");
 
 		// Update all of descriptor set buffer bindings
 		for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 		{
+			Descriptor_Frame[i].SetDescriptorSet(&DescriptorSets[i]);
+			Descriptor_Drawcall[i].SetDescriptorSet(&DescriptorSets[i]);
+
 			const uint32_t DescriptorCount = 2;
 			// Data about connection between Descriptor and buffer
 			VkWriteDescriptorSet SetWrites[DescriptorCount] = {};
 
 			// FRAME DESCRIPTOR
-			SetWrites[0] = Descriptor_Frame[i].ConstructDescriptorBindingInfo(DescriptorSets[i]);
+			SetWrites[0] = Descriptor_Frame[i].ConstructDescriptorBindingInfo();
 			// DRAWCALL DESCRIPTOR
-			SetWrites[1] = Descriptor_Drawcall[i].ConstructDescriptorBindingInfo(DescriptorSets[i]);
+			SetWrites[1] = Descriptor_Drawcall[i].ConstructDescriptorBindingInfo();
 
 			// Update the descriptor sets with new buffer / binding info
 			vkUpdateDescriptorSets(MainDevice.LD, DescriptorCount, SetWrites,
@@ -1151,7 +1153,7 @@ namespace VKE
 		VkPhysicalDeviceFeatures deviceFeatures;
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-		if (!QueueFamilies.IsValid())
+		if (!MainDevice.QueueFamilyIndices.IsValid())
 		{
 			return false;
 		}
@@ -1313,7 +1315,7 @@ namespace VKE
 				uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * j;
 
 				const uint32_t DescriptorSetCount = 2;
-				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex], Mesh->GetDescriptorSet()};
+				VkDescriptorSet DescriptorSetGroup[] = { *Descriptor_Drawcall[SwapChain.ImageIndex].GetDescriptorSet(), Mesh->GetDescriptorSet()};
 
 				// Bind Descriptor sets for Projection / View / Model matrix
 				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
@@ -1358,17 +1360,17 @@ namespace VKE
 			// At least one queue and it has graphic queue family (a queue could be multiple types)
 			if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
 			{
-				QueueFamilies.graphicFamily = i;
+				MainDevice.QueueFamilyIndices.graphicFamily = i;
 			}
 			VkBool32 presentationSuppot = false;
 			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Surface, &presentationSuppot);
 			// Check if queue is presentation type (can be both graphics and presentations)
 			if (queueFamily.queueCount > 0 && presentationSuppot)
 			{
-				QueueFamilies.presentationFamily = i;
+				MainDevice.QueueFamilyIndices.presentationFamily = i;
 			}
 			// If both graphic family and presentation family are found, no need to keep going
-			if (QueueFamilies.graphicFamily >= 0 && QueueFamilies.presentationFamily >= 0)
+			if (MainDevice.QueueFamilyIndices.graphicFamily >= 0 && MainDevice.QueueFamilyIndices.presentationFamily >= 0)
 			{
 				break;
 			}

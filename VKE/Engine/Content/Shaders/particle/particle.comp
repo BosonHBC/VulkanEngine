@@ -1,7 +1,6 @@
 #version 450
 
 const vec3 g = vec3( 0., -90.8, 0. );
-const float dt = 0.01;
 const float groundY = -5.f;
 const float firctionCoefficient = 0.5f;
 #define DAMPING -0.1f
@@ -18,6 +17,10 @@ layout(std140, binding = 0) buffer s_Particle
    sParticle Particles[ ];
 };
 
+layout (binding = 1) uniform sParticleSupportData 
+{
+	float dt;
+};
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 uint hash( uint x ) {
     x += ( x << 10u );

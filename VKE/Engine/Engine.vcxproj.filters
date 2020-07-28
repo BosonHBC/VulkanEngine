@@ -84,6 +84,9 @@
     <ClCompile Include="Graphics\Camera.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Graphics\ComputePass.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h">
@@ -129,6 +132,9 @@
       <Filter>Source Files\Input</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\Camera.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\ComputePass.h">
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
   </ItemGroup>

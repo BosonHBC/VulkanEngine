@@ -51,7 +51,7 @@ namespace VKE
 		cBuffer VertexBuffer, IndexBuffer;
 		
 		FMainDevice* pMainDevice;
-		VkDescriptorSet SamplerDescriptorSet;
+		VkDescriptorSet SamplerDescriptorSet;	// @TODO: Should be put in Material class
 
 		bool createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);
 		bool createIndexBuffer(const std::vector<uint32_t>& iIndices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);

@@ -70,16 +70,6 @@ namespace VKE
 		glm::vec2 TexCoord;		// Texture coordinate
 	};
 
-	struct FMainDevice
-	{
-		VkPhysicalDevice PD;					// Physical Device
-		VkDevice LD;							// Logical Device
-		VkQueue graphicQueue;					// Graphic Queue,also transfer queue
-		VkQueue presentationQueue;				// Presentation Queue
-
-		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
-	};
-
 	// Indices (location) of Queue Families (if they exist at all)
 	struct FQueueFamilyIndices
 	{
@@ -88,6 +78,18 @@ namespace VKE
 
 		bool IsValid() const { return (graphicFamily >= 0 && presentationFamily >= 0); }
 	};
+
+	struct FMainDevice
+	{
+		VkPhysicalDevice PD;					// Physical Device
+		VkDevice LD;							// Logical Device
+		VkQueue graphicQueue;					// Graphic Queue,also transfer queue
+		VkQueue presentationQueue;				// Presentation Queue
+		FQueueFamilyIndices QueueFamilies;		// Queue families
+		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
+	};
+
+
 
 	struct FSwapChainDetail
 	{
@@ -141,6 +143,9 @@ namespace VKE
 	// Find a valid memory type index
 	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PD, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 	
+	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool);
+	void EndCommandBuffer(VkCommandBuffer CommandBuffer, VkDevice LD, VkQueue Queue, VkCommandPool CommandPool);
+
 	// Copy data from src buffer to dst buffer
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
 		VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize);
@@ -167,4 +172,7 @@ namespace VKE
 		unsigned char* LoadTextureFile(const std::string& fileName, int& oWidth, int& oHeight, VkDeviceSize& oImageSize);
 		void freeLoadedTextureData(unsigned char* Data);
 	}
+
+	float RandRange(float min, float max);
+	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max);
 }

@@ -3,15 +3,7 @@
 
 namespace VKE
 {
-	// Data structure to distinguish how many descriptors type the program is using
-	// Useful in creating descriptor set pool
-	std::set<VkDescriptorType> DescriptorTypeSet;
-	const std::set<VkDescriptorType>& cDescriptor::GetDescriptorTypeSet()
-	{
-		return DescriptorTypeSet;
-	}
-
-	bool cDescriptor::CreateDescriptor(VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,	/* Properties of the descriptor */
+	bool cDescriptor::CreateDescriptor( VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,	/* Properties of the descriptor */
 		VkPhysicalDevice PD, VkDevice LD)																	/* Properties for creating a buffer */
 	{
 		// Ensure that SetDescriptorBufferRange has called such that the buffer has a size
@@ -34,7 +26,7 @@ namespace VKE
 		DescriptorInfo.Binding = Binding;
 		DescriptorInfo.Stages = Stages;
 		BufferInfo.buffer = Buffer.GetBuffer();
-		DescriptorTypeSet.insert(DescriptorInfo.Type);
+
 		return true;
 	}
 
@@ -67,14 +59,15 @@ namespace VKE
 		Buffer.cleanUp();
 	}
 
-	VkWriteDescriptorSet cDescriptor::ConstructDescriptorBindingInfo(VkDescriptorSet DescriptorSet)
+
+	VkWriteDescriptorSet cDescriptor::ConstructDescriptorBindingInfo()
 	{
 		// Data about connection between Descriptor and buffer
 		VkWriteDescriptorSet SetWrite = {};
 
 		// Write info
 		SetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		SetWrite.dstSet = DescriptorSet;								// Descriptor set to update
+		SetWrite.dstSet = *pDescriptorSet;								// Descriptor set to update
 		SetWrite.dstBinding = DescriptorInfo.Binding;					// matches with binding on layout/shader
 		SetWrite.dstArrayElement = 0;									// Index in array to update
 		SetWrite.descriptorType = DescriptorInfo.Type;					// Type of the descriptor, should match the descriptor set type
