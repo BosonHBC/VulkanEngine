@@ -85,7 +85,7 @@ namespace VKE
 		VkDevice LD;							// Logical Device
 		VkQueue graphicQueue;					// Graphic Queue,also transfer queue
 		VkQueue presentationQueue;				// Presentation Queue
-		FQueueFamilyIndices QueueFamilies;		// Queue families
+		FQueueFamilyIndices QueueFamilyIndices;		// Queue families
 		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
 	};
 

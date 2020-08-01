@@ -8,7 +8,7 @@ namespace VKE
 		assert(pMainDevice);
 		if (pMainDevice)
 		{
-			return ComputeFamilyIndex != pMainDevice->QueueFamilies.graphicFamily;
+			return ComputeFamilyIndex != pMainDevice->QueueFamilyIndices.graphicFamily;
 		}
 		return false;
 	}

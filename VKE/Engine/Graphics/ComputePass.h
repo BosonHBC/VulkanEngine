@@ -41,27 +41,45 @@ namespace VKE
 		VkPipelineLayout ComputePipelineLayout;
 		VkPipeline ComputePipeline;
 
+		// Synchronization related
+		// Signal when compute pass is finished
+		VkSemaphore OnComputeFinished;
+
 		bool init(FMainDevice* const iMainDevice)
 		{
 			pMainDevice = iMainDevice;
 			// 1. Get compute queue and queue family
 			vkGetDeviceQueue(pMainDevice->LD, ComputeFamilyIndex, 0, &Queue);
 
-			// 2. Create compute command pool
-			createCommandPool();
-			// 3. create storage buffer and uniform buffer
+			// . create storage buffer and uniform buffer
 			createStorageBuffer();
 			createUniformBuffer();
-			// 4. set up descriptor set related
+			// . set up descriptor set related
 			prepareDescriptors();
-
-
-
+			// . Create compute pipeline
+			createComputePipeline();
+			// . Create compute command pool
+			createCommandPool();
+			// . Create command buffer
+			createCommandBuffer();
+			// . Create semaphores and fences
+			createSynchronization();
 		}
 
 		void cleanUp()
 		{
+			// wait until the device is not doing anything (nothing on any queue)
+			vkDeviceWaitIdle(pMainDevice->LD);
 
+			vkDestroySemaphore(pMainDevice->LD, OnComputeFinished, nullptr);
+
+			vkDestroyCommandPool(pMainDevice->LD, CommandPool, nullptr);
+			vkDestroyPipeline(pMainDevice->LD, ComputePipeline, nullptr);
+			vkDestroyPipelineLayout(pMainDevice->LD, ComputePipelineLayout, nullptr);
+			vkDestroyDescriptorSetLayout(pMainDevice->LD, DescriptorSetLayout, nullptr);
+			vkDestroyDescriptorPool(pMainDevice->LD, DescriptorPool, nullptr);
+			UniformBuffer.cleanUp();
+			StorageBuffer.cleanUp();
 		}
 
 		void recordCommands()
@@ -70,15 +88,7 @@ namespace VKE
 		}
 
 	private:
-		void createCommandPool()
-		{
-			VkCommandPoolCreateInfo cmdPoolInfo = {};
-			cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-			cmdPoolInfo.queueFamilyIndex = ComputeFamilyIndex;
-			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-			auto Result = vkCreateCommandPool(pMainDevice->LD, &cmdPoolInfo, nullptr, &CommandPool);
-			RESULT_CHECK(Result, "Fail to create Compute Command Pool\n");
-		}
+
 		bool createStorageBuffer()
 		{
 			const glm::vec3 initialLocMin(-0.10, 1.50, -0.10), initialLocMax(0.10, 1.60, 0.10), initialVelMin(-1.00, 0, -1.00), initialVelMax(1.00, 1.00, 1.00);
@@ -245,6 +255,86 @@ namespace VKE
 			vkUpdateDescriptorSets(pMainDevice->LD, DescriptorCount, SetWrites,
 				0, nullptr // Allows copy descriptor set to another descriptor set
 			);
+		}
+		void createComputePipeline()
+		{
+			// 1. Create pipeline layout according to the descriptor set layout
+			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
+
+			PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			PipelineLayoutCreateInfo.setLayoutCount = 1;
+			PipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
+			PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+			PipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+			VkResult Result = vkCreatePipelineLayout(pMainDevice->LD, &PipelineLayoutCreateInfo, nullptr, &ComputePipelineLayout);
+			RESULT_CHECK(Result, "Fail to craete comptue pipeline layout.");
+			
+			// 2. Load shader
+			FShaderModuleScopeGuard ComputeShaderModule;
+			std::vector<char> FragShaderCode = FileIO::ReadFile("Content/Shaders/particle/particle.comp.spv");
+			ComputeShaderModule.CreateShaderModule(pMainDevice->LD, FragShaderCode);
+
+			// 3. Create Shader stage
+			VkPipelineShaderStageCreateInfo ComputeShaderStage = {};
+			ComputeShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			ComputeShaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+			ComputeShaderStage.module = ComputeShaderModule.ShaderModule;
+			ComputeShaderStage.pName = "main";
+
+			// 4. Create the compute pipeline
+			VkComputePipelineCreateInfo ComputePipelineCreateInfo = {};
+
+			ComputePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			ComputePipelineCreateInfo.flags = 0;
+			ComputePipelineCreateInfo.layout = ComputePipelineLayout;
+			ComputePipelineCreateInfo.stage = ComputeShaderStage;
+			ComputePipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+			ComputePipelineCreateInfo.basePipelineIndex = -1;
+
+			Result = vkCreateComputePipelines(pMainDevice->LD, VK_NULL_HANDLE, 1, &ComputePipelineCreateInfo, nullptr, &ComputePipeline);
+		}
+		void createCommandPool()
+		{
+			VkCommandPoolCreateInfo cmdPoolInfo = {};
+			cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			cmdPoolInfo.queueFamilyIndex = ComputeFamilyIndex;
+			cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+			auto Result = vkCreateCommandPool(pMainDevice->LD, &cmdPoolInfo, nullptr, &CommandPool);
+			RESULT_CHECK(Result, "Fail to create Compute Command Pool\n");
+		}
+		void createCommandBuffer()
+		{
+			VkCommandBufferAllocateInfo cbAllocInfo = {};						
+			cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			cbAllocInfo.commandPool = CommandPool;						
+			cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;				
+																				
+			cbAllocInfo.commandBufferCount = 1;
+
+			VkResult Result = vkAllocateCommandBuffers(pMainDevice->LD, &cbAllocInfo, &CommandBuffer);
+			RESULT_CHECK(Result, "Fail to allocate compute command buffers.");
+		}
+		void createSynchronization()
+		{
+			VkSemaphoreCreateInfo SemaphoreCreateInfo = {};
+			SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+			VkResult Result = vkCreateSemaphore(pMainDevice->LD, &SemaphoreCreateInfo,nullptr, &OnComputeFinished);
+			RESULT_CHECK(Result, "Fail to create OnComputeFinish Semaphore");
+
+			// Need to signal in init stage because the graphic pass is running before the compute pass, so making sure no need to wait at for the compute pass in the first render
+			// Signal the semaphore with an empty queue (no wait, no command buffer, no fence to signal)
+			VkSubmitInfo SubmitInfo = {};
+			SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			SubmitInfo.signalSemaphoreCount = 1;
+			SubmitInfo.pSignalSemaphores = &OnComputeFinished;
+
+			VkResult Result = vkQueueSubmit(Queue, 1, &SubmitInfo, VK_NULL_HANDLE);
+			RESULT_CHECK(Result, "Fail to submit initial compute queue");
+			// Wait for the queue to finish
+			Result = vkQueueWaitIdle(Queue);
+			RESULT_CHECK(Result, "Fail to wait the queue to finish");
 		}
 	};
 }
