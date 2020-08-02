@@ -14,6 +14,7 @@
 namespace VKE
 {
 	class cModel;
+	struct FComputePass;
 	class VKRenderer
 	{
 	public:
@@ -32,7 +33,11 @@ namespace VKE
 		// Scene Objects
 		std::vector<cModel*> RenderList;
 	private:
+		// GLFW window
 		GLFWwindow* window;
+
+		// Compute pass
+		FComputePass* pCompute;
 
 		uint64_t ElapsedFrame = 0;
 

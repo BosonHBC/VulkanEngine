@@ -75,8 +75,8 @@ namespace VKE
 	{
 		int graphicFamily = -1;			// Location of Graphics Queue Family
 		int presentationFamily = -1;	// Location of Presentation Queue Family
-
-		bool IsValid() const { return (graphicFamily >= 0 && presentationFamily >= 0); }
+		int computeFamily = -1;			// Location of compute queue family
+		bool IsValid() const;
 	};
 
 	struct FMainDevice

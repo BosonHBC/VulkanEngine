@@ -1,5 +1,7 @@
 #include "VKRenderer.h"
 
+#include "ComputePass.h"
+
 #include "Camera.h"
 #include "Mesh/Mesh.h"
 #include "Texture/Texture.h"
@@ -46,6 +48,16 @@ namespace VKE
 			createCommandPool();
 			createCommandBuffers();
 			createSynchronization();
+
+			// Create Texture
+			cTexture::Load("DefaultWhite.png", MainDevice);
+			cTexture::Load("brick.png", MainDevice);
+			cTexture::Load("panda.jpg", MainDevice);
+			cTexture::Load("teapot.png", MainDevice);
+
+			// Create compute pass
+			pCompute = DBG_NEW FComputePass();
+			pCompute->init(&MainDevice);
 		}
 		catch (const std::runtime_error &e)
 		{
@@ -53,11 +65,7 @@ namespace VKE
 			return EXIT_FAILURE;
 		}
 
-		// Create Texture
-		cTexture::Load("DefaultWhite.png", MainDevice);
-		cTexture::Load("brick.png", MainDevice);
-		cTexture::Load("panda.jpg", MainDevice);
-		cTexture::Load("teapot.png", MainDevice);
+
 		return EXIT_SUCCESS;
 	}
 
@@ -138,6 +146,10 @@ namespace VKE
 	{
 		// wait until the device is not doing anything (nothing on any queue)
 		vkDeviceWaitIdle(MainDevice.LD);
+
+		// Cleanup compute pass
+		pCompute->cleanUp();
+		safe_delete(pCompute);
 
 		vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(MainDevice.LD, SamplerSetLayout, nullptr);
@@ -1369,10 +1381,11 @@ namespace VKE
 			{
 				MainDevice.QueueFamilyIndices.presentationFamily = i;
 			}
-			// If both graphic family and presentation family are found, no need to keep going
-			if (MainDevice.QueueFamilyIndices.graphicFamily >= 0 && MainDevice.QueueFamilyIndices.presentationFamily >= 0)
+
+			// try to find a queue family index that support compute bit but not graphic and compute
+			if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) && ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0))
 			{
-				break;
+				MainDevice.QueueFamilyIndices.computeFamily = i;
 			}
 			++i;
 		}

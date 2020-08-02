@@ -1,11 +1,13 @@
 #include "Utilities.h"
-
 #include "../Engine.h"
+#include "ComputePass.h"
+
 #include <algorithm>
 #include <fstream>
 #include "stb_image.h"
 namespace VKE
 {
+
 	VkDeviceSize MinUniformBufferOffset = 0;
 
 	VkSurfaceFormatKHR FSwapChainDetail::getSurfaceFormat() const
@@ -485,5 +487,11 @@ namespace VKE
 	}
 
 
+
+	bool FQueueFamilyIndices::IsValid() const
+	{
+		// If compute pipeline is note required, no need to check compute family
+		return (graphicFamily >= 0 && presentationFamily >= 0 && (FComputePass::SComputePipelineRequired ? computeFamily >= 0 : true)); 
+	}
 
 }
