@@ -47,7 +47,6 @@ namespace VKE
 		pMainDevice = &iMainDevice;
 		// Create vkImage, vkMemory
 		createTextureImage(iTextureName, Format);
-		ImageView = CreateImageViewFromImage(pMainDevice, Image, Format, VK_IMAGE_ASPECT_COLOR_BIT);
 		createTextureSampler();
 	}
 
@@ -64,16 +63,14 @@ namespace VKE
 	{
 		vkDestroySampler(pMainDevice->LD, Sampler, nullptr);
 
-		vkDestroyImageView(pMainDevice->LD, ImageView, nullptr);
-		vkDestroyImage(pMainDevice->LD,Image, nullptr);
-		vkFreeMemory(pMainDevice->LD, TexImageMemory, nullptr);
+		Buffer.cleanUp();
 	}
 
 	VkDescriptorImageInfo cTexture::GetImageInfo()
 	{
 		VkDescriptorImageInfo Info;
 		Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
-		Info.imageView = ImageView;
+		Info.imageView = Buffer.GetImageView();
 		Info.sampler = Sampler;
 
 		return Info;
@@ -108,23 +105,23 @@ namespace VKE
 		FileIO::freeLoadedTextureData(ImageData);
 
 		// 1. Create image to hold final texture
-		if (!CreateImage(pMainDevice, Width, Height, Format, VK_IMAGE_TILING_OPTIMAL,
+		if (!Buffer.init(pMainDevice, Width, Height, Format, VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,								// Destination of transfer, and also a texture sampler
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			Image, TexImageMemory))
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT
+			))
 		{
 			return -1;
 		}
 
 		// 2. COPY DATA TO THE IMAGE
 		// Transition image to be DST for copy operation
-		TransitionImageLayout(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		TransitionImageLayout(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, Buffer.GetImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Actual copy command
-		CopyImageBuffer(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, StagingBuffer.GetBuffer(), Image, Width, Height);
+		CopyImageBuffer(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, StagingBuffer.GetBuffer(), Buffer.GetImage(), Width, Height);
 
 		// Transition image to be shader readable for shader usage
-		TransitionImageLayout(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		TransitionImageLayout(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, Buffer.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// 3. Clean up staging buffer parts
 		StagingBuffer.cleanUp();

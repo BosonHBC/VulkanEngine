@@ -87,6 +87,9 @@
     <ClCompile Include="Graphics\ComputePass.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Graphics\Buffer\ImageBuffer.cpp">
+      <Filter>Source Files\Graphics\Buffer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h">
@@ -136,6 +139,9 @@
     </ClInclude>
     <ClInclude Include="Graphics\ComputePass.h">
       <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Buffer\ImageBuffer.h">
+      <Filter>Source Files\Graphics\Buffer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

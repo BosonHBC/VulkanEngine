@@ -9,6 +9,7 @@
 #include "BufferFormats.h"
 #include "Descriptors/Descriptor_Dynamic.h"
 #include "Mesh/Mesh.h"
+#include "Buffer/ImageBuffer.h"
 
 #include <vector>
 namespace VKE
@@ -37,7 +38,7 @@ namespace VKE
 		GLFWwindow* window;
 
 		// Compute pass
-		FComputePass* pCompute;
+		FComputePass* pCompute = nullptr;
 
 		uint64_t ElapsedFrame = 0;
 
@@ -49,14 +50,12 @@ namespace VKE
 
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
 		FSwapChainData SwapChain;							// SwapChain data group
-		std::vector<VkFramebuffer> SwapChainFramebuffers;	
-		std::vector<VkCommandBuffer> CommandBuffers;		
+		std::vector<VkFramebuffer> SwapChainFramebuffers;
+		std::vector<VkCommandBuffer> CommandBuffers;
 
 		VkFormat DepthFormat;
-		VkImage DepthBufferImage;
-		VkDeviceMemory DepthBufferImageMemory;
-		VkImageView DepthBufferImageView;
-		
+		std::vector <cImageBuffer> DepthBuffers;
+
 		// -Pipeline
 		VkRenderPass RenderPass;
 		VkPipeline GraphicPipeline;
@@ -100,7 +99,7 @@ namespace VKE
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSynchronization();
-		
+
 		void createUniformBuffer();
 		void createDescriptorPool();
 		void updateDescriptorSetWrites();

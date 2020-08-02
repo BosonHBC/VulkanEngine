@@ -161,6 +161,7 @@
   <ItemGroup>
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Graphics\Buffer\Buffer.cpp" />
+    <ClCompile Include="Graphics\Buffer\ImageBuffer.cpp" />
     <ClCompile Include="Graphics\Camera.cpp" />
     <ClCompile Include="Graphics\ComputePass.cpp" />
     <ClCompile Include="Graphics\Descriptors\Descriptor.cpp" />
@@ -178,6 +179,7 @@
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Graphics\BufferFormats.h" />
     <ClInclude Include="Graphics\Buffer\Buffer.h" />
+    <ClInclude Include="Graphics\Buffer\ImageBuffer.h" />
     <ClInclude Include="Graphics\Camera.h" />
     <ClInclude Include="Graphics\ComputePass.h" />
     <ClInclude Include="Graphics\Descriptors\Descriptor.h" />

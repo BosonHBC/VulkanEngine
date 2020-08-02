@@ -56,8 +56,9 @@ namespace VKE
 			cTexture::Load("teapot.png", MainDevice);
 
 			// Create compute pass
-			pCompute = DBG_NEW FComputePass();
-			pCompute->init(&MainDevice);
+			//pCompute = DBG_NEW FComputePass();
+			if (pCompute)
+				pCompute->init(&MainDevice);
 		}
 		catch (const std::runtime_error &e)
 		{
@@ -148,7 +149,8 @@ namespace VKE
 		vkDeviceWaitIdle(MainDevice.LD);
 
 		// Cleanup compute pass
-		pCompute->cleanUp();
+		if (pCompute)
+			pCompute->cleanUp();
 		safe_delete(pCompute);
 
 		vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
@@ -179,9 +181,10 @@ namespace VKE
 		}
 		// clean up depth buffer
 		{
-			vkDestroyImageView(MainDevice.LD, DepthBufferImageView, nullptr);
-			vkDestroyImage(MainDevice.LD, DepthBufferImage, nullptr);
-			vkFreeMemory(MainDevice.LD, DepthBufferImageMemory, nullptr);
+			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
+			{
+				DepthBuffers[i].cleanUp();
+			}
 		}
 		// Descriptor related
 		{
@@ -832,6 +835,8 @@ namespace VKE
 
 	void VKRenderer::createDepthBufferImage()
 	{
+		DepthBuffers.resize(SwapChain.Images.size());
+
 		DepthFormat = chooseSupportedFormat(
 			{
 				VK_FORMAT_D32_SFLOAT_S8_UINT,	// 32-bit Depth and 8-bit Stencil buffer
@@ -841,16 +846,17 @@ namespace VKE
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-		if (!CreateImage(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DepthBufferImage, DepthBufferImageMemory))
+		for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 		{
-			throw std::runtime_error("Fail to create depth buffer image");
-			return;
+			if (!DepthBuffers[i].init(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
+				VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT))
+			{
+				throw std::runtime_error("Fail to create depth buffer image");
+				return;
+			}
 		}
-
-		// Create depth buffer image view
-		DepthBufferImageView = CreateImageViewFromImage(&MainDevice, DepthBufferImage, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+		
 	}
 
 	void VKRenderer::createFrameBuffer()
@@ -865,7 +871,7 @@ namespace VKE
 			VkImageView Attachments[AttachmentCount] =
 			{
 				SwapChain.Images[i].ImgView,
-				DepthBufferImageView
+				DepthBuffers[i].GetImageView()
 			};
 
 			VkFramebufferCreateInfo FramebufferCreateInfo = {};
@@ -1327,7 +1333,7 @@ namespace VKE
 				uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * j;
 
 				const uint32_t DescriptorSetCount = 2;
-				VkDescriptorSet DescriptorSetGroup[] = { *Descriptor_Drawcall[SwapChain.ImageIndex].GetDescriptorSet(), Mesh->GetDescriptorSet()};
+				VkDescriptorSet DescriptorSetGroup[] = { *Descriptor_Drawcall[SwapChain.ImageIndex].GetDescriptorSet(), Mesh->GetDescriptorSet() };
 
 				// Bind Descriptor sets for Projection / View / Model matrix
 				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
@@ -1341,7 +1347,7 @@ namespace VKE
 					1,						// For drawing same object multiple times
 					0, 0);*/
 
-				// Execute pipeline, Index draw
+					// Execute pipeline, Index draw
 				vkCmdDrawIndexed(CB, Mesh->GetIndexCount(), 1, 0, 0, 0);
 			}
 
