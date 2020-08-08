@@ -7,6 +7,9 @@
 #include "Texture/Texture.h"
 #include "Transform/Transform.h"
 #include "Model/Model.h"
+#include "Descriptors/Descriptor_Buffer.h"
+#include "Descriptors/Descriptor_Dynamic.h"
+#include "Descriptors/Descriptor_Image.h"
 
 #include <stdexcept>
 #include "stdlib.h"
@@ -197,13 +200,9 @@ namespace VKE
 		{
 			vkDestroyDescriptorPool(MainDevice.LD, DescriptorPool, nullptr);
 
-			vkDestroyDescriptorSetLayout(MainDevice.LD, DescriptorSetLayout, nullptr);
-
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
-				Descriptor_Frame[i].cleanUp();
-				Descriptor_Drawcall[i].cleanUp();
-
+				DescriptorSets[i].cleanUp();
 			}
 		}
 
@@ -609,23 +608,10 @@ namespace VKE
 	{
 		// UNIFORM DESCRIPTOR SET LAYOUT
 		{
-			const uint32_t BindingCount = 2;
-			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
-			// FrameData binding info
-			Bindings[0] = Descriptor_Frame[0].ConstructDescriptorSetLayoutBinding();
-
-			// Drawcall data binding info
-			Bindings[1] = Descriptor_Drawcall[0].ConstructDescriptorSetLayoutBinding();
-
-			VkDescriptorSetLayoutCreateInfo LayoutCreateInfo;
-			LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			LayoutCreateInfo.bindingCount = BindingCount;
-			LayoutCreateInfo.pBindings = Bindings;
-			LayoutCreateInfo.pNext = nullptr;
-			LayoutCreateInfo.flags = 0;
-
-			VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &LayoutCreateInfo, nullptr, &DescriptorSetLayout);
-			RESULT_CHECK(Result, "Fail to create descriptor set layout.")
+			for (size_t i = 0; i < DescriptorSets.size(); ++i)
+			{
+				DescriptorSets[i].CreateDescriptorSetLayout();
+			}
 		}
 
 		// SAMPLER DESCRIPTOR LAYOUT
@@ -863,7 +849,7 @@ namespace VKE
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 
 		const uint32_t SetLayoutCount = 2;
-		VkDescriptorSetLayout Layouts[SetLayoutCount] = { DescriptorSetLayout, SamplerSetLayout };
+		VkDescriptorSetLayout Layouts[SetLayoutCount] = { DescriptorSets[0].GetDescriptorSetLayout(), SamplerSetLayout };
 
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		PipelineLayoutCreateInfo.setLayoutCount = SetLayoutCount;
@@ -1106,21 +1092,13 @@ namespace VKE
 	{
 		// One uniform buffer for each image (and by extension, command buffer)
 		size_t Size = SwapChain.Images.size();
-		Descriptor_Frame.resize(Size);
-		Descriptor_Drawcall.resize(Size);
+		DescriptorSets.resize(Size, cDescriptorSet(&MainDevice));
 
 		// Create UniformBuffers
 		for (size_t i = 0; i < Size; ++i)
 		{
-			// Only needs 1 FFrame per pass
-			Descriptor_Frame[i].SetDescriptorBufferRange(sizeof(BufferFormats::FFrame), 1);
-			Descriptor_Frame[i].CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, VK_SHADER_STAGE_VERTEX_BIT,
-				MainDevice.PD, MainDevice.LD);
-
-			// Needs MAX_OBJECTS FDrawcall per pass
-			Descriptor_Drawcall[i].SetDescriptorBufferRange(sizeof(BufferFormats::FDrawCall), MAX_OBJECTS);
-			Descriptor_Drawcall[i].CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT,
-				MainDevice.PD, MainDevice.LD);
+			DescriptorSets[i].CreateBufferDescriptor(sizeof(BufferFormats::FFrame), 1, VK_SHADER_STAGE_VERTEX_BIT);
+			DescriptorSets[i].CreateDynamicBufferDescriptor(sizeof(BufferFormats::FDrawCall), MAX_OBJECTS, VK_SHADER_STAGE_VERTEX_BIT);
 		}
 	}
 
@@ -1190,40 +1168,11 @@ namespace VKE
 	{
 		// DESCRIPTOR SETS
 		{
-			DescriptorSets.resize(SwapChain.Images.size());
-			// Fill array of layouts ready for set creation
-			std::vector<VkDescriptorSetLayout> SetLayouts(SwapChain.Images.size(), DescriptorSetLayout);
-
-			/** 1. Allocate descriptor set from the pool together */
-			VkDescriptorSetAllocateInfo SetAllocInfo = {};
-			SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			SetAllocInfo.descriptorPool = DescriptorPool;													// Pool to allocate descriptor set from
-			SetAllocInfo.descriptorSetCount = static_cast<uint32_t>(SwapChain.Images.size());				// Number of sets to allocate
-			SetAllocInfo.pSetLayouts = SetLayouts.data();
-
-			// Allocate descriptor sets (multiple)
-			VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &SetAllocInfo, DescriptorSets.data());
-			RESULT_CHECK(Result, "Fail to Allocate Descriptor Set!");
-
 			/** 2. Update all of descriptor set buffer bindings */
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
-				Descriptor_Frame[i].SetDescriptorSet(&DescriptorSets[i]);
-				Descriptor_Drawcall[i].SetDescriptorSet(&DescriptorSets[i]);
-
-				const uint32_t SetWriteCount = 2;
-				// Data about connection between Descriptor and buffer
-				VkWriteDescriptorSet SetWrites[SetWriteCount] = {};
-
-				// FRAME DESCRIPTOR
-				SetWrites[0] = Descriptor_Frame[i].ConstructDescriptorBindingInfo();
-				// DRAWCALL DESCRIPTOR
-				SetWrites[1] = Descriptor_Drawcall[i].ConstructDescriptorBindingInfo();
-
-				// Update the descriptor sets with new buffer / binding info
-				vkUpdateDescriptorSets(MainDevice.LD, SetWriteCount, SetWrites,
-					0, nullptr // Allows copy descriptor set to another descriptor set
-				);
+				DescriptorSets[i].AllocateDescriptorSet(DescriptorPool);
+				DescriptorSets[i].BindDescriptorWithSet();
 			}
 		}
 		// INPUT DESCRIPTOR SETS
@@ -1289,19 +1238,26 @@ namespace VKE
 	{
 		int idx = SwapChain.ImageIndex;
 		// Copy Frame data
-		Descriptor_Frame[idx].UpdateBufferData(&GetCurrentCamera()->GetFrameData());
-
-		// Update model data to pDrawcallTransferSpace
-		for (size_t i = 0; i < RenderList.size(); ++i)
+		if (cDescriptor_Buffer* Buffer = DescriptorSets[idx].GetDescriptorAt<cDescriptor_Buffer>(0))
 		{
-			using namespace BufferFormats;
-			FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(Descriptor_Drawcall[idx].GetAllocatedMemory()) + (i * Descriptor_Drawcall[idx].GetSlotSize()));
-			*Drawcall = RenderList[i]->Transform.M();
+			Buffer->UpdateBufferData(&GetCurrentCamera()->GetFrameData());
 		}
-		// Copy Model data
-		// Reuse void* Data
-		size_t DBufferSize = static_cast<size_t>(Descriptor_Drawcall[idx].GetSlotSize()) * RenderList.size();
-		Descriptor_Drawcall[idx].UpdatePartialData(Descriptor_Drawcall[idx].GetAllocatedMemory(), 0, DBufferSize);
+		
+		if (cDescriptor_DynamicBuffer* DBuffer = DescriptorSets[idx].GetDescriptorAt<cDescriptor_DynamicBuffer>(1))
+		{
+			// Update model data to pDrawcallTransferSpace
+			for (size_t i = 0; i < RenderList.size(); ++i)
+			{
+				using namespace BufferFormats;
+				FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (i *DBuffer->GetSlotSize()));
+				*Drawcall = RenderList[i]->Transform.M();
+			}
+			// Copy Model data
+			// Reuse void* Data
+			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * RenderList.size();
+			DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
+		}
+		
 	}
 
 
@@ -1571,11 +1527,11 @@ namespace VKE
 				vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 				// Dynamic Offset Amount
-				uint32_t DynamicOffset = static_cast<uint32_t>(Descriptor_Drawcall[SwapChain.ImageIndex].GetSlotSize()) * j;
+				uint32_t DynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * j;
 
 				const uint32_t DescriptorSetCount = 2;
 				// Two descriptor sets
-				VkDescriptorSet DescriptorSetGroup[] = { *Descriptor_Drawcall[SwapChain.ImageIndex].GetDescriptorSet(), Mesh->GetDescriptorSet() };
+				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), Mesh->GetDescriptorSet() };
 
 				// Bind Descriptor sets for Projection / View / Model matrix
 				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,

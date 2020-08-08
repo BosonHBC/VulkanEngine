@@ -117,7 +117,7 @@ namespace VKE
 	{
 		// Only 1 supportData is needed
 		UniformBuffer.SetDescriptorBufferRange(sizeof(BufferFormats::FParticleSupportData), 1);
-		UniformBuffer.CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, pMainDevice->PD, pMainDevice->LD);
+		UniformBuffer.CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, pMainDevice);
 		// Setup initial data
 		BufferFormats::FParticleSupportData Temp = {};
 		Temp.dt = 0.01f;
@@ -185,8 +185,6 @@ namespace VKE
 			// Allocate descriptor sets (multiple)
 			VkResult Result = vkAllocateDescriptorSets(pMainDevice->LD, &SetAllocInfo, &DescriptorSet);
 			RESULT_CHECK(Result, "Fail to Allocate Compute Descriptor Set!");
-
-			UniformBuffer.SetDescriptorSet(&DescriptorSet);
 		}
 
 		// 4. Update descriptor set write
@@ -209,7 +207,7 @@ namespace VKE
 			SetWrites[0].pBufferInfo = &StorageBufferInfo;
 
 			// particle support data DESCRIPTOR
-			SetWrites[1] = UniformBuffer.ConstructDescriptorBindingInfo();
+			SetWrites[1] = UniformBuffer.ConstructDescriptorBindingInfo(DescriptorSet);
 
 			// Update the descriptor sets with new buffer / binding info
 			vkUpdateDescriptorSets(pMainDevice->LD, DescriptorCount, SetWrites,

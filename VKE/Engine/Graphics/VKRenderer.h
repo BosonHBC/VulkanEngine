@@ -7,7 +7,7 @@
 #include "Utilities.h"
 
 #include "BufferFormats.h"
-#include "Descriptors/Descriptor_Dynamic.h"
+#include "Descriptors/DescriptorSet.h"
 #include "Mesh/Mesh.h"
 #include "Buffer/ImageBuffer.h"
 
@@ -72,11 +72,8 @@ namespace VKE
 
 		// - Descriptors
 #pragma region Uniform Buffer / Dynamic Descripotor set
-		VkDescriptorSetLayout DescriptorSetLayout;
 		VkDescriptorPool DescriptorPool;
-		std::vector<VkDescriptorSet> DescriptorSets;
-		std::vector<cDescriptor_Buffer> Descriptor_Frame;
-		std::vector<cDescriptor_DynamicBuffer> Descriptor_Drawcall;
+		std::vector<cDescriptorSet> DescriptorSets;
 #pragma endregion
 		// -- Push Constant
 		VkPushConstantRange PushConstantRange;

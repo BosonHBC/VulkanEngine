@@ -2,12 +2,9 @@
 #include "Utilities.h"
 namespace VKE
 {
-
-	bool cDescriptor_DynamicBuffer::CreateDescriptor( 
-		VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages, /* Properties of the descriptor */
-		VkPhysicalDevice PD, VkDevice LD) /* Properties for creating a buffer */
+	bool cDescriptor_DynamicBuffer::CreateDescriptor(VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages, FMainDevice* iMainDevice)
 	{
-		bool Result = cDescriptor_Buffer::CreateDescriptor(Type, Binding, Stages, PD, LD);
+		bool Result = cDescriptor_Buffer::CreateDescriptor(Type, Binding, Stages, iMainDevice);
 		if (!Result)
 		{
 			return Result;
