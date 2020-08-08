@@ -418,14 +418,15 @@ namespace VKE
 		SwapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;						// How to handle blending image with external graphics (e.g. other window)
 		SwapChainCreateInfo.clipped = VK_TRUE;														// Whether to clip parts of image not in view (e.g. behind another window)
 
+		uint32_t QueueFamilyIndices[] =
+		{
+			static_cast<uint32_t>(MainDevice.QueueFamilyIndices.graphicFamily),
+			static_cast<uint32_t>(MainDevice.QueueFamilyIndices.presentationFamily),
+		};
+
 		// Images are sharing between two queues
 		if (MainDevice.QueueFamilyIndices.graphicFamily != MainDevice.QueueFamilyIndices.presentationFamily)
 		{
-			uint32_t QueueFamilyIndices[] =
-			{
-				static_cast<uint32_t>(MainDevice.QueueFamilyIndices.graphicFamily),
-				static_cast<uint32_t>(MainDevice.QueueFamilyIndices.presentationFamily),
-			};
 			SwapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;						// Image share handling
 			SwapChainCreateInfo.queueFamilyIndexCount = 2;											// Number of queues sharing image between
 			SwapChainCreateInfo.pQueueFamilyIndices = QueueFamilyIndices;							// Array of queues to share between
@@ -505,16 +506,10 @@ namespace VKE
 		DepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		// Setup sub-pass 0
-		Subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		Subpasses[0] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
 		Subpasses[0].colorAttachmentCount = 1;
 		Subpasses[0].pColorAttachments = &ColorAttachmentReference;
 		Subpasses[0].pDepthStencilAttachment = &DepthAttachmentReference;
-		Subpasses[0].inputAttachmentCount = 0;
-		Subpasses[0].pInputAttachments = nullptr;
-		Subpasses[0].preserveAttachmentCount = 0;
-		Subpasses[0].pPreserveAttachments = nullptr;
-		Subpasses[0].pResolveAttachments = nullptr;
-		Subpasses[0].flags = 0;																// Flag as default
 
 		/** 2. Sub-pass 2 attachments (input attachments) */
 		VkAttachmentDescription SwapChainColorAttachment = {};
@@ -550,16 +545,11 @@ namespace VKE
 		InputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		// Setup sub-pass 1
-		Subpasses[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;					// Pipeline type, (Graphics pipeline, Compute pipeline, RayTracing_NV...)
+		Subpasses[1] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
 		Subpasses[1].colorAttachmentCount = 1;
 		Subpasses[1].pColorAttachments = &SwapChainColorAttachmentReference;				// Color attachment references
-		Subpasses[1].pDepthStencilAttachment = nullptr;										// No Depth buffer for the second sub pass
 		Subpasses[1].inputAttachmentCount = InputReferenceCount;
 		Subpasses[1].pInputAttachments = InputReferences;
-		Subpasses[1].preserveAttachmentCount = 0;
-		Subpasses[1].pPreserveAttachments = nullptr;
-		Subpasses[1].pResolveAttachments = nullptr;
-		Subpasses[1].flags = 0;																// Flag as default
 
 		/** 3. Need to determine when layout transitions occur using sub-pass dependencies */
 		const uint32_t DependencyCount = 3;
@@ -1480,7 +1470,7 @@ namespace VKE
 		std::vector<std::string> TextureNames = cModel::LoadMaterials(scene);
 
 		// Conversion from the materials list IDs to our Descriptor Array IDs
-		std::vector<int> MatToTex(TextureNames.size());
+		std::vector<int> MatToTex(TextureNames.size(), 0);
 
 		// Loop over texture names and create texture for them
 		for (size_t i = 0; i < MatToTex.size(); ++i)
@@ -1501,7 +1491,10 @@ namespace VKE
 		std::vector<std::shared_ptr<cMesh>> Meshes = cModel::LoadNode(ifileName, MainDevice, MainDevice.graphicQueue, MainDevice.GraphicsCommandPool, scene->mRootNode, scene, MatToTex);
 		for (auto& Mesh : Meshes)
 		{
-			Mesh->CreateDescriptorSet(SamplerSetLayout, SamplerDescriptorPool);
+			if (Mesh.get())
+			{
+				Mesh->CreateDescriptorSet(SamplerSetLayout, SamplerDescriptorPool);
+			}
 		}
 		oModel = DBG_NEW cModel(Meshes);
 
@@ -1525,7 +1518,7 @@ namespace VKE
 
 		const uint32_t ClearColorCount = 3;
 		VkClearValue ClearValues[ClearColorCount] = {};
-		ClearValues[0].color = {0.0f, 0.0f, 0.0f, 0.0f};							// SwapChain image clear color, doesn't make any difference if the image is drawn properly
+		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };							// SwapChain image clear color, doesn't make any difference if the image is drawn properly
 		ClearValues[1].color = { 0.4f, 0.4f, 0.4f, 1.0f };							// Color attachment clear value
 		ClearValues[2].depthStencil.depth = 1.0f;									// Depth attachment clear value
 
@@ -1596,7 +1589,7 @@ namespace VKE
 					1,						// For drawing same object multiple times
 					0, 0);*/
 
-				// Execute pipeline, Index draw
+					// Execute pipeline, Index draw
 				vkCmdDrawIndexed(CB, Mesh->GetIndexCount(), 1, 0, 0, 0);
 			}
 
@@ -1634,23 +1627,26 @@ namespace VKE
 		int i = 0;
 		for (const auto& queueFamily : queueFamilyList)
 		{
-			// At least one queue and it has graphic queue family (a queue could be multiple types)
-			if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+			if (queueFamily.queueCount > 0)
 			{
-				MainDevice.QueueFamilyIndices.graphicFamily = i;
-			}
-			VkBool32 presentationSuppot = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Surface, &presentationSuppot);
-			// Check if queue is presentation type (can be both graphics and presentations)
-			if (queueFamily.queueCount > 0 && presentationSuppot)
-			{
-				MainDevice.QueueFamilyIndices.presentationFamily = i;
-			}
+				// At least one queue and it has graphic queue family (a queue could be multiple types)
+				if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && MainDevice.QueueFamilyIndices.graphicFamily == -1)
+				{
+					MainDevice.QueueFamilyIndices.graphicFamily = i;
+				}
+				VkBool32 presentationSuppot = false;
+				vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Surface, &presentationSuppot);
+				// Check if queue is presentation type (can be both graphics and presentations)
+				if (presentationSuppot && MainDevice.QueueFamilyIndices.presentationFamily == -1)
+				{
+					MainDevice.QueueFamilyIndices.presentationFamily = i;
+				}
 
-			// try to find a queue family index that support compute bit but not graphic and compute
-			if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) && ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0))
-			{
-				MainDevice.QueueFamilyIndices.computeFamily = i;
+				// try to find a queue family index that support compute bit but not graphic and compute
+				if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) && ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) && MainDevice.QueueFamilyIndices.computeFamily == -1)
+				{
+					MainDevice.QueueFamilyIndices.computeFamily = i;
+				}
 			}
 			++i;
 		}

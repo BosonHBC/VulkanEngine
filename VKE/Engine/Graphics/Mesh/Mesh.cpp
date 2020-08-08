@@ -63,6 +63,7 @@ namespace VKE
 		// Allocate memory for descriptor
 		VkDescriptorSetAllocateInfo SetAllocInfo = {};
 		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.pNext = nullptr;
 		SetAllocInfo.descriptorPool = SamplerDescriptorPool;
 		SetAllocInfo.pSetLayouts = &SamplerSetLayout;
 		SetAllocInfo.descriptorSetCount = 1;			// Can create multiple at one time if multiple images are loaded
@@ -72,21 +73,30 @@ namespace VKE
 
 		// @TODO:
 		// In the future, if the material has multiple textures, there should be a material class handle the descriptor creation
-		VkDescriptorImageInfo ImageInfos[1] = {};
-		ImageInfos[0] = cTexture::Get(MaterialID)->GetImageInfo();
+		VkDescriptorImageInfo ImageInfo = {};
+		if (cTexture* Tex = cTexture::Get(MaterialID).get())
+		{
+			ImageInfo = Tex->GetImageInfo();
+		}
+		else
+		{
+			printf("Invalid Texture\n");
+			ImageInfo = cTexture::Get(0)->GetImageInfo();
+			return;
+		}
 
 		// Descriptor write info
-		VkWriteDescriptorSet DescriptorWrites[1] = {};
-		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescriptorWrites[0].dstSet = SamplerDescriptorSet;
-		DescriptorWrites[0].dstBinding = 0;
-		DescriptorWrites[0].dstArrayElement = 0;
-		DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		DescriptorWrites[0].descriptorCount = 1;
-		DescriptorWrites[0].pImageInfo = &ImageInfos[0];
+		VkWriteDescriptorSet DescriptorWrite = {};
+		DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrite.dstSet = SamplerDescriptorSet;
+		DescriptorWrite.dstBinding = 0;
+		DescriptorWrite.dstArrayElement = 0;
+		DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrite.descriptorCount = 1;
+		DescriptorWrite.pImageInfo = &ImageInfo;
 
 		// Update new descriptor set
-		vkUpdateDescriptorSets(pMainDevice->LD, 1, DescriptorWrites, 0, nullptr);
+		vkUpdateDescriptorSets(pMainDevice->LD, 1, &DescriptorWrite, 0, nullptr);
 	}
 
 	bool cMesh::createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool)

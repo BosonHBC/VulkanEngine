@@ -6,11 +6,13 @@ namespace VKE
 
 	bool cImageBuffer::init(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,  VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImageAspectFlags AspectFlags)
 	{
-		if (!pMainDevice)
+		pMainDevice = iMainDevice;
+		if (pMainDevice == nullptr)
 		{
+			printf("cImageBuffer::init(...): pMainDevice is nullptr, return false\n");
 			return false;
 		}
-		pMainDevice = iMainDevice;
+		
 		ImageFormat = Format;
 		if (!CreateImage(pMainDevice, Width, Height, ImageFormat, Tiling, UseFlags, PropFlags, Image, Memory))
 		{

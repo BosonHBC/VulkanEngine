@@ -95,7 +95,9 @@ namespace VKE
 
 		// Create new mesh with details
 		std::shared_ptr<cMesh> NewMesh = cMesh::Load(iFileName, MainDevice, TransferQueue, TransferCommandPool, Vertices, Indices);
-		NewMesh->SetMaterialID(MatToTex[Mesh->mMaterialIndex]);
+		int MaterialID = MatToTex[Mesh->mMaterialIndex];
+
+		NewMesh->SetMaterialID(MaterialID);
 
 		return NewMesh;
 	}

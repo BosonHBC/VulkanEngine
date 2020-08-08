@@ -89,8 +89,6 @@ namespace VKE
 		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
 	};
 
-
-
 	struct FSwapChainDetail
 	{
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities;			// Surface properties, e.g. image size / extents
@@ -141,6 +139,7 @@ namespace VKE
 	namespace Helpers
 	{
 		VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits ShaderStage, VkShaderModule ShaderModule, const char* MainFunctionName = "main");
+		VkSubpassDescription SubpassDescriptionDefault(VkPipelineBindPoint BindPoint);
 	}
 
 	// ================================================

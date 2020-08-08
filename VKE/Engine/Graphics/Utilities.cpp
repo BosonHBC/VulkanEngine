@@ -505,6 +505,24 @@ namespace VKE
 			ShaderStageCreateInfo.pName = MainFunctionName;
 			return ShaderStageCreateInfo;
 		}
+
+		VkSubpassDescription SubpassDescriptionDefault(VkPipelineBindPoint BindPoint)
+		{
+			VkSubpassDescription SubpassDescription;
+			SubpassDescription.pipelineBindPoint = BindPoint; // Pipeline type, (Graphics pipeline, Compute pipeline, RayTracing_NV...)
+			SubpassDescription.colorAttachmentCount = 0;
+			SubpassDescription.pColorAttachments = nullptr;
+			SubpassDescription.pDepthStencilAttachment = nullptr;
+			SubpassDescription.inputAttachmentCount = 0;
+			SubpassDescription.pInputAttachments = nullptr;
+			SubpassDescription.preserveAttachmentCount = 0;
+			SubpassDescription.pPreserveAttachments = nullptr;
+			SubpassDescription.pResolveAttachments = nullptr;
+			SubpassDescription.flags = 0;
+
+			return SubpassDescription;
+		}
+
 	}
 
 

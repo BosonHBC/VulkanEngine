@@ -18,6 +18,7 @@ namespace VKE
 		static void Free();
 		static uint32_t s_CreatedResourcesCount;
 
+		cTexture();
 		cTexture(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM);
 		cTexture(const cTexture& i_other) = delete;
 		cTexture(cTexture&& i_other) = delete;

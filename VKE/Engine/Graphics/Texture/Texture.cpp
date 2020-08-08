@@ -28,8 +28,21 @@ namespace VKE
 
 	std::shared_ptr<cTexture> cTexture::Get(int ID)
 	{
-		assert(static_cast<size_t>(ID) < s_TextureList.size());
-		return s_TextureList[ID];
+		if (s_TextureList.size() <= 0)
+		{
+			printf("ERROR: Texture list is empty! Returning Null Texture\n");
+			return std::make_shared<cTexture>();
+		}
+		if (static_cast<size_t>(ID) >= s_TextureList.size())
+		{
+			printf("ERROR: Texture ID is larger than the list! Returning white texture\n");
+			return s_TextureList[0];
+		}
+		else
+		{
+			return s_TextureList[ID];
+		}
+		
 	}
 
 	void cTexture::Free()
@@ -48,6 +61,11 @@ namespace VKE
 		// Create vkImage, vkMemory
 		createTextureImage(iTextureName, Format);
 		createTextureSampler();
+	}
+
+	cTexture::cTexture()
+	{
+		printf("Warning! Default constructor is called, means error happened.\n");
 	}
 
 	cTexture::~cTexture()
