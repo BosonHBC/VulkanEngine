@@ -82,9 +82,8 @@ namespace VKE
 		VkDescriptorPool SamplerDescriptorPool;
 
 		// -- Input Descriptor Set
-		VkDescriptorSetLayout InputSetLayout;
 		VkDescriptorPool InputDescriptorPool;
-		std::vector<VkDescriptorSet> InputDescriptorSets;
+		std::vector<cDescriptorSet> InputDescriptorSets;
 
 		/** Create functions */
 		void createInstance();

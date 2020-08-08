@@ -156,11 +156,8 @@ namespace VKE
 			pCompute->cleanUp();
 		safe_delete(pCompute);
 
-		vkDestroyDescriptorPool(MainDevice.LD, InputDescriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(MainDevice.LD, InputSetLayout, nullptr);
 
-		vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(MainDevice.LD, SamplerSetLayout, nullptr);
+
 
 		cTexture::Free();
 
@@ -199,11 +196,14 @@ namespace VKE
 		// Descriptor related
 		{
 			vkDestroyDescriptorPool(MainDevice.LD, DescriptorPool, nullptr);
-
+			vkDestroyDescriptorPool(MainDevice.LD, InputDescriptorPool, nullptr);
+			vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
 				DescriptorSets[i].cleanUp();
+				InputDescriptorSets[i].cleanUp();
 			}
+			vkDestroyDescriptorSetLayout(MainDevice.LD, SamplerSetLayout, nullptr);
 		}
 
 		{
@@ -646,29 +646,10 @@ namespace VKE
 
 		// INPUT DESCRIPTOR LAYOUT
 		{
-			const uint32_t BindingCount = 2;
-			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
-			Bindings[0].binding = 0;
-			Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			Bindings[0].descriptorCount = 1;
-			Bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			Bindings[0].pImmutableSamplers = nullptr;
-
-			Bindings[1].binding = 1;
-			Bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			Bindings[1].descriptorCount = 1;
-			Bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			Bindings[1].pImmutableSamplers = nullptr;
-
-			VkDescriptorSetLayoutCreateInfo InputLayoutCreateInfo = {};
-			InputLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			InputLayoutCreateInfo.bindingCount = BindingCount;
-			InputLayoutCreateInfo.pBindings = Bindings;
-			InputLayoutCreateInfo.pNext = nullptr;
-			InputLayoutCreateInfo.flags = 0;
-
-			VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &InputLayoutCreateInfo, nullptr, &InputSetLayout);
-			RESULT_CHECK(Result, "Fail to create Input descriptor set layout.")
+			for (size_t i = 0; i < InputDescriptorSets.size(); ++i)
+			{
+				InputDescriptorSets[i].CreateDescriptorSetLayout();
+			}
 		}
 	}
 
@@ -931,7 +912,7 @@ namespace VKE
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
 			PipelineLayoutCreateInfo1.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			PipelineLayoutCreateInfo1.setLayoutCount = 1;
-			PipelineLayoutCreateInfo1.pSetLayouts = &InputSetLayout;
+			PipelineLayoutCreateInfo1.pSetLayouts = &InputDescriptorSets[0].GetDescriptorSetLayout();
 			PipelineLayoutCreateInfo1.pushConstantRangeCount = 0;
 			PipelineLayoutCreateInfo1.pPushConstantRanges = nullptr;
 
@@ -1093,12 +1074,16 @@ namespace VKE
 		// One uniform buffer for each image (and by extension, command buffer)
 		size_t Size = SwapChain.Images.size();
 		DescriptorSets.resize(Size, cDescriptorSet(&MainDevice));
-
+		InputDescriptorSets.resize(Size, cDescriptorSet(&MainDevice));
 		// Create UniformBuffers
 		for (size_t i = 0; i < Size; ++i)
 		{
 			DescriptorSets[i].CreateBufferDescriptor(sizeof(BufferFormats::FFrame), 1, VK_SHADER_STAGE_VERTEX_BIT);
 			DescriptorSets[i].CreateDynamicBufferDescriptor(sizeof(BufferFormats::FDrawCall), MAX_OBJECTS, VK_SHADER_STAGE_VERTEX_BIT);
+
+			InputDescriptorSets[i].CreateImageBufferDescriptor(&ColorBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			InputDescriptorSets[i].CreateImageBufferDescriptor(&DepthBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
 		}
 	}
 
@@ -1177,59 +1162,10 @@ namespace VKE
 		}
 		// INPUT DESCRIPTOR SETS
 		{
-			InputDescriptorSets.resize(SwapChain.Images.size());
-			// Fill array of layouts ready for set creation
-			std::vector<VkDescriptorSetLayout> InputSetLayouts(SwapChain.Images.size(), InputSetLayout);
-			VkDescriptorSetAllocateInfo InputSetAllocInfo = {};
-			InputSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			InputSetAllocInfo.descriptorPool = InputDescriptorPool;
-			InputSetAllocInfo.descriptorSetCount = static_cast<uint32_t>(SwapChain.Images.size());
-			InputSetAllocInfo.pSetLayouts = InputSetLayouts.data();
-
-			// Allocate input descriptor sets (multiple)
-			VkResult Result = vkAllocateDescriptorSets(MainDevice.LD, &InputSetAllocInfo, InputDescriptorSets.data());
-			RESULT_CHECK(Result, "Fail to Allocate Input Descriptor Set!");
-
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
-				// Color Attachment Descriptor
-				VkDescriptorImageInfo ColorAttachmentDescriptor = {};
-				ColorAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				ColorAttachmentDescriptor.imageView = ColorBuffers[i].GetImageView();
-				ColorAttachmentDescriptor.sampler = VK_NULL_HANDLE;		// Can not use sampler since it is a input attachment
-
-				VkWriteDescriptorSet ColorWrite = {};
-				ColorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				ColorWrite.dstSet = InputDescriptorSets[i];
-				ColorWrite.dstBinding = 0;
-				ColorWrite.dstArrayElement = 0;
-				ColorWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-				ColorWrite.descriptorCount = 1;
-				ColorWrite.pImageInfo = &ColorAttachmentDescriptor;
-
-				// Depth Attachment Descriptor
-				VkDescriptorImageInfo DepthAttachmentDescriptor = {};
-				DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				DepthAttachmentDescriptor.imageView = DepthBuffers[i].GetImageView();
-				DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;		// Can not use sampler since it is a input attachment
-
-				VkWriteDescriptorSet DepthWrite = {};
-				DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				DepthWrite.dstSet = InputDescriptorSets[i];
-				DepthWrite.dstBinding = 1;
-				DepthWrite.dstArrayElement = 0;
-				DepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-				DepthWrite.descriptorCount = 1;
-				DepthWrite.pImageInfo = &DepthAttachmentDescriptor;
-
-				const uint32_t SetWriteCount = 2;
-				// Data about connection between Descriptor and buffer
-				VkWriteDescriptorSet SetWrites[SetWriteCount] = { ColorWrite, DepthWrite };
-
-				// Update the descriptor sets with new buffer / binding info
-				vkUpdateDescriptorSets(MainDevice.LD, SetWriteCount, SetWrites,
-					0, nullptr // Allows copy descriptor set to another descriptor set
-				);
+				InputDescriptorSets[i].AllocateDescriptorSet(InputDescriptorPool);
+				InputDescriptorSets[i].BindDescriptorWithSet();
 			}
 		}
 	}
@@ -1557,7 +1493,7 @@ namespace VKE
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, SecondGraphicPipeline);
 			// No need to bind vertex buffer or index buffer
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, SecondPipelineLayout,
-				0, 1, &InputDescriptorSets[SwapChain.ImageIndex],
+				0, 1, &InputDescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
 				0, nullptr);	// no dynamic offset
 			// Draw 3 vertex (1 triangle) only 
 			vkCmdDraw(CB, 3, 1, 0, 0);
