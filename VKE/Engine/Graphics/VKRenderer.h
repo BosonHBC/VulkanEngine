@@ -53,13 +53,17 @@ namespace VKE
 		std::vector<VkFramebuffer> SwapChainFramebuffers;
 		std::vector<VkCommandBuffer> CommandBuffers;
 
-		VkFormat DepthFormat;
 		std::vector <cImageBuffer> DepthBuffers;
+		std::vector <cImageBuffer> ColorBuffers;			
 
 		// -Pipeline
 		VkRenderPass RenderPass;
+		
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
+		
+		VkPipeline SecondGraphicPipeline;
+		VkPipelineLayout SecondPipelineLayout;
 
 		// -Synchronization
 		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage
@@ -71,8 +75,8 @@ namespace VKE
 		VkDescriptorSetLayout DescriptorSetLayout;
 		VkDescriptorPool DescriptorPool;
 		std::vector<VkDescriptorSet> DescriptorSets;
-		std::vector<cDescriptor> Descriptor_Frame;
-		std::vector<cDescriptor_Dynamic> Descriptor_Drawcall;
+		std::vector<cDescriptor_Buffer> Descriptor_Frame;
+		std::vector<cDescriptor_DynamicBuffer> Descriptor_Drawcall;
 #pragma endregion
 		// -- Push Constant
 		VkPushConstantRange PushConstantRange;
@@ -80,8 +84,10 @@ namespace VKE
 		VkDescriptorSetLayout SamplerSetLayout;
 		VkDescriptorPool SamplerDescriptorPool;
 
-		// - Assets
-		std::vector<VkDescriptorSet> SamplerDescriptorSets;					// Each image needs a descriptor (sampler)
+		// -- Input Descriptor Set
+		VkDescriptorSetLayout InputSetLayout;
+		VkDescriptorPool InputDescriptorPool;
+		std::vector<VkDescriptorSet> InputDescriptorSets;
 
 		/** Create functions */
 		void createInstance();
@@ -94,7 +100,7 @@ namespace VKE
 		void createDescriptorSetLayout();
 		void createPushConstantRange();
 		void createGraphicsPipeline();
-		void createDepthBufferImage();
+		void createFrameBufferImage();
 		void createFrameBuffer();
 		void createCommandPool();
 		void createCommandBuffers();
@@ -102,7 +108,7 @@ namespace VKE
 
 		void createUniformBuffer();
 		void createDescriptorPool();
-		void updateDescriptorSetWrites();
+		void allocateDescriptorSetsAndUpdateDescriptorSetWrites();
 
 		/** intermediate functions */
 		void prepareForDraw();

@@ -134,6 +134,15 @@ namespace VKE
 		bool Valid = false;
 	};
 
+	// =======================================================================
+	// =============== Create Info generation helper Functions =============== 
+	// =======================================================================
+
+	namespace Helpers
+	{
+		VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits ShaderStage, VkShaderModule ShaderModule, const char* MainFunctionName = "main");
+	}
+
 	// ================================================
 	// =============== Global Functions =============== 
 	// ================================================

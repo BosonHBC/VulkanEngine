@@ -3,7 +3,7 @@
 
 namespace VKE
 {
-	bool cDescriptor::CreateDescriptor( VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,	/* Properties of the descriptor */
+	bool cDescriptor_Buffer::CreateDescriptor( VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,	/* Properties of the descriptor */
 		VkPhysicalDevice PD, VkDevice LD)																	/* Properties for creating a buffer */
 	{
 		// Ensure that SetDescriptorBufferRange has called such that the buffer has a size
@@ -30,7 +30,7 @@ namespace VKE
 		return true;
 	}
 
-	void cDescriptor::SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount)
+	void cDescriptor_Buffer::SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount)
 	{
 		// For uniform buffer, the size should be the same as the size of desired buffer format
 		BufferInfo.range = BufferFormatSize;
@@ -38,7 +38,7 @@ namespace VKE
 		this->ObjectCount = ObjectCount;
 	}
 
-	void cDescriptor::UpdateBufferData(void* srcData)
+	void cDescriptor_Buffer::UpdateBufferData(void* srcData)
 	{
 		void * pData = nullptr;
 		vkMapMemory(Buffer.GetDevice(), Buffer.GetMemory(), 0, BufferInfo.range, 0, &pData);
@@ -46,7 +46,7 @@ namespace VKE
 		vkUnmapMemory(Buffer.GetDevice(), Buffer.GetMemory());
 	}
 
-	void cDescriptor::UpdatePartialData(void * srcData, VkDeviceSize Offset, VkDeviceSize Size)
+	void cDescriptor_Buffer::UpdatePartialData(void * srcData, VkDeviceSize Offset, VkDeviceSize Size)
 	{
 		void* pData = nullptr;
 		vkMapMemory(Buffer.GetDevice(), Buffer.GetMemory(), Offset, Size, 0, &pData);
@@ -54,13 +54,13 @@ namespace VKE
 		vkUnmapMemory(Buffer.GetDevice(), Buffer.GetMemory());
 	}
 
-	void cDescriptor::cleanUp()
+	void cDescriptor_Buffer::cleanUp()
 	{
 		Buffer.cleanUp();
 	}
 
 
-	VkWriteDescriptorSet cDescriptor::ConstructDescriptorBindingInfo()
+	VkWriteDescriptorSet cDescriptor_Buffer::ConstructDescriptorBindingInfo()
 	{
 		// Data about connection between Descriptor and buffer
 		VkWriteDescriptorSet SetWrite = {};
@@ -77,7 +77,7 @@ namespace VKE
 		return SetWrite;
 	}
 
-	VkDescriptorSetLayoutBinding cDescriptor::ConstructDescriptorSetLayoutBinding()
+	VkDescriptorSetLayoutBinding cDescriptor_Buffer::ConstructDescriptorSetLayoutBinding()
 	{
 		VkDescriptorSetLayoutBinding Binding = {};
 		// FrameData binding info

@@ -24,7 +24,7 @@ namespace VKE
 		cBuffer StorageBuffer;		// Buffer for particle data
 		BufferFormats::FParticle Particles[Particle_Count];
 
-		cDescriptor UniformBuffer;										// Buffer for support data(BufferFormats::FParticleSupportData) for computing particles movement
+		cDescriptor_Buffer UniformBuffer;										// Buffer for support data(BufferFormats::FParticleSupportData) for computing particles movement
 		BufferFormats::FParticleSupportData ParticleSupportData;		// Including deltaTime, will add in the future
 
 		// Command related

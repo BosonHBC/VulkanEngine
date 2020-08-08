@@ -3,11 +3,11 @@
 
 namespace VKE
 {
-	class cDescriptor_Dynamic : public cDescriptor
+	class cDescriptor_DynamicBuffer : public cDescriptor_Buffer
 	{
 	public:
-		cDescriptor_Dynamic() : cDescriptor() {}
-		~cDescriptor_Dynamic() {};
+		cDescriptor_DynamicBuffer() : cDescriptor_Buffer() {}
+		~cDescriptor_DynamicBuffer() {};
 
 		/* Create Function */
 		// Store descriptor information, create buffer, allocate device memory

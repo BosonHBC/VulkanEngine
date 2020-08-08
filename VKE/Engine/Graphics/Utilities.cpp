@@ -494,4 +494,18 @@ namespace VKE
 		return (graphicFamily >= 0 && presentationFamily >= 0 && (FComputePass::SComputePipelineRequired ? computeFamily >= 0 : true)); 
 	}
 
+	namespace Helpers
+	{
+		VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits ShaderStage, VkShaderModule ShaderModule, const char* MainFunctionName /*= "main"*/)
+		{
+			VkPipelineShaderStageCreateInfo ShaderStageCreateInfo = {};
+			ShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			ShaderStageCreateInfo.stage = ShaderStage;
+			ShaderStageCreateInfo.module = ShaderModule;
+			ShaderStageCreateInfo.pName = MainFunctionName;
+			return ShaderStageCreateInfo;
+		}
+	}
+
+
 }

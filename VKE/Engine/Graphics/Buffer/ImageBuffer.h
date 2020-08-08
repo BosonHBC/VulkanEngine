@@ -29,6 +29,7 @@ namespace VKE
 		const VkImageView& GetImageView() const { return ImageView; }
 		const VkImage&  GetImage() const { return Image; }
 		const VkDeviceMemory&  GetImageMemory() const { return Memory; }
+		const VkFormat& GetFormat() const { return ImageFormat; }
 	private:
 		FMainDevice* pMainDevice;
 

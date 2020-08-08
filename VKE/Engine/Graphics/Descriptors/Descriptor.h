@@ -12,12 +12,12 @@ namespace VKE
 	};
 	// This class contains information of a descriptor which helps descriptor set creation
 	// Also contains the buffer binds to the descriptor set
-	class cDescriptor
+	class cDescriptor_Buffer
 	{
 	public:
 		/** Constructors */
-		cDescriptor() {};
-		virtual ~cDescriptor() {};
+		cDescriptor_Buffer() {};
+		virtual ~cDescriptor_Buffer() {};
 
 		/* Create Function */
 		// Store descriptor information, create buffer, allocate device memory
