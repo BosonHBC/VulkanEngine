@@ -1,5 +1,5 @@
 #pragma once
-#include "Descriptor.h"
+#include "Descriptor_Buffer.h"
 
 namespace VKE
 {

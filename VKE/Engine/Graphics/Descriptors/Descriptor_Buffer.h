@@ -24,7 +24,6 @@ namespace VKE
 		virtual bool CreateDescriptor( 
 			VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,	// Properties of the descriptor
 			VkPhysicalDevice PD, VkDevice LD									// Properties for creating a buffer
-			
 		);
 		
 		// Calculate the buffer size, different types of buffers should have different size calculations

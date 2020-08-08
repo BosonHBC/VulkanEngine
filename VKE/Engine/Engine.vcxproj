@@ -164,7 +164,7 @@
     <ClCompile Include="Graphics\Buffer\ImageBuffer.cpp" />
     <ClCompile Include="Graphics\Camera.cpp" />
     <ClCompile Include="Graphics\ComputePass.cpp" />
-    <ClCompile Include="Graphics\Descriptors\Descriptor.cpp" />
+    <ClCompile Include="Graphics\Descriptors\Descriptor_Buffer.cpp" />
     <ClCompile Include="Graphics\Descriptors\Descriptor_Dynamic.cpp" />
     <ClCompile Include="Graphics\Mesh\Mesh.cpp" />
     <ClCompile Include="Graphics\Model\Model.cpp" />
@@ -182,7 +182,7 @@
     <ClInclude Include="Graphics\Buffer\ImageBuffer.h" />
     <ClInclude Include="Graphics\Camera.h" />
     <ClInclude Include="Graphics\ComputePass.h" />
-    <ClInclude Include="Graphics\Descriptors\Descriptor.h" />
+    <ClInclude Include="Graphics\Descriptors\Descriptor_Buffer.h" />
     <ClInclude Include="Graphics\Descriptors\Descriptor_Dynamic.h" />
     <ClInclude Include="Graphics\Mesh\Mesh.h" />
     <ClInclude Include="Graphics\Model\Model.h" />

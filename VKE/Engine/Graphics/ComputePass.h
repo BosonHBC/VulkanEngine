@@ -4,7 +4,7 @@
 #include "Engine.h"
 #include "Utilities.h"
 #include "Buffer/Buffer.h"
-#include "Descriptors/Descriptor.h"
+#include "Descriptors/Descriptor_Buffer.h"
 #include "BufferFormats.h"
 
 namespace VKE
@@ -25,7 +25,7 @@ namespace VKE
 		BufferFormats::FParticle Particles[Particle_Count];
 
 		cDescriptor_Buffer UniformBuffer;										// Buffer for support data(BufferFormats::FParticleSupportData) for computing particles movement
-		BufferFormats::FParticleSupportData ParticleSupportData;		// Including deltaTime, will add in the future
+		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
 
 		// Command related
 		VkCommandPool CommandPool;
