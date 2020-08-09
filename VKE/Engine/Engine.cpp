@@ -51,19 +51,7 @@ namespace VKE {
 			return EXIT_FAILURE;
 		}
 		
-		// Create Mesh
-		cModel* pContainerModel = nullptr;
-		cModel* pPlaneModel = nullptr;
 
-		g_Renderer->CreateModel("Container.obj", pContainerModel);
-		g_Renderer->RenderList.push_back(pContainerModel);
-
-		g_Renderer->CreateModel("Plane.obj", pPlaneModel);
-		g_Renderer->RenderList.push_back(pPlaneModel);
-
-		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
-
-		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25,25,25));
 		return result;
 	}
 

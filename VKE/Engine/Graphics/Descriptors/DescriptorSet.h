@@ -5,13 +5,26 @@
 
 namespace VKE
 {
+	enum EDescriptorSetType : uint8_t
+	{
+		FirstPass_vert,
+		SecondPass_frag,
+		FirstPass_frag,
+		ComputePass,
+		Invalid = uint8_t(-1),
+	};
+
 	class IDescriptor;
 	class cImageBuffer;
 	class cDescriptorSet
 	{
 	public:
+		/** Static functions */
+		static void CleanupDescriptorSetLayout(FMainDevice* iMainDevice);
+		static VkDescriptorSetLayout GetDescriptorSetLayout(EDescriptorSetType iType);
+	public:
 		/** Constructors */
-		cDescriptorSet() = delete;
+		cDescriptorSet() {};
 		cDescriptorSet(FMainDevice* iMainDevice) : pMainDevice(iMainDevice) {}
 		~cDescriptorSet() {};
 		cDescriptorSet(const cDescriptorSet& i_other) = default;
@@ -33,7 +46,7 @@ namespace VKE
 			return Descriptor;
 		}
 
-		const VkDescriptorSetLayout& GetDescriptorSetLayout() const { return DescriptorSetLayout; }
+		const VkDescriptorSetLayout& GetDescriptorSetLayout() const;
 		const VkDescriptorSet& GetDescriptorSet() const { return DescriptorSet; }
 
 		// Create different types of descriptors
@@ -43,8 +56,10 @@ namespace VKE
 
 		void CreateImageBufferDescriptor(cImageBuffer* const & iImageBuffer, VkDescriptorType Type, VkShaderStageFlags ShaderStage, VkImageLayout ImageLayout, VkSampler Sampler = VK_NULL_HANDLE);
 
+		void CreateStorageBufferDescriptor(VkDeviceSize BufferFormatSize, uint32_t ObjectCount, VkShaderStageFlags ShaderStage, VkBufferUsageFlags UsageFlags, VkMemoryPropertyFlags MemoryPropertyFlags);
+
 		// Create Descriptor set layout
-		void CreateDescriptorSetLayout();
+		void CreateDescriptorSetLayout(EDescriptorSetType iDescriptorType);
 		
 		// Allocate Descriptor Set
 		void AllocateDescriptorSet(VkDescriptorPool Pool);
@@ -52,11 +67,11 @@ namespace VKE
 		// Bind Descriptor's content to the descriptor set
 		void BindDescriptorWithSet();
 
-		
-	protected:
 		FMainDevice* pMainDevice = nullptr;
-		// Descriptor set layout
-		VkDescriptorSetLayout DescriptorSetLayout;
+	protected:
+
+		// Used for querying the descriptor set layout
+		EDescriptorSetType DescriptorSetType = Invalid;
 		// Descriptors that hold data
 		std::vector<IDescriptor*> Descriptors;
 		// Descriptor Set that has the layout determined by DescriptorSetLayout and hold store descriptors

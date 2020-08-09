@@ -84,7 +84,7 @@ namespace VKE
 		Buffer.cleanUp();
 	}
 
-	VkDescriptorImageInfo cTexture::GetImageInfo()
+	VkDescriptorImageInfo cTexture::GetImageInfo() const
 	{
 		VkDescriptorImageInfo Info;
 		Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
@@ -136,7 +136,7 @@ namespace VKE
 		TransitionImageLayout(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, Buffer.GetImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		// Actual copy command
-		CopyImageBuffer(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, StagingBuffer.GetBuffer(), Buffer.GetImage(), Width, Height);
+		CopyImageBuffer(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, StagingBuffer.GetvkBuffer(), Buffer.GetImage(), Width, Height);
 
 		// Transition image to be shader readable for shader usage
 		TransitionImageLayout(pMainDevice->LD, pMainDevice->graphicQueue, pMainDevice->GraphicsCommandPool, Buffer.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

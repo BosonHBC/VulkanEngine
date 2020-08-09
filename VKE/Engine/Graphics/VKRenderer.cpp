@@ -44,22 +44,14 @@ namespace VKE
 				allocateDescriptorSetsAndUpdateDescriptorSetWrites();
 				createPushConstantRange();
 			}
-
-			createGraphicsPipeline();
-
 			createFrameBuffer();
 			createCommandPool();
 			createCommandBuffers();
 			createSynchronization();
-
-			// Create Texture
-			cTexture::Load("DefaultWhite.png", MainDevice);
-			cTexture::Load("brick.png", MainDevice);
-			cTexture::Load("panda.jpg", MainDevice);
-			cTexture::Load("teapot.png", MainDevice);
-
+			LoadAssets();
+			createGraphicsPipeline();
 			// Create compute pass
-			//pCompute = DBG_NEW FComputePass();
+			pCompute = DBG_NEW FComputePass();
 			if (pCompute)
 				pCompute->init(&MainDevice);
 		}
@@ -203,7 +195,7 @@ namespace VKE
 				DescriptorSets[i].cleanUp();
 				InputDescriptorSets[i].cleanUp();
 			}
-			vkDestroyDescriptorSetLayout(MainDevice.LD, SamplerSetLayout, nullptr);
+			cDescriptorSet::CleanupDescriptorSetLayout(&MainDevice);
 		}
 
 		{
@@ -225,6 +217,29 @@ namespace VKE
 		vkDestroySurfaceKHR(vkInstance, Surface, nullptr);
 		vkDestroyDevice(MainDevice.LD, nullptr);
 		vkDestroyInstance(vkInstance, nullptr);
+	}
+
+	void VKRenderer::LoadAssets()
+	{
+		// Create Texture
+		cTexture::Load("DefaultWhite.png", MainDevice);
+		cTexture::Load("brick.png", MainDevice);
+		cTexture::Load("panda.jpg", MainDevice);
+		cTexture::Load("teapot.png", MainDevice);
+
+		// Create Mesh
+		cModel* pContainerModel = nullptr;
+		cModel* pPlaneModel = nullptr;
+
+		CreateModel("Container.obj", pContainerModel);
+		RenderList.push_back(pContainerModel);
+
+		CreateModel("Plane.obj", pPlaneModel);
+		RenderList.push_back(pPlaneModel);
+
+		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
+
+		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));
 	}
 
 	void VKRenderer::createInstance()
@@ -326,18 +341,17 @@ namespace VKE
 		// vector for queue create information
 		std::vector< VkDeviceQueueCreateInfo> queueCreateInfos;
 		// set of queue family indices, prevent duplication
-		std::set<int> queueFamilyIndices = { MainDevice.QueueFamilyIndices.graphicFamily, MainDevice.QueueFamilyIndices.presentationFamily };
+		std::set<int> queueFamilyIndices = { MainDevice.QueueFamilyIndices.graphicFamily, MainDevice.QueueFamilyIndices.presentationFamily, MainDevice.QueueFamilyIndices.computeFamily };
+		const float DefaultPriority = 0.0f;
 		for (auto& queueFamilyIdx : queueFamilyIndices)
 		{
 			VkDeviceQueueCreateInfo queueCreateInfo = {};
 			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 			queueCreateInfo.queueFamilyIndex = queueFamilyIdx;											// Index of the family to create a queue from
 			queueCreateInfo.queueCount = 1;
-			float priority = 1.0f;
-			queueCreateInfo.pQueuePriorities = &priority;												// If there are multiple queues, GPU needs to know the execution order of different queues (1.0 == highest prioity)
+			queueCreateInfo.pQueuePriorities = &DefaultPriority;										// If there are multiple queues, GPU needs to know the execution order of different queues (1.0 == highest prioity)
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
-
 
 		// Info to create a (logical) device
 		VkDeviceCreateInfo DeviceCreateInfo = {};
@@ -610,45 +624,15 @@ namespace VKE
 		{
 			for (size_t i = 0; i < DescriptorSets.size(); ++i)
 			{
-				DescriptorSets[i].CreateDescriptorSetLayout();
+				DescriptorSets[i].CreateDescriptorSetLayout(FirstPass_vert);
 			}
-		}
-
-		// SAMPLER DESCRIPTOR LAYOUT
-		{
-			const uint32_t BindingCount = 2;
-			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
-
-			// Albedo map
-			Bindings[0].binding = 0;
-			Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			Bindings[0].descriptorCount = 1;
-			Bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			Bindings[0].pImmutableSamplers = nullptr;
-
-			// Normal map
-			Bindings[1].binding = 1;
-			Bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			Bindings[1].descriptorCount = 1;
-			Bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			Bindings[1].pImmutableSamplers = nullptr;
-
-			VkDescriptorSetLayoutCreateInfo TextureLayoutCreateInfo = {};
-			TextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			TextureLayoutCreateInfo.bindingCount = BindingCount;
-			TextureLayoutCreateInfo.pBindings = Bindings;
-			TextureLayoutCreateInfo.pNext = nullptr;
-			TextureLayoutCreateInfo.flags = 0;
-
-			VkResult Result = vkCreateDescriptorSetLayout(MainDevice.LD, &TextureLayoutCreateInfo, nullptr, &SamplerSetLayout);
-			RESULT_CHECK(Result, "Fail to create sampler descriptor set layout.")
 		}
 
 		// INPUT DESCRIPTOR LAYOUT
 		{
 			for (size_t i = 0; i < InputDescriptorSets.size(); ++i)
 			{
-				InputDescriptorSets[i].CreateDescriptorSetLayout();
+				InputDescriptorSets[i].CreateDescriptorSetLayout(SecondPass_frag);
 			}
 		}
 	}
@@ -830,7 +814,7 @@ namespace VKE
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 
 		const uint32_t SetLayoutCount = 2;
-		VkDescriptorSetLayout Layouts[SetLayoutCount] = { DescriptorSets[0].GetDescriptorSetLayout(), SamplerSetLayout };
+		VkDescriptorSetLayout Layouts[SetLayoutCount] = { DescriptorSets[0].GetDescriptorSetLayout(), cDescriptorSet::GetDescriptorSetLayout(FirstPass_frag) };
 
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		PipelineLayoutCreateInfo.setLayoutCount = SetLayoutCount;
@@ -1385,7 +1369,7 @@ namespace VKE
 		{
 			if (Mesh.get())
 			{
-				Mesh->CreateDescriptorSet(SamplerSetLayout, SamplerDescriptorPool);
+				Mesh->CreateDescriptorSet(SamplerDescriptorPool);
 			}
 		}
 		oModel = DBG_NEW cModel(Meshes);

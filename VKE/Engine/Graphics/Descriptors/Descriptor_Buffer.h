@@ -4,10 +4,7 @@
 #include "Buffer/Buffer.h"
 namespace VKE
 {
-
-	// This class contains information of a descriptor which helps descriptor set creation
-	// Also contains the buffer binds to the descriptor set
-	
+	// Buffer descriptor such as uniform buffer, storage buffer
 	class cDescriptor_Buffer : public IDescriptor
 	{
 	public:
@@ -26,7 +23,7 @@ namespace VKE
 
 		// Calculate the buffer size, different types of buffers should have different size calculations
 		virtual void SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount);
-		
+		virtual void CreateBuffer(VkBufferUsageFlags UsageFlags, VkMemoryPropertyFlags MemoryPropertyFlags);
 		/* Update Function */
 		// Update the full memory block
 		void UpdateBufferData(void* srcData);
@@ -37,6 +34,7 @@ namespace VKE
 
 		/** Getters */
 		// Get buffer size for Descriptor_buffer
+		cBuffer& GetBuffer() { return Buffer; }
 		const VkDeviceSize& GetSlotSize() const { return BufferInfo.range; }
 		const VkDeviceMemory& GetBufferMemory() const { return Buffer.GetMemory(); }
 

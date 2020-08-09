@@ -4,14 +4,16 @@
 #include "Engine.h"
 #include "Utilities.h"
 #include "Buffer/Buffer.h"
-#include "Descriptors/Descriptor_Buffer.h"
 #include "BufferFormats.h"
+#include "Descriptors/DescriptorSet.h"
 
 namespace VKE
 {
 #define Particle_Count 256
 	struct FComputePass
 	{
+		FComputePass() {}
+
 		static bool SComputePipelineRequired;
 		// LD, PD
 		FMainDevice* pMainDevice;
@@ -20,21 +22,18 @@ namespace VKE
 		VkQueue Queue;
 		bool needSynchronization() const;
 
-		// Buffers
-		cBuffer StorageBuffer;		// Buffer for particle data
-		BufferFormats::FParticle Particles[Particle_Count];
-
-		cDescriptor_Buffer UniformBuffer;										// Buffer for support data(BufferFormats::FParticleSupportData) for computing particles movement
-		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
-
 		// Command related
 		VkCommandPool CommandPool;
 		VkCommandBuffer CommandBuffer;
 
 		// Descriptor related
 		VkDescriptorPool DescriptorPool;
-		VkDescriptorSetLayout DescriptorSetLayout;
-		VkDescriptorSet DescriptorSet;
+		// Contain StoratgeBuffer(binding = 0) of particles 
+		// And UniformBuffer(binding = 1) of support data(BufferFormats::FParticleSupportData) for computing particles movement								
+		cDescriptorSet ComputeDescriptorSet;									
+		// Actual data of particles and support data
+		BufferFormats::FParticle Particles[Particle_Count];
+		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
 
 		// Pipeline related
 		VkPipelineLayout ComputePipelineLayout;
@@ -58,11 +57,8 @@ namespace VKE
 			vkDestroyPipeline(pMainDevice->LD, ComputePipeline, nullptr);
 			vkDestroyPipelineLayout(pMainDevice->LD, ComputePipelineLayout, nullptr);
 
-			vkDestroyDescriptorSetLayout(pMainDevice->LD, DescriptorSetLayout, nullptr);
+			ComputeDescriptorSet.cleanUp();
 			vkDestroyDescriptorPool(pMainDevice->LD, DescriptorPool, nullptr);
-
-			UniformBuffer.cleanUp();
-			StorageBuffer.cleanUp();
 		}
 
 		void recordCommands()

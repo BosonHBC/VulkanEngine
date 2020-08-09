@@ -1,5 +1,5 @@
 #include "ComputePass.h"
-
+#include "Descriptors/Descriptor_Buffer.h"
 namespace VKE
 {
 	bool FComputePass::SComputePipelineRequired = false;
@@ -21,6 +21,7 @@ namespace VKE
 			SComputePipelineRequired = true;
 		}
 		pMainDevice = iMainDevice;
+		ComputeDescriptorSet.pMainDevice = pMainDevice;
 		// 1. Get compute queue and queue family
 		vkGetDeviceQueue(pMainDevice->LD, pMainDevice->QueueFamilyIndices.computeFamily, 0, &Queue);
 		// . Create compute command pool
@@ -32,10 +33,10 @@ namespace VKE
 		createUniformBuffer();
 		// . set up descriptor set related
 		prepareDescriptors();
-		// . Create compute pipeline
-		createComputePipeline();
 		// . Create semaphores and fences
 		createSynchronization();
+		// . Create compute pipeline
+		createComputePipeline();
 		// . Record command lines
 		recordCommands();
 	}
@@ -66,14 +67,13 @@ namespace VKE
 		memcpy(pData, Particles, static_cast<size_t>(StorageBufferSize));
 		vkUnmapMemory(pMainDevice->LD, StagingBuffer.GetMemory());
 
-		// Create storage buffer
-		if (!StorageBuffer.CreateBufferAndAllocateMemory(pMainDevice->PD, pMainDevice->LD, StorageBufferSize,
+		// Create storage buffer, Binding = 0
+		ComputeDescriptorSet.CreateStorageBufferDescriptor(StorageBufferSize, 1, VK_SHADER_STAGE_COMPUTE_BIT, 
 			// 1. As transfer destination from staging buffer, 2. As storage buffer storing particle data in compute shader, 3. As vertex data in vertex shader
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-		{
-			return;
-		}
+			// Local hosted buffer, need get data from staging buffer 
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+			);
 
 		// Allocate the transfer command buffer
 		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(pMainDevice->LD, CommandPool);
@@ -85,7 +85,8 @@ namespace VKE
 		BufferCopyRegion.size = StorageBufferSize;
 
 		// Command to copy src buffer to dst buffer
-		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer.GetBuffer(), StorageBuffer.GetBuffer(), 1, &BufferCopyRegion);
+		const cBuffer& StorageBuffer = ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(0)->GetBuffer();
+		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer.GetvkBuffer(), StorageBuffer.GetvkBuffer(), 1, &BufferCopyRegion);
 		// Setup a barrier when compute queue is not the same as the graphic queue
 		if (needSynchronization())
 		{
@@ -95,7 +96,7 @@ namespace VKE
 			Barrier.dstAccessMask = 0;
 			Barrier.srcQueueFamilyIndex = pMainDevice->QueueFamilyIndices.graphicFamily;
 			Barrier.dstQueueFamilyIndex = pMainDevice->QueueFamilyIndices.computeFamily;
-			Barrier.buffer = StorageBuffer.GetBuffer();
+			Barrier.buffer = StorageBuffer.GetvkBuffer();
 			Barrier.offset = 0;
 			Barrier.size = StorageBufferSize;
 
@@ -115,13 +116,12 @@ namespace VKE
 
 	void FComputePass::createUniformBuffer()
 	{
-		// Only 1 supportData is needed
-		UniformBuffer.SetDescriptorBufferRange(sizeof(BufferFormats::FParticleSupportData), 1);
-		UniformBuffer.CreateDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, pMainDevice);
+		// Binding = 1
+		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FParticleSupportData), 1, VK_SHADER_STAGE_COMPUTE_BIT);
 		// Setup initial data
 		BufferFormats::FParticleSupportData Temp = {};
 		Temp.dt = 0.01f;
-		UniformBuffer.UpdateBufferData(&Temp);
+		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&Temp);
 	}
 
 	void FComputePass::prepareDescriptors()
@@ -150,6 +150,7 @@ namespace VKE
 		// 2. Create Descriptor layout
 		//-------------------------------------------------------
 		{
+/*
 			const uint32_t BindingCount = 2;
 			VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
 			// Storage buffer binding info
@@ -167,16 +168,15 @@ namespace VKE
 			LayoutCreateInfo.bindingCount = BindingCount;
 			LayoutCreateInfo.pBindings = Bindings;
 			LayoutCreateInfo.pNext = nullptr;
-			LayoutCreateInfo.flags = 0;
+			LayoutCreateInfo.flags = 0;*/
 
-			VkResult Result = vkCreateDescriptorSetLayout(pMainDevice->LD, &LayoutCreateInfo, nullptr, &DescriptorSetLayout);
-			RESULT_CHECK(Result, "Fail to create compute descriptor set layout.")
+			ComputeDescriptorSet.CreateDescriptorSetLayout(ComputePass);
 		}
 
 		// 3. Allocate Descriptor sets
 		//-------------------------------------------------------
 		{
-			VkDescriptorSetAllocateInfo SetAllocInfo = {};
+			/*VkDescriptorSetAllocateInfo SetAllocInfo = {};
 			SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			SetAllocInfo.descriptorPool = DescriptorPool;
 			SetAllocInfo.descriptorSetCount = 1;
@@ -184,12 +184,14 @@ namespace VKE
 
 			// Allocate descriptor sets (multiple)
 			VkResult Result = vkAllocateDescriptorSets(pMainDevice->LD, &SetAllocInfo, &DescriptorSet);
-			RESULT_CHECK(Result, "Fail to Allocate Compute Descriptor Set!");
+			RESULT_CHECK(Result, "Fail to Allocate Compute Descriptor Set!");*/
+			ComputeDescriptorSet.AllocateDescriptorSet(DescriptorPool);
 		}
 
 		// 4. Update descriptor set write
 		//-------------------------------------------------------
 		{
+/*
 			const uint32_t DescriptorCount = 2;
 			// Data about connection between Descriptor and buffer
 			VkWriteDescriptorSet SetWrites[DescriptorCount] = {};
@@ -212,7 +214,8 @@ namespace VKE
 			// Update the descriptor sets with new buffer / binding info
 			vkUpdateDescriptorSets(pMainDevice->LD, DescriptorCount, SetWrites,
 				0, nullptr // Allows copy descriptor set to another descriptor set
-			);
+			);*/
+			ComputeDescriptorSet.BindDescriptorWithSet();
 		}
 	}
 
@@ -223,7 +226,7 @@ namespace VKE
 
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		PipelineLayoutCreateInfo.setLayoutCount = 1;
-		PipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
+		PipelineLayoutCreateInfo.pSetLayouts = &ComputeDescriptorSet.GetDescriptorSetLayout();
 		PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 		PipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 

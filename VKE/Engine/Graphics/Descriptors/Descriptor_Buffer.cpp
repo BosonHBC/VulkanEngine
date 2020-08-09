@@ -15,15 +15,7 @@ namespace VKE
 			return false;
 		}
 
-		// Create uniform buffer
-		if (!Buffer.CreateBufferAndAllocateMemory(iMainDevice->PD, iMainDevice->LD, BufferInfo.range * ObjectCount,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-		{
-			return false;
-		}
-
-		BufferInfo.buffer = Buffer.GetBuffer();
+		
 
 		return true;
 	}
@@ -34,6 +26,17 @@ namespace VKE
 		BufferInfo.range = BufferFormatSize;
 		BufferInfo.offset = 0;
 		this->ObjectCount = ObjectCount;
+	}
+
+	void cDescriptor_Buffer::CreateBuffer(VkBufferUsageFlags UsageFlags, VkMemoryPropertyFlags MemoryPropertyFlags)
+	{
+		// Create uniform buffer
+		if (!Buffer.CreateBufferAndAllocateMemory(pMainDevice->PD, pMainDevice->LD, BufferInfo.range * ObjectCount, UsageFlags, MemoryPropertyFlags))
+		{
+			return;
+		}
+
+		BufferInfo.buffer = Buffer.GetvkBuffer();
 	}
 
 	void cDescriptor_Buffer::UpdateBufferData(void* srcData)

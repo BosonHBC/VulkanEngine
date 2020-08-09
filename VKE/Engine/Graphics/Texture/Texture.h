@@ -28,8 +28,11 @@ namespace VKE
 		~cTexture();
 
 		void cleanUp();
-		VkDescriptorImageInfo GetImageInfo();
+
+		/** Getters */
+		VkDescriptorImageInfo GetImageInfo() const;
 		int GetID() const { return TextureID; }
+		cImageBuffer& GetImageBuffer() { return Buffer; }
 	protected:
 		FMainDevice* pMainDevice;
 		int Width, Height;

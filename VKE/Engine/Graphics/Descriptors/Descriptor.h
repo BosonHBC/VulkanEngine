@@ -24,6 +24,7 @@ namespace VKE
 		// 1. Store descriptor information. In child class, this function may generate contents for the descriptor also
 		virtual bool CreateDescriptor(VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages, FMainDevice* iMainDevice)
 		{
+			pMainDevice = iMainDevice;
 			DescriptorInfo.Type = Type;
 			DescriptorInfo.Binding = Binding;
 			DescriptorInfo.Stages = Stages;
@@ -49,5 +50,6 @@ namespace VKE
 	protected:
 		// Information of this descriptor
 		FDescriptorInfo DescriptorInfo;
+		FMainDevice* pMainDevice;
 	};
 }

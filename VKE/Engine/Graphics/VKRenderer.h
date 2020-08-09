@@ -30,6 +30,8 @@ namespace VKE
 		void draw();
 		void cleanUp();
 
+		void LoadAssets();
+
 		bool CreateModel(const std::string& ifileName, cModel*& oModel);
 		// Scene Objects
 		std::vector<cModel*> RenderList;
@@ -78,7 +80,6 @@ namespace VKE
 		// -- Push Constant
 		VkPushConstantRange PushConstantRange;
 		// -- Sampler Descriptor Set
-		VkDescriptorSetLayout SamplerSetLayout;
 		VkDescriptorPool SamplerDescriptorPool;
 
 		// -- Input Descriptor Set
