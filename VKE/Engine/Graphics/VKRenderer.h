@@ -83,7 +83,6 @@ namespace VKE
 		VkDescriptorPool SamplerDescriptorPool;
 
 		// -- Input Descriptor Set
-		VkDescriptorPool InputDescriptorPool;
 		std::vector<cDescriptorSet> InputDescriptorSets;
 
 		/** Create functions */
@@ -94,18 +93,18 @@ namespace VKE
 		void createSurface();
 		void createSwapChain();
 		void createRenderPass();
-		void createDescriptorSetLayout();
+
+		void CreateDescriptorSets();
+		void createDescriptorPool();
 		void createPushConstantRange();
-		void createGraphicsPipeline();
+
 		void createFrameBufferImage();
 		void createFrameBuffer();
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSynchronization();
+		void createGraphicsPipeline();
 
-		void createUniformBuffer();
-		void createDescriptorPool();
-		void allocateDescriptorSetsAndUpdateDescriptorSetWrites();
 
 		/** intermediate functions */
 		void prepareForDraw();

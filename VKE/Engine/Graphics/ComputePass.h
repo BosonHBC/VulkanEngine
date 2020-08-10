@@ -19,11 +19,11 @@ namespace VKE
 		FMainDevice* pMainDevice;
 
 		// Queue
-		VkQueue Queue;
+		VkQueue ComputeQueue;
 		bool needSynchronization() const;
 
 		// Command related
-		VkCommandPool CommandPool;
+		VkCommandPool ComputeCommandPool;
 		VkCommandBuffer CommandBuffer;
 
 		// Descriptor related
@@ -45,26 +45,11 @@ namespace VKE
 
 		void init(FMainDevice* const iMainDevice);
 
-		void cleanUp()
-		{
-			// wait until the device is not doing anything (nothing on any queue)
-			vkDeviceWaitIdle(pMainDevice->LD);
+		void cleanUp();
 
-			vkDestroySemaphore(pMainDevice->LD, OnComputeFinished, nullptr);
+		// Compute pass commands, no need to re-record like graphic commands
+		void recordComputeCommands();
 
-			vkDestroyCommandPool(pMainDevice->LD, CommandPool, nullptr);
-
-			vkDestroyPipeline(pMainDevice->LD, ComputePipeline, nullptr);
-			vkDestroyPipelineLayout(pMainDevice->LD, ComputePipelineLayout, nullptr);
-
-			ComputeDescriptorSet.cleanUp();
-			vkDestroyDescriptorPool(pMainDevice->LD, DescriptorPool, nullptr);
-		}
-
-		void recordCommands()
-		{
-
-		}
 
 	private:
 

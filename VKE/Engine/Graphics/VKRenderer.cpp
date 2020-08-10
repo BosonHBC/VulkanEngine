@@ -37,11 +37,7 @@ namespace VKE
 			createRenderPass();
 			// Descriptor set and push constant related
 			{
-				// fill the Descriptor list, this function should be call first
-				createUniformBuffer();
-				createDescriptorPool();
-				createDescriptorSetLayout();
-				allocateDescriptorSetsAndUpdateDescriptorSetWrites();
+				CreateDescriptorSets();
 				createPushConstantRange();
 			}
 			createFrameBuffer();
@@ -188,7 +184,6 @@ namespace VKE
 		// Descriptor related
 		{
 			vkDestroyDescriptorPool(MainDevice.LD, DescriptorPool, nullptr);
-			vkDestroyDescriptorPool(MainDevice.LD, InputDescriptorPool, nullptr);
 			vkDestroyDescriptorPool(MainDevice.LD, SamplerDescriptorPool, nullptr);
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
@@ -617,23 +612,41 @@ namespace VKE
 		RESULT_CHECK(Result, "Fail to create render pass.");
 
 	}
-
-	void VKRenderer::createDescriptorSetLayout()
+	void VKRenderer::CreateDescriptorSets()
 	{
-		// UNIFORM DESCRIPTOR SET LAYOUT
+		// 1. Prepare DescriptorSet Info
+		size_t Count = SwapChain.Images.size();
+		DescriptorSets.resize(Count, cDescriptorSet(&MainDevice));
+		InputDescriptorSets.resize(Count, cDescriptorSet(&MainDevice));
+		// Create Buffers
+		for (size_t i = 0; i < Count; ++i)
 		{
-			for (size_t i = 0; i < DescriptorSets.size(); ++i)
-			{
-				DescriptorSets[i].CreateDescriptorSetLayout(FirstPass_vert);
-			}
+			DescriptorSets[i].CreateBufferDescriptor(sizeof(BufferFormats::FFrame), 1, VK_SHADER_STAGE_VERTEX_BIT);
+			DescriptorSets[i].CreateDynamicBufferDescriptor(sizeof(BufferFormats::FDrawCall), MAX_OBJECTS, VK_SHADER_STAGE_VERTEX_BIT);
+
+			InputDescriptorSets[i].CreateImageBufferDescriptor(&ColorBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			InputDescriptorSets[i].CreateImageBufferDescriptor(&DepthBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+		// 2. Create Descriptor Pool
+		createDescriptorPool();
+		// 3. Create Descriptor Set Layout
+		for (size_t i = 0; i < DescriptorSets.size(); ++i)
+		{
+			// UNIFORM DESCRIPTOR SET LAYOUT
+			DescriptorSets[i].CreateDescriptorSetLayout(FirstPass_vert);
+			// INPUT DESCRIPTOR LAYOUT
+			InputDescriptorSets[i].CreateDescriptorSetLayout(SecondPass_frag);
 		}
 
-		// INPUT DESCRIPTOR LAYOUT
+		for (size_t i = 0; i < Count; ++i)
 		{
-			for (size_t i = 0; i < InputDescriptorSets.size(); ++i)
-			{
-				InputDescriptorSets[i].CreateDescriptorSetLayout(SecondPass_frag);
-			}
+			// 4. Allocate Descriptor sets
+			DescriptorSets[i].AllocateDescriptorSet(DescriptorPool);
+			InputDescriptorSets[i].AllocateDescriptorSet(DescriptorPool);
+			// 5. Update set write info
+			DescriptorSets[i].BindDescriptorWithSet();
+			InputDescriptorSets[i].BindDescriptorWithSet();
+
 		}
 	}
 
@@ -1051,39 +1064,21 @@ namespace VKE
 		}
 	}
 
-
-
-	void VKRenderer::createUniformBuffer()
-	{
-		// One uniform buffer for each image (and by extension, command buffer)
-		size_t Size = SwapChain.Images.size();
-		DescriptorSets.resize(Size, cDescriptorSet(&MainDevice));
-		InputDescriptorSets.resize(Size, cDescriptorSet(&MainDevice));
-		// Create UniformBuffers
-		for (size_t i = 0; i < Size; ++i)
-		{
-			DescriptorSets[i].CreateBufferDescriptor(sizeof(BufferFormats::FFrame), 1, VK_SHADER_STAGE_VERTEX_BIT);
-			DescriptorSets[i].CreateDynamicBufferDescriptor(sizeof(BufferFormats::FDrawCall), MAX_OBJECTS, VK_SHADER_STAGE_VERTEX_BIT);
-
-			InputDescriptorSets[i].CreateImageBufferDescriptor(&ColorBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			InputDescriptorSets[i].CreateImageBufferDescriptor(&DepthBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-		}
-	}
-
 	void VKRenderer::createDescriptorPool()
 	{
 		// Type of descriptors + how many DESCRIPTORS, not DESCRIPTOR Sets (combined makes the pool size)
-		const uint32_t DescriptorTypeCount = 2;
+		const uint32_t DescriptorTypeCount = 3;
 		VkDescriptorPoolSize PoolSize[DescriptorTypeCount] = {};
 		PoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		PoolSize[0].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
 		PoolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		PoolSize[1].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
+		PoolSize[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		PoolSize[2].descriptorCount = static_cast<uint32_t>(ColorBuffers.size() + DepthBuffers.size());
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size());
+		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size() + ColorBuffers.size());
 		PoolCreateInfo.poolSizeCount = DescriptorTypeCount;
 		PoolCreateInfo.pPoolSizes = PoolSize;
 
@@ -1105,53 +1100,6 @@ namespace VKE
 			Result = vkCreateDescriptorPool(MainDevice.LD, &SamplerPoolCreateInfo, nullptr, &SamplerDescriptorPool);
 			RESULT_CHECK(Result, "Failed to create a Sampler Descriptor Pool");
 		}
-
-		// CREATE INPUT DESCRIPTOR POOL
-		{
-			// Color attachment pool size
-			VkDescriptorPoolSize ColorInputPoolSize = {};
-			ColorInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			ColorInputPoolSize.descriptorCount = static_cast<uint32_t>(ColorBuffers.size());
-
-			// Depth attachment pool size
-			VkDescriptorPoolSize DepthInputPoolSize = {};
-			DepthInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			DepthInputPoolSize.descriptorCount = static_cast<uint32_t>(DepthBuffers.size());
-
-			const uint32_t PoolSizeCount = 2;
-			VkDescriptorPoolSize PoolSizes[PoolSizeCount] = { ColorInputPoolSize , DepthInputPoolSize };
-
-			VkDescriptorPoolCreateInfo InputPoolCreateInfo = {};
-			InputPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			InputPoolCreateInfo.maxSets = ColorBuffers.size(); // Could be DepthBuffers.size() too, it is the same
-			InputPoolCreateInfo.poolSizeCount = PoolSizeCount;
-			InputPoolCreateInfo.pPoolSizes = PoolSizes;
-
-			Result = vkCreateDescriptorPool(MainDevice.LD, &InputPoolCreateInfo, nullptr, &InputDescriptorPool);
-			RESULT_CHECK(Result, "Failed to create a Sampler Descriptor Pool");
-
-		}
-	}
-
-	void VKRenderer::allocateDescriptorSetsAndUpdateDescriptorSetWrites()
-	{
-		// DESCRIPTOR SETS
-		{
-			/** 2. Update all of descriptor set buffer bindings */
-			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
-			{
-				DescriptorSets[i].AllocateDescriptorSet(DescriptorPool);
-				DescriptorSets[i].BindDescriptorWithSet();
-			}
-		}
-		// INPUT DESCRIPTOR SETS
-		{
-			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
-			{
-				InputDescriptorSets[i].AllocateDescriptorSet(InputDescriptorPool);
-				InputDescriptorSets[i].BindDescriptorWithSet();
-			}
-		}
 	}
 
 	void VKRenderer::updateUniformBuffers()
@@ -1162,7 +1110,7 @@ namespace VKE
 		{
 			Buffer->UpdateBufferData(&GetCurrentCamera()->GetFrameData());
 		}
-		
+
 		if (cDescriptor_DynamicBuffer* DBuffer = DescriptorSets[idx].GetDescriptorAt<cDescriptor_DynamicBuffer>(1))
 		{
 			// Update model data to pDrawcallTransferSpace
@@ -1177,7 +1125,7 @@ namespace VKE
 			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * RenderList.size();
 			DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
 		}
-		
+
 	}
 
 
@@ -1560,5 +1508,7 @@ namespace VKE
 
 		return SwapChainDetails;
 	}
+
+
 
 }
