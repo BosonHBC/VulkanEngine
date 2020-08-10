@@ -61,11 +61,17 @@ namespace VKE
 		// -Pipeline
 		VkRenderPass RenderPass;
 		
+		// first pass
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
 		
-		VkPipeline SecondGraphicPipeline;
-		VkPipelineLayout SecondPipelineLayout;
+		// second pass
+		VkPipeline RenderParticlePipeline;
+		VkPipelineLayout RenderParticlePipelineLayout;
+
+		// third pass
+		VkPipeline PostProcessPipeline;
+		VkPipelineLayout PostProcessPipelineLayout;
 
 		// -Synchronization
 		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage

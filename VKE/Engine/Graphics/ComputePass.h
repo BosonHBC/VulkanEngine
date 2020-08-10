@@ -28,10 +28,10 @@ namespace VKE
 
 		// Descriptor related
 		VkDescriptorPool DescriptorPool;
-		// Contain StoratgeBuffer(binding = 0) of particles 
-		// And UniformBuffer(binding = 1) of support data(BufferFormats::FParticleSupportData) for computing particles movement								
+		// *Contain StoratgeBuffer(binding = 0) of particles 
+		// *And UniformBuffer(binding = 1) of support data(BufferFormats::FParticleSupportData) for computing particles movement								
 		cDescriptorSet ComputeDescriptorSet;									
-		// Actual data of particles and support data
+		// *Actual data of particles and support data
 		BufferFormats::FParticle Particles[Particle_Count];
 		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
 
@@ -50,6 +50,7 @@ namespace VKE
 		// Compute pass commands, no need to re-record like graphic commands
 		void recordComputeCommands();
 
+		const cBuffer& GetStorageBuffer();
 
 	private:
 

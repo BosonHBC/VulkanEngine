@@ -195,8 +195,11 @@ namespace VKE
 
 		{
 			// Destroy pipelines first and then destroy render pass
-			vkDestroyPipeline(MainDevice.LD, SecondGraphicPipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, SecondPipelineLayout, nullptr);
+			vkDestroyPipeline(MainDevice.LD, PostProcessPipeline, nullptr);
+			vkDestroyPipelineLayout(MainDevice.LD, PostProcessPipelineLayout, nullptr);
+
+			vkDestroyPipeline(MainDevice.LD, RenderParticlePipeline, nullptr);
+			vkDestroyPipelineLayout(MainDevice.LD, RenderParticlePipelineLayout, nullptr);
 
 			vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
 			vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
@@ -478,7 +481,7 @@ namespace VKE
 	void VKRenderer::createRenderPass()
 	{
 		// Array of sub-passes
-		const uint32_t SubpassCount = 2;
+		const uint32_t SubpassCount = 3;
 		VkSubpassDescription Subpasses[SubpassCount];
 
 		/** 1. Sub-pass 0 attachments (input attachments) */
@@ -519,6 +522,12 @@ namespace VKE
 		Subpasses[0].pColorAttachments = &ColorAttachmentReference;
 		Subpasses[0].pDepthStencilAttachment = &DepthAttachmentReference;
 
+		// Setup sub-pass 1, using the same as the first pass
+		Subpasses[1] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
+		Subpasses[1].colorAttachmentCount = 1;
+		Subpasses[1].pColorAttachments = &ColorAttachmentReference;
+		Subpasses[1].pDepthStencilAttachment = &DepthAttachmentReference;
+
 		/** 2. Sub-pass 2 attachments (input attachments) */
 		VkAttachmentDescription SwapChainColorAttachment = {};
 
@@ -552,15 +561,15 @@ namespace VKE
 		InputReferences[1].attachment = 2;														// This is Depth
 		InputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-		// Setup sub-pass 1
-		Subpasses[1] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
-		Subpasses[1].colorAttachmentCount = 1;
-		Subpasses[1].pColorAttachments = &SwapChainColorAttachmentReference;				// Color attachment references
-		Subpasses[1].inputAttachmentCount = InputReferenceCount;
-		Subpasses[1].pInputAttachments = InputReferences;
+		// Setup sub-pass 2
+		Subpasses[2] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
+		Subpasses[2].colorAttachmentCount = 1;
+		Subpasses[2].pColorAttachments = &SwapChainColorAttachmentReference;				// Color attachment references
+		Subpasses[2].inputAttachmentCount = InputReferenceCount;
+		Subpasses[2].pInputAttachments = InputReferences;
 
 		/** 3. Need to determine when layout transitions occur using sub-pass dependencies */
-		const uint32_t DependencyCount = 3;
+		const uint32_t DependencyCount = 4;
 		VkSubpassDependency SubpassDependencies[DependencyCount];
 
 		// 3.1 External to Sub-pass 0
@@ -573,27 +582,37 @@ namespace VKE
 		SubpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// transition happens before color attachment output stage
 		SubpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		SubpassDependencies[0].dependencyFlags = 0;
-
-		// 3.2 Sub-pass 0 (output color / depth) to sub-pass 1 (shader read)
+		
+		// 3.2 External to Sub-pass 0
 		SubpassDependencies[1].srcSubpass = 0;
-		SubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// Color attachment finish output before trying to read it.
-		SubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;			// Since it is output, which means it is write bit
+		SubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		SubpassDependencies[1].dstSubpass = 1;
-		SubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;			// Access shader-read-only part of the two attachments on the fragment shader stage, so need to finish before this stage
-		SubpassDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;						// Before the shader tries to read it
+		SubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SubpassDependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		SubpassDependencies[1].dependencyFlags = 0;
 
-		// 3.3 sub-pass 1 to External
-		// Conversion from VK_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		// 3.3 Sub-pass 1 (output color / depth) to sub-pass 2 (shader read)
 		SubpassDependencies[2].srcSubpass = 1;
-		SubpassDependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SubpassDependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		SubpassDependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// Color attachment finish output before trying to read it.
+		SubpassDependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;			// Since it is output, which means it is write bit
 
-		SubpassDependencies[2].dstSubpass = VK_SUBPASS_EXTERNAL;
-		SubpassDependencies[2].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		SubpassDependencies[2].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		SubpassDependencies[2].dstSubpass = 2;
+		SubpassDependencies[2].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;			// Access shader-read-only part of the two attachments on the fragment shader stage, so need to finish before this stage
+		SubpassDependencies[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;						// Before the shader tries to read it
 		SubpassDependencies[2].dependencyFlags = 0;
+
+		// 3.4 sub-pass 1 to External
+		// Conversion from VK_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		SubpassDependencies[3].srcSubpass = 1;
+		SubpassDependencies[3].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SubpassDependencies[3].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+		SubpassDependencies[3].dstSubpass = VK_SUBPASS_EXTERNAL;
+		SubpassDependencies[3].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		SubpassDependencies[3].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		SubpassDependencies[3].dependencyFlags = 0;
 
 		/** 4. Create Render Pass from 1. attachment descriptions, 2. sub-pass description, 3.sub-pass dependencies*/
 		const uint32_t AttachmentCount = 3;
@@ -874,12 +893,11 @@ namespace VKE
 		// PipelineCache can save the cache when the next time create a pipeline
 		Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &GraphicPipeline);
 		RESULT_CHECK(Result, "Fail to create Graphics Pipelines.");
-
 		/** 2. Create second Pipeline*/
 		{
 			// === Read in SPIR-V code of shaders === 
-			auto VertexShaderCode1 = FileIO::ReadFile("Content/Shaders/bigTriangle.spv");
-			auto FragShaderCode1 = FileIO::ReadFile("Content/Shaders/second.spv");
+			auto VertexShaderCode1 = FileIO::ReadFile("Content/Shaders/particle/particle.vert.spv");
+			auto FragShaderCode1 = FileIO::ReadFile("Content/Shaders/particle/particle.frag.spv");
 
 			// Build Shader Module to link to Graphics Pipeline
 			FShaderModuleScopeGuard VertexShaderModule1, FragmentShaderModule1;
@@ -895,8 +913,68 @@ namespace VKE
 			{
 				VSCreateInfo, FSCreateInfo
 			};
+			VkVertexInputBindingDescription ParticleVertexInputBindingDescription = {};
+			ParticleVertexInputBindingDescription.binding = 0;
+			ParticleVertexInputBindingDescription.stride = sizeof(glm::vec4);		// Position
+			ParticleVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-			// No vertex data for the second pass
+			VkVertexInputAttributeDescription ParticleInputAttributeDescription = {};
+			ParticleInputAttributeDescription.location = 0;
+			ParticleInputAttributeDescription.binding = 0;
+			ParticleInputAttributeDescription.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			ParticleInputAttributeDescription.offset = offsetof(BufferFormats::FParticle, Pos);
+
+			// particle vertex data
+			VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+			VertexInputCreateInfo.pVertexBindingDescriptions = &ParticleVertexInputBindingDescription;
+			VertexInputCreateInfo.vertexAttributeDescriptionCount = 1;
+			VertexInputCreateInfo.pVertexAttributeDescriptions = &ParticleInputAttributeDescription;
+
+			// Change back to point list
+			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+
+			// Create Another pipeline layout
+			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
+			PipelineLayoutCreateInfo1.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			PipelineLayoutCreateInfo1.setLayoutCount = 1;
+			PipelineLayoutCreateInfo1.pSetLayouts = &DescriptorSets[0].GetDescriptorSetLayout();
+			PipelineLayoutCreateInfo1.pushConstantRangeCount = 0;
+			PipelineLayoutCreateInfo1.pPushConstantRanges = nullptr;
+
+			Result = vkCreatePipelineLayout(MainDevice.LD, &PipelineLayoutCreateInfo1, nullptr, &RenderParticlePipelineLayout);
+			RESULT_CHECK(Result, "Fail to create the second pipeline layout");
+
+			// Update PipelineCraeteInfo according to the previous changes
+			PipelineCreateInfo.pStages = ShaderStages1;
+			PipelineCreateInfo.layout = RenderParticlePipelineLayout;
+			PipelineCreateInfo.subpass = 1;	// Which sub-pass this pipeline is in 
+
+			// Create the second pipeline 
+			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &RenderParticlePipeline);
+			RESULT_CHECK(Result, "Fail to create the second Graphics Pipelines.");
+		}
+		/** 3. Create third Pipeline*/
+		{
+			// === Read in SPIR-V code of shaders === 
+			auto VertexShaderCode2 = FileIO::ReadFile("Content/Shaders/bigTriangle.spv");
+			auto FragShaderCode2 = FileIO::ReadFile("Content/Shaders/second.spv");
+
+			// Build Shader Module to link to Graphics Pipeline
+			FShaderModuleScopeGuard VertexShaderModule2, FragmentShaderModule2;
+			VertexShaderModule2.CreateShaderModule(MainDevice.LD, VertexShaderCode2);
+			FragmentShaderModule2.CreateShaderModule(MainDevice.LD, FragShaderCode2);
+
+			/* reuse create info from the first render pass*/
+			// Vertex shader
+			VSCreateInfo.module = VertexShaderModule2.ShaderModule;
+			FSCreateInfo.module = FragmentShaderModule2.ShaderModule;
+
+			VkPipelineShaderStageCreateInfo ShaderStages2[ShaderStageCount] =
+			{
+				VSCreateInfo, FSCreateInfo
+			};
+
+			// No vertex data for the third pass
 			VertexInputCreateInfo.vertexBindingDescriptionCount = 0;
 			VertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
 			VertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
@@ -905,25 +983,28 @@ namespace VKE
 			// disable depth / stencil testing
 			DepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
 
-			// Create Another pipeline layout
-			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
-			PipelineLayoutCreateInfo1.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			PipelineLayoutCreateInfo1.setLayoutCount = 1;
-			PipelineLayoutCreateInfo1.pSetLayouts = &InputDescriptorSets[0].GetDescriptorSetLayout();
-			PipelineLayoutCreateInfo1.pushConstantRangeCount = 0;
-			PipelineLayoutCreateInfo1.pPushConstantRanges = nullptr;
+			// Change back to Triangle list
+			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-			Result = vkCreatePipelineLayout(MainDevice.LD, &PipelineLayoutCreateInfo1, nullptr, &SecondPipelineLayout);
+			// Create Another pipeline layout
+			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo2 = {};
+			PipelineLayoutCreateInfo2.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			PipelineLayoutCreateInfo2.setLayoutCount = 1;
+			PipelineLayoutCreateInfo2.pSetLayouts = &InputDescriptorSets[0].GetDescriptorSetLayout();
+			PipelineLayoutCreateInfo2.pushConstantRangeCount = 0;
+			PipelineLayoutCreateInfo2.pPushConstantRanges = nullptr;
+
+			Result = vkCreatePipelineLayout(MainDevice.LD, &PipelineLayoutCreateInfo2, nullptr, &PostProcessPipelineLayout);
 			RESULT_CHECK(Result, "Fail to create the second pipeline layout");
 
 			// Update PipelineCraeteInfo according to the previous changes
-			PipelineCreateInfo.pStages = ShaderStages1;
-			PipelineCreateInfo.layout = SecondPipelineLayout;
-			PipelineCreateInfo.subpass = 1;	// Which sub-pass this pipeline is in 
+			PipelineCreateInfo.pStages = ShaderStages2;
+			PipelineCreateInfo.layout = PostProcessPipelineLayout;
+			PipelineCreateInfo.subpass = 2;	// Which sub-pass this pipeline is in 
 
-			// Create the second pipeline 
-			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &SecondGraphicPipeline);
-			RESULT_CHECK(Result, "Fail to create the second Graphics Pipelines.");
+			// Create the third pipeline 
+			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &PostProcessPipeline);
+			RESULT_CHECK(Result, "Fail to create the third Graphics Pipelines.");
 		}
 
 	}
@@ -1023,11 +1104,11 @@ namespace VKE
 		//Resize command buffer count to have one for each framebuffer
 		CommandBuffers.resize(SwapChainFramebuffers.size());
 
-		VkCommandBufferAllocateInfo cbAllocInfo = {};						// Memory exists already, only get it from the pool
+		VkCommandBufferAllocateInfo cbAllocInfo = {};										// Memory exists already, only get it from the pool
 		cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		cbAllocInfo.commandPool = MainDevice.GraphicsCommandPool;						// Only works for graphics command pool
-		cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;				// VK_COMMAND_BUFFER_LEVEL_PRIMARY: Submitted directly to queue, can not be called by another command buffer
-																			// VK_COMMAND_BUFFER_LEVEL_SECONDARY: Command buffer within a command buffer e.g. VkCmdExecuteCommands(another command buffer)
+		cbAllocInfo.commandPool = MainDevice.GraphicsCommandPool;							// Only works for graphics command pool
+		cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;								// VK_COMMAND_BUFFER_LEVEL_PRIMARY: Submitted directly to queue, can not be called by another command buffer
+																							// VK_COMMAND_BUFFER_LEVEL_SECONDARY: Command buffer within a command buffer e.g. VkCmdExecuteCommands(another command buffer)
 		cbAllocInfo.commandBufferCount = static_cast<uint32_t>(CommandBuffers.size());		// Allows allocating multiple command buffers at the same time
 
 		VkResult Result = vkAllocateCommandBuffers(MainDevice.LD, &cbAllocInfo, CommandBuffers.data());		// Don't need a custom allocation function
@@ -1420,11 +1501,29 @@ namespace VKE
 		}
 		// Start the second sub-pass
 		{
+			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipeline);
+			
+			// Bind storage buffer as a vertex buffer
+			VkDeviceSize Offsets[] = { 0 };
+			vkCmdBindVertexBuffers(CB, 0, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
+			
+			// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
+			uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * RenderList.size();
+
+			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
+				0, 1, &DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
+				1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
+
+			vkCmdDraw(CB, Particle_Count, 1, 0, 0);
+		}
+		// Start the third sub-pass
+		{
 
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
-			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, SecondGraphicPipeline);
+			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipeline);
 			// No need to bind vertex buffer or index buffer
-			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, SecondPipelineLayout,
+			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipelineLayout,
 				0, 1, &InputDescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
 				0, nullptr);	// no dynamic offset
 			// Draw 3 vertex (1 triangle) only 

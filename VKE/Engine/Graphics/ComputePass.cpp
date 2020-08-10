@@ -188,6 +188,11 @@ namespace VKE
 
 	}
 
+	const VKE::cBuffer& FComputePass::GetStorageBuffer() 
+	{
+		return ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(0)->GetBuffer();
+	}
+
 	void FComputePass::createStorageBuffer()
 	{
 		const glm::vec3 initialLocMin(-0.10, 1.50, -0.10), initialLocMax(0.10, 1.60, 0.10), initialVelMin(-1.00, 0, -1.00), initialVelMax(1.00, 1.00, 1.00);
