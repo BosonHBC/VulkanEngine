@@ -74,7 +74,7 @@ namespace VKE
 			AcquireBufferBarrier.buffer = StorageBuffer.GetvkBuffer();
 			AcquireBufferBarrier.offset = 0;
 			AcquireBufferBarrier.size = StorageBuffer.BufferSize();
-			
+
 			vkCmdPipelineBarrier(TransferCommandBuffer,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -125,6 +125,8 @@ namespace VKE
 	{
 		VkCommandBufferBeginInfo BufferBeginInfo = {};
 		BufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		//BufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
 		// Begin command buffer
 		VkResult Result = vkBeginCommandBuffer(CommandBuffer, &BufferBeginInfo);
 		RESULT_CHECK(Result, "Fail to start recording a compute command buffer");
@@ -159,7 +161,7 @@ namespace VKE
 		// Dispatch the compute job
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ComputePipeline);
 		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ComputePipelineLayout, 0, 1, &ComputeDescriptorSet.GetDescriptorSet(), 0, 0);
-		vkCmdDispatch(CommandBuffer, Particle_Count / 16, 1, 1);
+		vkCmdDispatch(CommandBuffer, Particle_Count / 256, 1, 1);
 
 		// Add barrier to ensure that compute shader has finished writing to the buffer
 		// Without this the (rendering) vertex shader may display incomplete results (partial data from last frame)
@@ -188,9 +190,14 @@ namespace VKE
 
 	}
 
-	const VKE::cBuffer& FComputePass::GetStorageBuffer() 
+	const VKE::cBuffer& FComputePass::GetStorageBuffer()
 	{
 		return ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(0)->GetBuffer();
+	}
+
+	void FComputePass::undateUniformBuffer()
+	{
+		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&ParticleSupportData);
 	}
 
 	void FComputePass::createStorageBuffer()
@@ -199,7 +206,7 @@ namespace VKE
 		// Initialize the particle data
 		for (size_t i = 0; i < Particle_Count; ++i)
 		{
-			Particles[i].Pos = glm::vec4(RandRange(initialLocMin, initialVelMax), 1.0f);
+			Particles[i].Pos = glm::vec4(RandRange(initialLocMin, initialLocMax), 1.0f);
 			Particles[i].Vel = glm::vec4(RandRange(initialVelMin, initialVelMax), 1.0f);
 		}
 		// Create storage buffer
@@ -270,10 +277,10 @@ namespace VKE
 	{
 		// Binding = 1
 		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FParticleSupportData), 1, VK_SHADER_STAGE_COMPUTE_BIT);
+
 		// Setup initial data
-		BufferFormats::FParticleSupportData Temp = {};
-		Temp.dt = 0.01f;
-		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&Temp);
+		ParticleSupportData.dt = 0.0005f;
+		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&ParticleSupportData);
 	}
 
 	void FComputePass::prepareDescriptors()
@@ -298,77 +305,10 @@ namespace VKE
 			RESULT_CHECK(Result, "Failed to create a compute Descriptor Pool");
 		}
 
+		ComputeDescriptorSet.CreateDescriptorSetLayout(ComputePass);
+		ComputeDescriptorSet.AllocateDescriptorSet(DescriptorPool);
+		ComputeDescriptorSet.BindDescriptorWithSet();
 
-		// 2. Create Descriptor layout
-		//-------------------------------------------------------
-		{
-			/*
-						const uint32_t BindingCount = 2;
-						VkDescriptorSetLayoutBinding Bindings[BindingCount] = {};
-						// Storage buffer binding info
-						Bindings[0].binding = 0;
-						Bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-						Bindings[0].descriptorCount = 1;
-						Bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;				// only be used in compute shader in compute pipeline
-						Bindings[0].pImmutableSamplers = nullptr;
-
-						// particle support data binding info
-						Bindings[1] = UniformBuffer.ConstructDescriptorSetLayoutBinding();
-
-						VkDescriptorSetLayoutCreateInfo LayoutCreateInfo;
-						LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-						LayoutCreateInfo.bindingCount = BindingCount;
-						LayoutCreateInfo.pBindings = Bindings;
-						LayoutCreateInfo.pNext = nullptr;
-						LayoutCreateInfo.flags = 0;*/
-
-			ComputeDescriptorSet.CreateDescriptorSetLayout(ComputePass);
-		}
-
-		// 3. Allocate Descriptor sets
-		//-------------------------------------------------------
-		{
-			/*VkDescriptorSetAllocateInfo SetAllocInfo = {};
-			SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			SetAllocInfo.descriptorPool = DescriptorPool;
-			SetAllocInfo.descriptorSetCount = 1;
-			SetAllocInfo.pSetLayouts = &DescriptorSetLayout;
-
-			// Allocate descriptor sets (multiple)
-			VkResult Result = vkAllocateDescriptorSets(pMainDevice->LD, &SetAllocInfo, &DescriptorSet);
-			RESULT_CHECK(Result, "Fail to Allocate Compute Descriptor Set!");*/
-			ComputeDescriptorSet.AllocateDescriptorSet(DescriptorPool);
-		}
-
-		// 4. Update descriptor set write
-		//-------------------------------------------------------
-		{
-			/*
-						const uint32_t DescriptorCount = 2;
-						// Data about connection between Descriptor and buffer
-						VkWriteDescriptorSet SetWrites[DescriptorCount] = {};
-						// Storage buffer DESCRIPTOR
-						SetWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-						SetWrites[0].dstSet = DescriptorSet;
-						SetWrites[0].dstBinding = 0;
-						SetWrites[0].dstArrayElement = 0;
-						SetWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-						SetWrites[0].descriptorCount = 1;
-						VkDescriptorBufferInfo StorageBufferInfo = {};
-						StorageBufferInfo.buffer = StorageBuffer.GetBuffer();
-						StorageBufferInfo.offset = 0;
-						StorageBufferInfo.range = StorageBuffer.BufferSize();
-						SetWrites[0].pBufferInfo = &StorageBufferInfo;
-
-						// particle support data DESCRIPTOR
-						SetWrites[1] = UniformBuffer.ConstructDescriptorBindingInfo(DescriptorSet);
-
-						// Update the descriptor sets with new buffer / binding info
-						vkUpdateDescriptorSets(pMainDevice->LD, DescriptorCount, SetWrites,
-							0, nullptr // Allows copy descriptor set to another descriptor set
-						);*/
-			ComputeDescriptorSet.BindDescriptorWithSet();
-		}
 	}
 
 	void FComputePass::createComputePipeline()

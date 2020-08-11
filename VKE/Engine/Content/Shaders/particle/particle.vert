@@ -18,6 +18,6 @@ layout(set = 0, binding = 1) uniform sDrawcallData
 
 void main()
 {
-    gl_PointSize = 3;
+    gl_PointSize = 1;
     gl_Position = PVMatrix * pos;
 }

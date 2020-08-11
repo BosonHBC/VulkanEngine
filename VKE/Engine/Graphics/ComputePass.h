@@ -9,7 +9,8 @@
 
 namespace VKE
 {
-#define Particle_Count 256
+#define Particle_Count 256 * 1024
+#define Dispatch_Size_X 256
 	struct FComputePass
 	{
 		FComputePass() {}
@@ -52,6 +53,7 @@ namespace VKE
 
 		const cBuffer& GetStorageBuffer();
 
+		void undateUniformBuffer();
 	private:
 
 		void createStorageBuffer();

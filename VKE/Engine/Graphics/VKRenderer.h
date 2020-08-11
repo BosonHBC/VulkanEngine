@@ -74,6 +74,7 @@ namespace VKE
 		VkPipelineLayout PostProcessPipelineLayout;
 
 		// -Synchronization
+		std::vector<VkSemaphore> OnGraphicFinished;						// Used for graphic/compute sync
 		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage
 		std::vector <VkSemaphore> OnRenderFinisheds;					// If this image finishes rendering
 		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself

@@ -1,8 +1,8 @@
 #version 450
 
-const vec3 g = vec3( 0., -90.8, 0. );
-const float groundY = -5.f;
-const float firctionCoefficient = 0.5f;
+const vec3 g = vec3( 0., -0.98, 0. );
+const float groundY = 0.0;
+const float firctionCoefficient = 0.5;
 #define DAMPING -0.1f
 
 struct sParticle
@@ -76,16 +76,17 @@ void main()
 	else
 	{
 		// ground friction
-		a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
+		//a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
 	}
-	vec3 pp = p + v*dt + 0.5*dt*dt*a;
+	vec3 pp = p + v * dt + 0.5f * dt * dt * a;
 	vec3 vp = v + a * dt;
 
 	if(pp.y <= groundY)
 	{
 		pp.y = groundY;
-		vp.y = abs(vp.y) * 0.5f;
-		if(vp.y <= 1.f)
+		// Lose half of the vertical velocity
+		vp.y = abs(vp.y) * 0.5;
+		if(vp.y <= 0.001)
 			vp.y = 0;
 	}
 

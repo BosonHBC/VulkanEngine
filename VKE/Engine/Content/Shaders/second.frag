@@ -9,6 +9,7 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
+	/*
    	int xHalf = 800 / 2;
 	if(gl_FragCoord.x > xHalf)
 	{
@@ -23,5 +24,6 @@ void main()
 	{
 		outColor = vec4(subpassLoad(inputColor).rgb, 1.0f);
 	}
-   
+   */
+   outColor = vec4(subpassLoad(inputColor).rgb, 1.0f);
 }

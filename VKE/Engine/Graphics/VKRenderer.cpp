@@ -65,6 +65,9 @@ namespace VKE
 	{
 		RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
 		RenderList[0]->Transform.Update();
+		
+		if (pCompute)
+			pCompute->ParticleSupportData.dt = dt;
 	}
 
 
@@ -94,41 +97,66 @@ namespace VKE
 
 		VkResult Result = vkQueuePresentKHR(MainDevice.presentationQueue, &PresentInfo);
 		RESULT_CHECK(Result, "Fail to Present Image");
+
+		Result = vkQueueWaitIdle(MainDevice.presentationQueue);
+		RESULT_CHECK(Result, "Fail to wait for queue");
 	}
 
 	void VKRenderer::draw()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		prepareForDraw();
-		// Record commands
+		// Record graphic commands
 		recordCommands();
 		// Update uniform buffer
 		updateUniformBuffers();
+
+		const uint32_t GraphicWaitSemaphoreCount = 2;
+		VkSemaphore GraphicsWaitSemaphores[] = { pCompute->OnComputeFinished, OnImageAvailables[CurrentFrame] };
+		const uint32_t GraphicSignalSemaphoreCount = 2;
+		VkSemaphore GraphicsSignalSemaphores[] = { OnGraphicFinished[CurrentFrame], OnRenderFinisheds[CurrentFrame] };
+
 
 		/** II. submit command buffer to queue (graphic queue) for execution, make sure it waits for the image to be signaled as available before drawing,
 		 and signals (semaphore2) when it has finished rendering.*/
 		 // Queue Submission information
 		VkSubmitInfo SubmitInfo = {};
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.waitSemaphoreCount = 1;								// Number of semaphores to wait on
-		SubmitInfo.pWaitSemaphores = &OnImageAvailables[CurrentFrame];	// It can start the command buffers all the way before it can draw to the screen.
+		SubmitInfo.waitSemaphoreCount = GraphicWaitSemaphoreCount;		// Number of semaphores to wait on
+		SubmitInfo.pWaitSemaphores = GraphicsWaitSemaphores;			// It can start the command buffers all the way before it can draw to the screen.
 		VkPipelineStageFlags WaitStages[] =
 		{
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT				// Seen this in subpass dependency, command buffers will run until this stage
+			VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT		// Seen this in subpass dependency, command buffers will run until this stage
 		};
-		SubmitInfo.pWaitDstStageMask = WaitStages;						// Stages to check semaphores at
-		SubmitInfo.commandBufferCount = 1;								// Number of command buffers to submit, only submit to one frame once
-		SubmitInfo.pCommandBuffers = &CommandBuffers[SwapChain.ImageIndex];		// Command buffer to submit
-		SubmitInfo.signalSemaphoreCount = 1;							// Number of Semaphores to signal before the command buffer has finished
-		SubmitInfo.pSignalSemaphores = &OnRenderFinisheds[CurrentFrame];// When the command buffer is finished, these semaphores will be signaled
+		SubmitInfo.pWaitDstStageMask = WaitStages;											// Stages to check semaphores at
+		SubmitInfo.commandBufferCount = 1;													// Number of command buffers to submit, only submit to one frame once
+		SubmitInfo.pCommandBuffers = &CommandBuffers[SwapChain.ImageIndex];					// Command buffer to submit
+		SubmitInfo.signalSemaphoreCount = GraphicSignalSemaphoreCount;						// Number of Semaphores to signal before the command buffer has finished
+		SubmitInfo.pSignalSemaphores = GraphicsSignalSemaphores;							// When the command buffer is finished, these semaphores will be signaled
 
 		// This is the execute function also because the queue will execute commands automatically
 		// When finish those commands, open(signal) this fence
-		VkResult Result = vkQueueSubmit(MainDevice.graphicQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
+		VkResult Result = vkQueueSubmit(MainDevice.graphicQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		RESULT_CHECK(Result, "Fail to submit command buffers to graphic queue");
 
 		/** III. present image to screen when it has signaled finished rendering */
 		presentFrame();
+
+		// Wait for rendering finished
+		VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+		// Submit compute commands
+		VkSubmitInfo ComputeSubmitInfo = {};
+		ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		ComputeSubmitInfo.commandBufferCount = 1;
+		ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
+		ComputeSubmitInfo.waitSemaphoreCount = 1;
+		ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
+		ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
+		ComputeSubmitInfo.signalSemaphoreCount = 1;
+		ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
+		Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
+		RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
 
 		// Increment Elapsed Frame
 		++ElapsedFrame;
@@ -144,9 +172,6 @@ namespace VKE
 			pCompute->cleanUp();
 		safe_delete(pCompute);
 
-
-
-
 		cTexture::Free();
 
 		// Clean up render list
@@ -161,6 +186,7 @@ namespace VKE
 
 		for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 		{
+			vkDestroySemaphore(MainDevice.LD, OnGraphicFinished[i], nullptr);
 			vkDestroySemaphore(MainDevice.LD, OnRenderFinisheds[i], nullptr);
 			vkDestroySemaphore(MainDevice.LD, OnImageAvailables[i], nullptr);
 			vkDestroyFence(MainDevice.LD, DrawFences[i], nullptr);
@@ -582,7 +608,7 @@ namespace VKE
 		SubpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// transition happens before color attachment output stage
 		SubpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		SubpassDependencies[0].dependencyFlags = 0;
-		
+
 		// 3.2 External to Sub-pass 0
 		SubpassDependencies[1].srcSubpass = 0;
 		SubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -713,7 +739,6 @@ namespace VKE
 		VertexBindDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;			// Define how to move between data after each vertex, 
 																				// VK_VERTEX_INPUT_RATE_VERTEX : move to the next vertex
 																				// VK_VERTEX_INPUT_RATE_INSTANCE : Move to a vertex for the next instance
-
 		// How the data for an attribute is defined within a vertex
 		const uint32_t AttrubuteDescriptionCount = 3;
 		VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
@@ -915,7 +940,7 @@ namespace VKE
 			};
 			VkVertexInputBindingDescription ParticleVertexInputBindingDescription = {};
 			ParticleVertexInputBindingDescription.binding = 0;
-			ParticleVertexInputBindingDescription.stride = sizeof(glm::vec4);		// Position
+			ParticleVertexInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
 			ParticleVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 			VkVertexInputAttributeDescription ParticleInputAttributeDescription = {};
@@ -1119,6 +1144,7 @@ namespace VKE
 
 	void VKRenderer::createSynchronization()
 	{
+		OnGraphicFinished.resize(MAX_FRAME_DRAWS);
 		OnImageAvailables.resize(MAX_FRAME_DRAWS);
 		OnRenderFinisheds.resize(MAX_FRAME_DRAWS);
 		DrawFences.resize(MAX_FRAME_DRAWS);
@@ -1134,7 +1160,10 @@ namespace VKE
 
 		for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 		{
-			VkResult Result = vkCreateSemaphore(MainDevice.LD, &SemaphoreCreateInfo, nullptr, &OnImageAvailables[i]);
+			VkResult Result = vkCreateSemaphore(MainDevice.LD, &SemaphoreCreateInfo, nullptr, &OnGraphicFinished[i]);
+			RESULT_CHECK_ARGS(Result, "Fail to create OnGraphicFinished[%d] Semaphore", i);
+
+			Result = vkCreateSemaphore(MainDevice.LD, &SemaphoreCreateInfo, nullptr, &OnImageAvailables[i]);
 			RESULT_CHECK_ARGS(Result, "Fail to create OnImageAvailables[%d] Semaphore", i);
 
 			Result = vkCreateSemaphore(MainDevice.LD, &SemaphoreCreateInfo, nullptr, &OnRenderFinisheds[i]);
@@ -1436,7 +1465,33 @@ namespace VKE
 		VkResult Result = vkBeginCommandBuffer(CB, &BufferBeginInfo);
 		RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", SwapChain.ImageIndex);
 
+		const int& GraphicFamilyIndex = MainDevice.QueueFamilyIndices.graphicFamily;
+		const int& ComputeFamilyIndex = MainDevice.QueueFamilyIndices.computeFamily;
+		const cBuffer& StorageBuffer = pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(0)->GetBuffer();
+
 		/** Record part */
+		// Acquire barrier
+		if (pCompute->needSynchronization())
+		{
+			VkBufferMemoryBarrier BufferBarrier = {};
+			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			BufferBarrier.srcAccessMask = 0;
+			BufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+			BufferBarrier.srcQueueFamilyIndex = ComputeFamilyIndex;
+			BufferBarrier.dstQueueFamilyIndex = GraphicFamilyIndex;
+			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
+			BufferBarrier.offset = 0;
+			BufferBarrier.size = StorageBuffer.BufferSize();
+
+			vkCmdPipelineBarrier(CB,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+				0,							// No Dependency flag
+				0, nullptr,					// Not a Memory barrier
+				1, &BufferBarrier,			// A Buffer memory Barrier
+				0, nullptr);				// Not a Image memory barrier
+		}
+
 		// Begin Render Pass
 		vkCmdBeginRenderPass(CB, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1503,11 +1558,11 @@ namespace VKE
 		{
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipeline);
-			
+
 			// Bind storage buffer as a vertex buffer
 			VkDeviceSize Offsets[] = { 0 };
 			vkCmdBindVertexBuffers(CB, 0, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
-			
+
 			// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
 			uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * RenderList.size();
 
@@ -1531,6 +1586,28 @@ namespace VKE
 		}
 		// End Render Pass
 		vkCmdEndRenderPass(CB);
+
+		// Release barrier
+		if (pCompute->needSynchronization())
+		{
+			VkBufferMemoryBarrier BufferBarrier = {};
+			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+			BufferBarrier.dstAccessMask = 0;
+			BufferBarrier.srcQueueFamilyIndex = GraphicFamilyIndex;
+			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;
+			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
+			BufferBarrier.offset = 0;
+			BufferBarrier.size = StorageBuffer.BufferSize();
+
+			vkCmdPipelineBarrier(CB,
+				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				0,							// No Dependency flag
+				0, nullptr,					// Not a Memory barrier
+				1, &BufferBarrier,			// A Buffer memory Barrier
+				0, nullptr);				// Not a Image memory barrier
+		}
 
 		Result = vkEndCommandBuffer(CB);
 		RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", SwapChain.ImageIndex);
