@@ -122,8 +122,8 @@ namespace VKE
 		 // Queue Submission information
 		VkSubmitInfo SubmitInfo = {};
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.waitSemaphoreCount = GraphicWaitSemaphoreCount;		// Number of semaphores to wait on
-		SubmitInfo.pWaitSemaphores = GraphicsWaitSemaphores;			// It can start the command buffers all the way before it can draw to the screen.
+		SubmitInfo.waitSemaphoreCount = GraphicWaitSemaphoreCount;							// Number of semaphores to wait on
+		SubmitInfo.pWaitSemaphores = GraphicsWaitSemaphores;								// It can start the command buffers all the way before it can draw to the screen.
 		VkPipelineStageFlags WaitStages[] =
 		{
 			VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT		// Seen this in subpass dependency, command buffers will run until this stage
@@ -629,9 +629,9 @@ namespace VKE
 		SubpassDependencies[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;						// Before the shader tries to read it
 		SubpassDependencies[2].dependencyFlags = 0;
 
-		// 3.4 sub-pass 1 to External
+		// 3.4 sub-pass 2 to External
 		// Conversion from VK_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-		SubpassDependencies[3].srcSubpass = 1;
+		SubpassDependencies[3].srcSubpass = 2;
 		SubpassDependencies[3].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SubpassDependencies[3].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
@@ -941,7 +941,7 @@ namespace VKE
 			VkVertexInputBindingDescription ParticleVertexInputBindingDescription = {};
 			ParticleVertexInputBindingDescription.binding = 0;
 			ParticleVertexInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
-			ParticleVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			ParticleVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
 
 			VkVertexInputAttributeDescription ParticleInputAttributeDescription = {};
 			ParticleInputAttributeDescription.location = 0;
@@ -956,7 +956,7 @@ namespace VKE
 			VertexInputCreateInfo.pVertexAttributeDescriptions = &ParticleInputAttributeDescription;
 
 			// Change back to point list
-			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;				// VK_PRIMITIVE_TOPOLOGY_POINT_LIST will draw point
 
 			// Create Another pipeline layout
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
@@ -1477,12 +1477,14 @@ namespace VKE
 			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 			BufferBarrier.srcAccessMask = 0;
 			BufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+			// Transfer ownership from compute queue to graphic queue
 			BufferBarrier.srcQueueFamilyIndex = ComputeFamilyIndex;
 			BufferBarrier.dstQueueFamilyIndex = GraphicFamilyIndex;
 			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
 			BufferBarrier.offset = 0;
 			BufferBarrier.size = StorageBuffer.BufferSize();
 
+			// Block the vertex input stage until compute shader has finished
 			vkCmdPipelineBarrier(CB,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
@@ -1569,8 +1571,10 @@ namespace VKE
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
 				0, 1, &DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
 				1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
-
-			vkCmdDraw(CB, Particle_Count, 1, 0, 0);
+			
+			// Instance draw
+			// draw a quad
+			vkCmdDraw(CB, 6, Particle_Count, 0, 0);
 		}
 		// Start the third sub-pass
 		{
@@ -1592,14 +1596,17 @@ namespace VKE
 		{
 			VkBufferMemoryBarrier BufferBarrier = {};
 			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			// The storage buffer is used as vertex input
 			BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
 			BufferBarrier.dstAccessMask = 0;
+			// Transfer ownership from graphic queue to compute queue
 			BufferBarrier.srcQueueFamilyIndex = GraphicFamilyIndex;
-			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;
+			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;	
 			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
 			BufferBarrier.offset = 0;
 			BufferBarrier.size = StorageBuffer.BufferSize();
 
+			// Block the compute shader until vertex shader finished reading the storage buffer
 			vkCmdPipelineBarrier(CB,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,

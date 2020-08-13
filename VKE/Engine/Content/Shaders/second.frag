@@ -9,21 +9,21 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-	/*
+	
    	int xHalf = 800 / 2;
 	if(gl_FragCoord.x > xHalf)
 	{
-		float lowerBound = 0.92;
-		float upperBound = 1;
-		
-		float depth = subpassLoad(inputDepth).r;
-		float depthColorScaled = 1.0f - ((depth - lowerBound) / (upperBound - lowerBound));
-		outColor = vec4(subpassLoad(inputColor).rgb * depthColorScaled, 1.0f);
+		vec3 iColor = subpassLoad(inputColor).rgb;
+		if(iColor.r > 0.9)
+		{
+			float temp_b = iColor.b;
+			iColor.b = iColor.r;
+			iColor.r = temp_b;
+		}
+		outColor = vec4(iColor, 1.0f);
 	}
 	else
 	{
 		outColor = vec4(subpassLoad(inputColor).rgb, 1.0f);
 	}
-   */
-   outColor = vec4(subpassLoad(inputColor).rgb, 1.0f);
 }

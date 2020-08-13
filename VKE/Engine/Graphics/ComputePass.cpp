@@ -142,13 +142,16 @@ namespace VKE
 			VkBufferMemoryBarrier BufferBarrier = {};
 			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 			BufferBarrier.srcAccessMask = 0;
+			// Compute shader will write data to the storage buffer
 			BufferBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			// Transfer ownership from graphic queue to compute queue
 			BufferBarrier.srcQueueFamilyIndex = GraphicFamilyIndex;
 			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;
 			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
 			BufferBarrier.offset = 0;
 			BufferBarrier.size = StorageBuffer.BufferSize();
 
+			// Block the compute shader until vertex shader finished reading the storage buffer
 			vkCmdPipelineBarrier(CommandBuffer,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -171,12 +174,14 @@ namespace VKE
 			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 			BufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			BufferBarrier.dstAccessMask = 0;
+			// Transfer owner ship from compute queue to graphic queue
 			BufferBarrier.srcQueueFamilyIndex = ComputeFamilyIndex;
 			BufferBarrier.dstQueueFamilyIndex = GraphicFamilyIndex;
 			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
 			BufferBarrier.offset = 0;
 			BufferBarrier.size = StorageBuffer.BufferSize();
 
+			// Block the vertex input stage until compute shader has finished
 			vkCmdPipelineBarrier(CommandBuffer,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
