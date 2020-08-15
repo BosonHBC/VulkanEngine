@@ -41,8 +41,9 @@ namespace VKE
 
 	cMesh::cMesh(FMainDevice& iMainDevice,
 		VkQueue TransferQueue, VkCommandPool TransferCommandPool,
-		const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices)
+		const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices) : SamplerDescriptorSet(&iMainDevice)
 	{
+		
 		VertexCount = iVertices.size();
 		IndexCount = iIndices.size();
 		pMainDevice = &iMainDevice;
@@ -58,35 +59,23 @@ namespace VKE
 		IndexBuffer.cleanUp();
 	}
 
-	void cMesh::CreateDescriptorSet(VkDescriptorSetLayout SamplerSetLayout, VkDescriptorPool SamplerDescriptorPool)
+	void cMesh::CreateDescriptorSet(VkDescriptorPool SamplerDescriptorPool)
 	{
-		// Allocate memory for descriptor
-		VkDescriptorSetAllocateInfo SetAllocInfo = {};
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = SamplerDescriptorPool;
-		SetAllocInfo.pSetLayouts = &SamplerSetLayout;
-		SetAllocInfo.descriptorSetCount = 1;			// Can create multiple at one time if multiple images are loaded
-
-		VkResult Result = vkAllocateDescriptorSets(pMainDevice->LD, &SetAllocInfo, &SamplerDescriptorSet);
-		RESULT_CHECK(Result, " Fail to Allocate Texture Descriptor Set");
-
+		cTexture* Tex = cTexture::Get(MaterialID).get();
+		if (!Tex)
+		{
+			printf("Invalid Texture\n");
+			Tex = cTexture::Get(0).get();
+		}
 		// @TODO:
 		// In the future, if the material has multiple textures, there should be a material class handle the descriptor creation
-		VkDescriptorImageInfo ImageInfos[1] = {};
-		ImageInfos[0] = cTexture::Get(MaterialID)->GetImageInfo();
+		VkDescriptorImageInfo ImageInfo = Tex->GetImageInfo();
 
-		// Descriptor write info
-		VkWriteDescriptorSet DescriptorWrites[1] = {};
-		DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescriptorWrites[0].dstSet = SamplerDescriptorSet;
-		DescriptorWrites[0].dstBinding = 0;
-		DescriptorWrites[0].dstArrayElement = 0;
-		DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		DescriptorWrites[0].descriptorCount = 1;
-		DescriptorWrites[0].pImageInfo = &ImageInfos[0];
-
-		// Update new descriptor set
-		vkUpdateDescriptorSets(pMainDevice->LD, 1, DescriptorWrites, 0, nullptr);
+		// This is a texture, should be shader read only
+		SamplerDescriptorSet.CreateImageBufferDescriptor(&Tex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ImageInfo.imageLayout, ImageInfo.sampler);
+		SamplerDescriptorSet.CreateDescriptorSetLayout(FirstPass_frag); 
+		SamplerDescriptorSet.AllocateDescriptorSet(SamplerDescriptorPool);
+		SamplerDescriptorSet.BindDescriptorWithSet();
 	}
 
 	bool cMesh::createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool)
@@ -115,7 +104,7 @@ namespace VKE
 		)) return false;
 
 		// Copy staging buffer to vertex buffer in GPU
-		CopyBuffer(pMainDevice->LD, TransferQueue, TransferCommandPool, StagingBuffer.GetBuffer(), VertexBuffer.GetBuffer(), BufferSize);
+		CopyBuffer(pMainDevice->LD, TransferQueue, TransferCommandPool, StagingBuffer.GetvkBuffer(), VertexBuffer.GetvkBuffer(), BufferSize);
 
 		// Clean up staging buffer parts
 		StagingBuffer.cleanUp();
@@ -149,7 +138,7 @@ namespace VKE
 		)) return false;
 
 		// Copy staging buffer to index buffer in GPU
-		CopyBuffer(pMainDevice->LD, TransferQueue, TransferCommandPool, StagingBuffer.GetBuffer(), IndexBuffer.GetBuffer(), BufferSize);
+		CopyBuffer(pMainDevice->LD, TransferQueue, TransferCommandPool, StagingBuffer.GetvkBuffer(), IndexBuffer.GetvkBuffer(), BufferSize);
 
 		// Clean up staging buffer parts
 		StagingBuffer.cleanUp();

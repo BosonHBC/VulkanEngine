@@ -25,4 +25,6 @@ namespace VKE
 	double dt();
 
 	glm::vec2 GetMouseDelta();
+	extern uint64_t ElapsedFrame;
+
 }

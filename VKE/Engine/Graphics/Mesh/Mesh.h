@@ -6,6 +6,7 @@
 #include "BufferFormats.h"
 #include "Utilities.h"
 #include "Buffer/Buffer.h"
+#include "Descriptors/DescriptorSet.h"
 #include <memory>
 
 namespace VKE
@@ -32,17 +33,17 @@ namespace VKE
 			const std::vector<FVertex>& iVertices, const std::vector<uint32_t>& iIndices);
 
 		void cleanUp();
-		void CreateDescriptorSet(VkDescriptorSetLayout SamplerSetLayout, VkDescriptorPool SamplerDescriptorPool);
+		void CreateDescriptorSet(VkDescriptorPool SamplerDescriptorPool);
 
 		uint32_t GetVertexCount() const { return VertexCount; }
-		VkBuffer GetVertexBuffer() const { return VertexBuffer.GetBuffer(); }
+		VkBuffer GetVertexBuffer() const { return VertexBuffer.GetvkBuffer(); }
 
 		uint32_t GetIndexCount() const { return IndexCount; }
-		VkBuffer GetIndexBuffer() const { return IndexBuffer.GetBuffer(); }
+		VkBuffer GetIndexBuffer() const { return IndexBuffer.GetvkBuffer(); }
 
 		void SetMaterialID(int MatID) { MaterialID = MatID; }
 		int GetMaterialID() const {	return MaterialID; }
-		VkDescriptorSet GetDescriptorSet() { return SamplerDescriptorSet; }
+		const VkDescriptorSet& GetDescriptorSet() { return SamplerDescriptorSet.GetDescriptorSet(); }
 
 	private:
 		int MaterialID = 0;
@@ -51,7 +52,7 @@ namespace VKE
 		cBuffer VertexBuffer, IndexBuffer;
 		
 		FMainDevice* pMainDevice;
-		VkDescriptorSet SamplerDescriptorSet;
+		cDescriptorSet SamplerDescriptorSet;	// @TODO: Should be put in Material class
 
 		bool createVertexBuffer(const std::vector<FVertex>& iVertices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);
 		bool createIndexBuffer(const std::vector<uint32_t>& iIndices, VkQueue TransferQueue, VkCommandPool TransferCommandPool);

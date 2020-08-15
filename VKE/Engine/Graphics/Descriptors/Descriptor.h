@@ -1,7 +1,6 @@
 #pragma once
-#include <set>
+#include "Utilities.h"
 
-#include "Buffer/Buffer.h"
 namespace VKE
 {
 	struct FDescriptorInfo
@@ -10,61 +9,47 @@ namespace VKE
 		uint32_t Binding;
 		VkShaderStageFlags Stages;
 	};
-	// This class contains information of a descriptor which helps descriptor set creation
-	// Also contains the buffer binds to the descriptor set
-	class cDescriptor
+	/*
+		Interface of All kinds of descriptors: Buffer, Image
+	*/
+	struct FMainDevice;
+	class IDescriptor
 	{
+
 	public:
-		/** Static functions */
-		static const std::set<VkDescriptorType>& GetDescriptorTypeSet();
-		
-		/** Constructors */
-		cDescriptor() {};
-		virtual ~cDescriptor() {};
-
-		/* Create Function */
-		// Store descriptor information, create buffer, allocate device memory
-		virtual bool CreateDescriptor(
-			VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages,		// Properties of the descriptor
-			VkPhysicalDevice PD, VkDevice LD										// Properties for creating a buffer
-		);
-		
-		// Calculate the buffer size, different types of buffers should have different size calculations
-		virtual void SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount);
-		
-		/* Update Function */
-		// Update the full memory block
-		void UpdateBufferData(void* srcData);
-		void UpdatePartialData(void * srcData, VkDeviceSize Offset, VkDeviceSize Size);
-
-		/* Clean up Function */
-		virtual void cleanUp();
-
 		/** Getters */
 		const FDescriptorInfo& GetDescriptorInfo() const { return DescriptorInfo; }
-		const VkDeviceMemory& GetBufferMemory() const { return Buffer.GetMemory(); }
-		const VkDeviceSize& GetSlotSize() const { return BufferInfo.range; }
-		
-		// Helper function to get information when creating descriptor set
-		VkWriteDescriptorSet ConstructDescriptorBindingInfo(VkDescriptorSet DescriptorSet);
-		
+
+		/** Construction functions */
+		// 1. Store descriptor information. In child class, this function may generate contents for the descriptor also
+		virtual bool CreateDescriptor(VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages, FMainDevice* iMainDevice)
+		{
+			pMainDevice = iMainDevice;
+			DescriptorInfo.Type = Type;
+			DescriptorInfo.Binding = Binding;
+			DescriptorInfo.Stages = Stages;
+			return true;
+		}
+
 		// Helper function to get information when creating descriptor set layout
-		virtual VkDescriptorSetLayoutBinding ConstructDescriptorSetLayoutBinding();
+		virtual VkDescriptorSetLayoutBinding ConstructDescriptorSetLayoutBinding()
+		{
+			VkDescriptorSetLayoutBinding Binding = {};
+
+			Binding.binding = DescriptorInfo.Binding;				// binding in the uniform struct in shader
+			Binding.descriptorType = DescriptorInfo.Type;			// Type of descriptor, Uniform, dynamic_uniform, image_sampler ...
+			Binding.descriptorCount = 1;							// Number of descriptor for binding
+			Binding.stageFlags = DescriptorInfo.Stages;				// Shader stage to bind to
+			Binding.pImmutableSamplers = nullptr;					// for textures setting, if texture is immutable or not
+			return Binding;
+		}
+		// Helper function to get information when binding content to the descriptor set
+		virtual VkWriteDescriptorSet ConstructDescriptorBindingInfo(VkDescriptorSet SetToBind) = 0;
 	
+		virtual void cleanUp() = 0;
 	protected:
-		// Holding actual data of descriptor in GPU
-		cBuffer Buffer;
-		
 		// Information of this descriptor
 		FDescriptorInfo DescriptorInfo;
-		
-		// Info of the buffer this descriptor is trying connecting with 
-		// Buffer size: considering alignment, also used for allocating memory in both CPU and GPu
-		VkDescriptorBufferInfo BufferInfo;
-
-		// Object count should be considered in allocating memory
-		uint32_t ObjectCount;
-
+		FMainDevice* pMainDevice;
 	};
-
 }

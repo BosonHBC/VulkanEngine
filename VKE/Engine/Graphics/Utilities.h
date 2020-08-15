@@ -32,6 +32,10 @@
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
 #define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
 
+#define VERTEX_BUFFER_BIND_ID 0
+#define INSTANCE_BUFFER_BIND_ID 1
+
+#define PI 3.14159265359f
 namespace VKE
 {
 	// ================================================
@@ -57,7 +61,7 @@ namespace VKE
 	// Max objects are allowed in the scene
 	const int MAX_OBJECTS = 20;
 	
-
+	extern uint64_t ElapsedFrame;
 	// =======================================
 	// =============== Structs =============== 
 	// =======================================
@@ -70,23 +74,23 @@ namespace VKE
 		glm::vec2 TexCoord;		// Texture coordinate
 	};
 
+	// Indices (location) of Queue Families (if they exist at all)
+	struct FQueueFamilyIndices
+	{
+		int graphicFamily = -1;			// Location of Graphics Queue Family
+		int presentationFamily = -1;	// Location of Presentation Queue Family
+		int computeFamily = -1;			// Location of compute queue family
+		bool IsValid() const;
+	};
+
 	struct FMainDevice
 	{
 		VkPhysicalDevice PD;					// Physical Device
 		VkDevice LD;							// Logical Device
 		VkQueue graphicQueue;					// Graphic Queue,also transfer queue
 		VkQueue presentationQueue;				// Presentation Queue
-
+		FQueueFamilyIndices QueueFamilyIndices;		// Queue families
 		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
-	};
-
-	// Indices (location) of Queue Families (if they exist at all)
-	struct FQueueFamilyIndices
-	{
-		int graphicFamily = -1;			// Location of Graphics Queue Family
-		int presentationFamily = -1;	// Location of Presentation Queue Family
-
-		bool IsValid() const { return (graphicFamily >= 0 && presentationFamily >= 0); }
 	};
 
 	struct FSwapChainDetail
@@ -132,6 +136,16 @@ namespace VKE
 		bool Valid = false;
 	};
 
+	// =======================================================================
+	// =============== Create Info generation helper Functions =============== 
+	// =======================================================================
+
+	namespace Helpers
+	{
+		VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits ShaderStage, VkShaderModule ShaderModule, const char* MainFunctionName = "main");
+		VkSubpassDescription SubpassDescriptionDefault(VkPipelineBindPoint BindPoint);
+	}
+
 	// ================================================
 	// =============== Global Functions =============== 
 	// ================================================
@@ -141,6 +155,9 @@ namespace VKE
 	// Find a valid memory type index
 	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PD, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 	
+	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool);
+	void EndCommandBuffer(VkCommandBuffer CommandBuffer, VkDevice LD, VkQueue Queue, VkCommandPool CommandPool);
+
 	// Copy data from src buffer to dst buffer
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool,
 		VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize);
@@ -167,4 +184,9 @@ namespace VKE
 		unsigned char* LoadTextureFile(const std::string& fileName, int& oWidth, int& oHeight, VkDeviceSize& oImageSize);
 		void freeLoadedTextureData(unsigned char* Data);
 	}
+
+	float RandRange(float min, float max);
+	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max);
+
+	float Rand01();
 }

@@ -24,9 +24,9 @@ namespace VKE
 			Transform.SetTransform(i_initialPos, _pitch * _yaw, glm::vec3(1, 1, 1));
 		}
 		cCamera(const cCamera& i_other) = delete;
-		cCamera(const cCamera&& i_other) = delete;
+		cCamera(cCamera&& i_other) = delete;
 		cCamera& operator = (const cCamera& i_other) = delete;
-		cCamera& operator = (const cCamera&& i_other) = delete;
+		cCamera& operator = (cCamera&& i_other) = delete;
 		virtual ~cCamera() {};
 
 		/** Usage functions*/

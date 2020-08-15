@@ -1,11 +1,16 @@
 #include "Utilities.h"
-
 #include "../Engine.h"
+#include "ComputePass.h"
+
 #include <algorithm>
 #include <fstream>
+#include <random>
 #include "stb_image.h"
 namespace VKE
 {
+	std::default_random_engine RndGenerator;
+	std::uniform_real_distribution<float> Float01Distribution(0.0f, 1.0f);
+
 	VkDeviceSize MinUniformBufferOffset = 0;
 
 	VkSurfaceFormatKHR FSwapChainDetail::getSurfaceFormat() const
@@ -64,7 +69,7 @@ namespace VKE
 		}
 	}
 
-	
+
 	void FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
 	{
 		vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
@@ -81,7 +86,7 @@ namespace VKE
 		{
 			vkDestroyShaderModule(LogicDevice, ShaderModule, nullptr);
 		}
-		
+
 	}
 
 	bool FShaderModuleScopeGuard::CreateShaderModule(const VkDevice& LD, const std::vector<char>& iShaderCode)
@@ -131,7 +136,7 @@ namespace VKE
 			MainDevice.PD,
 			MemRequirements.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
 			Properties									// Memory property, is this local_bit or host_bit or others
-			);
+		);
 
 		// Allocate memory to VKDevieMemory
 		Result = vkAllocateMemory(MainDevice.LD, &MemAllocInfo, nullptr, &oBufferMemory);
@@ -164,8 +169,6 @@ namespace VKE
 		}
 		return static_cast<uint32_t>(-1);
 	}
-	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool);
-	void EndCommandBuffer(VkCommandBuffer CommandBuffer, VkDevice LD, VkQueue Queue, VkCommandPool CommandPool);
 
 	VkCommandBuffer BeginCommandBuffer(VkDevice LD, VkCommandPool CommandPool)
 	{
@@ -196,26 +199,39 @@ namespace VKE
 		// End Recording
 		vkEndCommandBuffer(CommandBuffer);
 
+		// Create fence to ensure that the command buffer has finished executing
+
+		VkFenceCreateInfo FenceCreateInfo = {};
+		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		FenceCreateInfo.flags = 0;
+		VkFence Fence;
+		VkResult Result = vkCreateFence(LD, &FenceCreateInfo, nullptr, &Fence);
+		RESULT_CHECK(Result, "Fail to create fence for executing transfer command");
+
 		// Queue submission information
 		VkSubmitInfo SubmitInfo = {};
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.commandBufferCount = 1;
 		SubmitInfo.pCommandBuffers = &CommandBuffer;
 
-		VkResult Result = vkQueueSubmit(Queue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		Result = vkQueueSubmit(Queue, 1, &SubmitInfo, Fence);
 		RESULT_CHECK(Result, "Fail to submit transfer command buffer to transfer queue");
 
-		// Prevent submitting multiple transfer command buffers to a same queue,
+		// Use fence to prevent submitting multiple transfer command buffers to a same queue,
 		// Sometime when there are tons of meshes loading in one time, this way can prevent crashing easily,
 		// But optimal way is using synchronization to load files at the same time.
-		vkQueueWaitIdle(Queue);
-
+		Result = vkWaitForFences(LD, 1, &Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+		RESULT_CHECK(Result, "Fail to wait for fence");
+		
+		// Free temp fence
+		vkDestroyFence(LD, Fence, nullptr);
 		// Free temporary command buffer back to pool
 		vkFreeCommandBuffers(LD, CommandPool, 1, &CommandBuffer);
 	}
 
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize)
 	{
+		// Allocate the transfer command buffer
 		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
 
 		// Region of data to copy from and to, allows copy multiple regions of data
@@ -227,6 +243,7 @@ namespace VKE
 		// Command to copy src buffer to dst buffer
 		vkCmdCopyBuffer(TransferCommandBuffer, SrcBuffer, DstBuffer, 1, &BufferCopyRegion);
 
+		// Stop the command and submit it to the queue, wait until it finish execution
 		EndCommandBuffer(TransferCommandBuffer, LD, TransferQueue, TransferCommandPool);
 	}
 
@@ -248,7 +265,7 @@ namespace VKE
 
 
 		// Command to copy src buffer to dst buffer
-		vkCmdCopyBufferToImage(TransferCommandBuffer, SrcBuffer, DstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1, &ImageCopyRegion);
+		vkCmdCopyBufferToImage(TransferCommandBuffer, SrcBuffer, DstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageCopyRegion);
 
 		EndCommandBuffer(TransferCommandBuffer, LD, TransferQueue, TransferCommandPool);
 	}
@@ -367,13 +384,13 @@ namespace VKE
 
 
 		// If transitioning from new image ready to receive data...
-		if(CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		if (CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
 		{
 			ImageMemoryBarrier.srcAccessMask = 0;									// Memory access stage transition must happen after: From the very start
 			ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must happen before: transfer write stage
-			
+
 			SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;							// On top of any stage
-			DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;								
+			DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		}
 		// If transitioning from transfer destination to shader readable...
 		else if (CurrentLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
@@ -393,6 +410,21 @@ namespace VKE
 		);
 
 		EndCommandBuffer(CommandBuffer, LD, Queue, CommandPool);
+	}
+
+	float RandRange(float min, float max)
+	{
+		return (Rand01() * (max - min) + min);
+	}
+
+	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max)
+	{
+		return glm::vec3(RandRange(min.x, max.x), RandRange(min.y, max.y), RandRange(min.z, max.z));
+	}
+
+	float Rand01()
+	{
+		return Float01Distribution(RndGenerator);
 	}
 
 	namespace FileIO {
@@ -461,6 +493,44 @@ namespace VKE
 
 	}
 
+
+
+	bool FQueueFamilyIndices::IsValid() const
+	{
+		// If compute pipeline is note required, no need to check compute family
+		return (graphicFamily >= 0 && presentationFamily >= 0 && (FComputePass::SComputePipelineRequired ? computeFamily >= 0 : true)); 
+	}
+
+	namespace Helpers
+	{
+		VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits ShaderStage, VkShaderModule ShaderModule, const char* MainFunctionName /*= "main"*/)
+		{
+			VkPipelineShaderStageCreateInfo ShaderStageCreateInfo = {};
+			ShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			ShaderStageCreateInfo.stage = ShaderStage;
+			ShaderStageCreateInfo.module = ShaderModule;
+			ShaderStageCreateInfo.pName = MainFunctionName;
+			return ShaderStageCreateInfo;
+		}
+
+		VkSubpassDescription SubpassDescriptionDefault(VkPipelineBindPoint BindPoint)
+		{
+			VkSubpassDescription SubpassDescription;
+			SubpassDescription.pipelineBindPoint = BindPoint; // Pipeline type, (Graphics pipeline, Compute pipeline, RayTracing_NV...)
+			SubpassDescription.colorAttachmentCount = 0;
+			SubpassDescription.pColorAttachments = nullptr;
+			SubpassDescription.pDepthStencilAttachment = nullptr;
+			SubpassDescription.inputAttachmentCount = 0;
+			SubpassDescription.pInputAttachments = nullptr;
+			SubpassDescription.preserveAttachmentCount = 0;
+			SubpassDescription.pPreserveAttachments = nullptr;
+			SubpassDescription.pResolveAttachments = nullptr;
+			SubpassDescription.flags = 0;
+
+			return SubpassDescription;
+		}
+
+	}
 
 
 }

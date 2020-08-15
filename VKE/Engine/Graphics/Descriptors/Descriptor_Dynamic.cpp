@@ -2,11 +2,9 @@
 #include "Utilities.h"
 namespace VKE
 {
-
-	bool cDescriptor_Dynamic::CreateDescriptor(VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages, /* Properties of the descriptor */
-		VkPhysicalDevice PD, VkDevice LD) /* Properties for creating a buffer */
+	bool cDescriptor_DynamicBuffer::CreateDescriptor(VkDescriptorType Type, uint32_t Binding, VkShaderStageFlags Stages, FMainDevice* iMainDevice)
 	{
-		bool Result = cDescriptor::CreateDescriptor(Type, Binding, Stages, PD, LD);
+		bool Result = cDescriptor_Buffer::CreateDescriptor(Type, Binding, Stages, iMainDevice);
 		if (!Result)
 		{
 			return Result;
@@ -16,7 +14,7 @@ namespace VKE
 		return Result;
 	}
 
-	void cDescriptor_Dynamic::SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount)
+	void cDescriptor_DynamicBuffer::SetDescriptorBufferRange(VkDeviceSize BufferFormatSize, uint32_t ObjectCount)
 	{
 		// For dynamic uniform buffer, the size should be aligned with MinUniformBufferOffset
 		VkDeviceSize MinAlignment = GetMinUniformOffsetAlignment();
@@ -25,14 +23,14 @@ namespace VKE
 		this->ObjectCount = ObjectCount;
 	}
 
-	void cDescriptor_Dynamic::cleanUp()
+	void cDescriptor_DynamicBuffer::cleanUp()
 	{
-		cDescriptor::cleanUp();
+		cDescriptor_Buffer::cleanUp();
 		// free allocated memory
 		_aligned_free(pAllocatedTransferSpace);
 	}
 
-	void cDescriptor_Dynamic::allocateDynamicBufferTransferSpace()
+	void cDescriptor_DynamicBuffer::allocateDynamicBufferTransferSpace()
 	{
 		// Create space in memory to hold dynamic buffer that is aligned to our required alignment
 		pAllocatedTransferSpace = _aligned_malloc(static_cast<size_t>(BufferInfo.range * ObjectCount), static_cast<size_t>(BufferInfo.range));

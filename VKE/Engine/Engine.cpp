@@ -13,8 +13,9 @@
 #include "Model/Model.h"
 
 namespace VKE {
-	const GLuint WIDTH = 800, HEIGHT = 600;
+	const GLuint WIDTH = 1280, HEIGHT = 720;
 	const std::string WINDOW_NAME = "Default";
+	uint64_t ElapsedFrame = 0;
 
 	//=================== Parameters =================== 
 	GLFWwindow* g_Window;
@@ -51,19 +52,7 @@ namespace VKE {
 			return EXIT_FAILURE;
 		}
 		
-		// Create Mesh
-		cModel* pContainerModel = nullptr;
-		cModel* pPlaneModel = nullptr;
 
-		g_Renderer->CreateModel("Container.obj", pContainerModel);
-		g_Renderer->RenderList.push_back(pContainerModel);
-
-		g_Renderer->CreateModel("Plane.obj", pPlaneModel);
-		g_Renderer->RenderList.push_back(pPlaneModel);
-
-		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
-
-		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25,25,25));
 		return result;
 	}
 
@@ -178,7 +167,7 @@ namespace VKE {
 
 	void initCamera()
 	{
-		g_Camera = DBG_NEW cCamera(glm::vec3(0,2,2), 45.f, 0.0f, 2.0f, 0.1f);
+		g_Camera = DBG_NEW cCamera(glm::vec3(0,2,5), 15.f, 0.0f, 2.0f, 0.1f);
 		g_Camera->UpdateProjectionMatrix(glm::radians(45.f), (float)WIDTH / (float)HEIGHT);
 		g_Camera->Update();
 

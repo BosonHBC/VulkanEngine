@@ -4,7 +4,7 @@ namespace VKE
 {
 	namespace BufferFormats
 	{
-		// Data update per frame
+		/** Data update per frame */
 		struct FFrame
 		{
 			glm::mat4 PVMatrix = glm::mat4(1.0f);
@@ -35,7 +35,7 @@ namespace VKE
 			}
 		};
 
-		// Data update per drawcall
+		/** Data update per drawcall */
 		struct FDrawCall
 		{
 			glm::mat4 ModelMatrix = glm::mat4(1.0f);
@@ -45,6 +45,38 @@ namespace VKE
 			{
 				ModelMatrix = i_model;
 			}
+		};
+
+		/** Particle Data */
+		struct FParticle
+		{
+			glm::vec3 Pos;
+			float ElpasedTime;
+			glm::vec3 Vel;
+			float LifeTime;
+			
+			float Volume;
+			float padding[3];
+		};
+
+		/** Emitter Data*/
+		struct FConeEmitter
+		{
+			float Radius = 1.0f;
+			float Angle = 45.f;		// in degree
+			float StartSpeedMin = 1.0f;
+			float StartSpeedMax = 1.0f;
+			float StartDelayRangeMin = 0.0f;
+			float StartDelayRangeMax = 2.0f;
+			float LifeTimeRangeMin = 2.0f;
+			float LifeTimeRangeMax = 3.0f;
+		};
+
+		/** Support data for particles */
+		struct FParticleSupportData
+		{
+			float dt;
+			unsigned int useGravity;
 		};
 	}
 }

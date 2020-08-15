@@ -7,13 +7,15 @@
 #include "Utilities.h"
 
 #include "BufferFormats.h"
-#include "Descriptors/Descriptor_Dynamic.h"
+#include "Descriptors/DescriptorSet.h"
 #include "Mesh/Mesh.h"
+#include "Buffer/ImageBuffer.h"
 
 #include <vector>
 namespace VKE
 {
 	class cModel;
+	struct FComputePass;
 	class VKRenderer
 	{
 	public:
@@ -28,56 +30,65 @@ namespace VKE
 		void draw();
 		void cleanUp();
 
+		void LoadAssets();
+
 		bool CreateModel(const std::string& ifileName, cModel*& oModel);
 		// Scene Objects
 		std::vector<cModel*> RenderList;
 	private:
+		// GLFW window
 		GLFWwindow* window;
 
-		uint64_t ElapsedFrame = 0;
+		// Compute pass
+		FComputePass* pCompute = nullptr;
 
 		// Vulkan Components
 		// - Main Components
 		FMainDevice MainDevice;
 		VkInstance vkInstance;
 		VkSurfaceKHR Surface;								// KHR extension required
-		FQueueFamilyIndices QueueFamilies;					// Queue families
+
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
 		FSwapChainData SwapChain;							// SwapChain data group
-		std::vector<VkFramebuffer> SwapChainFramebuffers;	
-		std::vector<VkCommandBuffer> CommandBuffers;		
+		std::vector<VkFramebuffer> SwapChainFramebuffers;
+		std::vector<VkCommandBuffer> CommandBuffers;
 
-		VkFormat DepthFormat;
-		VkImage DepthBufferImage;
-		VkDeviceMemory DepthBufferImageMemory;
-		VkImageView DepthBufferImageView;
-		
+		std::vector <cImageBuffer> DepthBuffers;
+		std::vector <cImageBuffer> ColorBuffers;			
+
 		// -Pipeline
 		VkRenderPass RenderPass;
+		
+		// first pass
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
+		
+		// second pass
+		VkPipeline RenderParticlePipeline;
+		VkPipelineLayout RenderParticlePipelineLayout;
+
+		// third pass
+		VkPipeline PostProcessPipeline;
+		VkPipelineLayout PostProcessPipelineLayout;
 
 		// -Synchronization
+		std::vector<VkSemaphore> OnGraphicFinished;						// Used for graphic/compute sync
 		std::vector<VkSemaphore> OnImageAvailables;						// If this image is locked by other usage
 		std::vector <VkSemaphore> OnRenderFinisheds;					// If this image finishes rendering
 		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself
 
 		// - Descriptors
 #pragma region Uniform Buffer / Dynamic Descripotor set
-		VkDescriptorSetLayout DescriptorSetLayout;
 		VkDescriptorPool DescriptorPool;
-		std::vector<VkDescriptorSet> DescriptorSets;
-		std::vector<cDescriptor> Descriptor_Frame;
-		std::vector<cDescriptor_Dynamic> Descriptor_Drawcall;
+		std::vector<cDescriptorSet> DescriptorSets;
 #pragma endregion
 		// -- Push Constant
 		VkPushConstantRange PushConstantRange;
 		// -- Sampler Descriptor Set
-		VkDescriptorSetLayout SamplerSetLayout;
 		VkDescriptorPool SamplerDescriptorPool;
 
-		// - Assets
-		std::vector<VkDescriptorSet> SamplerDescriptorSets;					// Each image needs a descriptor (sampler)
+		// -- Input Descriptor Set
+		std::vector<cDescriptorSet> InputDescriptorSets;
 
 		/** Create functions */
 		void createInstance();
@@ -87,18 +98,18 @@ namespace VKE
 		void createSurface();
 		void createSwapChain();
 		void createRenderPass();
-		void createDescriptorSetLayout();
+
+		void CreateDescriptorSets();
+		void createDescriptorPool();
 		void createPushConstantRange();
-		void createGraphicsPipeline();
-		void createDepthBufferImage();
+
+		void createFrameBufferImage();
 		void createFrameBuffer();
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSynchronization();
-		
-		void createUniformBuffer();
-		void createDescriptorPool();
-		void createDescriptorSets();
+		void createGraphicsPipeline();
+
 
 		/** intermediate functions */
 		void prepareForDraw();
