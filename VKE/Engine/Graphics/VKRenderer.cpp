@@ -67,7 +67,12 @@ namespace VKE
 		RenderList[0]->Transform.Update();
 		
 		if (pCompute)
+		{
 			pCompute->ParticleSupportData.dt = dt;
+			pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
+			pCompute->Emitter.Transform.Update();
+		}
+			
 	}
 
 
@@ -734,7 +739,7 @@ namespace VKE
 
 		// How the data for a single vertex (including position, color, normal, texture coordinate) is as a whole
 		VkVertexInputBindingDescription VertexBindDescription = {};
-		VertexBindDescription.binding = 0;										// Can bind multiple streams of data, this defines which one
+		VertexBindDescription.binding = VERTEX_BUFFER_BIND_ID;					// Can bind multiple streams of data, this defines which one
 		VertexBindDescription.stride = sizeof(FVertex);							// Size of of a single vertex object
 		VertexBindDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;			// Define how to move between data after each vertex, 
 																				// VK_VERTEX_INPUT_RATE_VERTEX : move to the next vertex
@@ -744,17 +749,17 @@ namespace VKE
 		VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
 
 		// Position attribute
-		AttributeDescriptions[0].binding = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
+		AttributeDescriptions[0].binding = VERTEX_BUFFER_BIND_ID;				// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
 		AttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
 		AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;			// format of the data, defnie the size of the data, 3 * 32 bit float data
 		AttributeDescriptions[0].offset = offsetof(FVertex, Position);			// Similar stride concept, position start at 0, but the following attribute data should has offset of sizeof(glm::vec3)
 		// Color attribute ...
-		AttributeDescriptions[1].binding = 0;
+		AttributeDescriptions[1].binding = VERTEX_BUFFER_BIND_ID;
 		AttributeDescriptions[1].location = 1;
 		AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		AttributeDescriptions[1].offset = offsetof(FVertex, Color);
 		// texture coordinate attribute
-		AttributeDescriptions[2].binding = 0;
+		AttributeDescriptions[2].binding = VERTEX_BUFFER_BIND_ID;
 		AttributeDescriptions[2].location = 2;
 		AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 		AttributeDescriptions[2].offset = offsetof(FVertex, TexCoord);
@@ -938,22 +943,27 @@ namespace VKE
 			{
 				VSCreateInfo, FSCreateInfo
 			};
-			VkVertexInputBindingDescription ParticleVertexInputBindingDescription = {};
-			ParticleVertexInputBindingDescription.binding = 0;
-			ParticleVertexInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
-			ParticleVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
+			VkVertexInputBindingDescription ParticleInstanceInputBindingDescription = {};
+			ParticleInstanceInputBindingDescription.binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInstanceInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
+			ParticleInstanceInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
 
-			VkVertexInputAttributeDescription ParticleInputAttributeDescription = {};
-			ParticleInputAttributeDescription.location = 0;
-			ParticleInputAttributeDescription.binding = 0;
-			ParticleInputAttributeDescription.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-			ParticleInputAttributeDescription.offset = offsetof(BufferFormats::FParticle, Pos);
+			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[2];
+			ParticleInputAttributeDescriptions[0].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[0].location = 0;
+			ParticleInputAttributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including elapsed life time a Pos.w
+			ParticleInputAttributeDescriptions[0].offset = offsetof(BufferFormats::FParticle, Pos);
+			
+			ParticleInputAttributeDescriptions[1].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[1].location = 1;
+			ParticleInputAttributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
+			ParticleInputAttributeDescriptions[1].offset = offsetof(BufferFormats::FParticle, Vel);
 
 			// particle vertex data
 			VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-			VertexInputCreateInfo.pVertexBindingDescriptions = &ParticleVertexInputBindingDescription;
-			VertexInputCreateInfo.vertexAttributeDescriptionCount = 1;
-			VertexInputCreateInfo.pVertexAttributeDescriptions = &ParticleInputAttributeDescription;
+			VertexInputCreateInfo.pVertexBindingDescriptions = &ParticleInstanceInputBindingDescription;
+			VertexInputCreateInfo.vertexAttributeDescriptionCount = 2;
+			VertexInputCreateInfo.pVertexAttributeDescriptions = ParticleInputAttributeDescriptions;
 
 			// Change back to point list
 			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;				// VK_PRIMITIVE_TOPOLOGY_POINT_LIST will draw point
@@ -1223,16 +1233,20 @@ namespace VKE
 
 		if (cDescriptor_DynamicBuffer* DBuffer = DescriptorSets[idx].GetDescriptorAt<cDescriptor_DynamicBuffer>(1))
 		{
+			using namespace BufferFormats;
 			// Update model data to pDrawcallTransferSpace
 			for (size_t i = 0; i < RenderList.size(); ++i)
 			{
-				using namespace BufferFormats;
 				FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (i *DBuffer->GetSlotSize()));
 				*Drawcall = RenderList[i]->Transform.M();
 			}
-			// Copy Model data
+			// Particle is drawn after all render objects
+			FDrawCall* ParticleDrawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (RenderList.size() *DBuffer->GetSlotSize()));
+			*ParticleDrawcall = pCompute->Emitter.Transform.M();
+			
+			// Copy Model data RenderList.Size() + Emitter.Size()
 			// Reuse void* Data
-			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * RenderList.size();
+			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + 1);
 			DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
 		}
 
@@ -1527,7 +1541,7 @@ namespace VKE
 				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
 
 				// Bind vertex data
-				vkCmdBindVertexBuffers(CB, 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
+				vkCmdBindVertexBuffers(CB, VERTEX_BUFFER_BIND_ID, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer for drawing with
 
 				// Only one index buffer is allowed, it handles all vertex buffer's index, uint32 type is more than enough for the index count
 				vkCmdBindIndexBuffer(CB, Mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
@@ -1563,7 +1577,7 @@ namespace VKE
 
 			// Bind storage buffer as a vertex buffer
 			VkDeviceSize Offsets[] = { 0 };
-			vkCmdBindVertexBuffers(CB, 0, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
+			vkCmdBindVertexBuffers(CB, INSTANCE_BUFFER_BIND_ID, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
 
 			// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
 			uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * RenderList.size();
@@ -1581,6 +1595,8 @@ namespace VKE
 
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipeline);
+			
+			pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->ParticleSupportData);
 			// No need to bind vertex buffer or index buffer
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipelineLayout,
 				0, 1, &InputDescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),

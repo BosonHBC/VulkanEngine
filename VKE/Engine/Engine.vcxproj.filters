@@ -43,6 +43,9 @@
     <Filter Include="Source Files\Input">
       <UniqueIdentifier>{6908c62a-e18e-44db-b711-98a43ff3c567}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\ParticleSystem">
+      <UniqueIdentifier>{d19c9930-d399-43a0-8f61-043d0c5fccfc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -95,6 +98,9 @@
     </ClCompile>
     <ClCompile Include="Graphics\Descriptors\Descriptor_Image.cpp">
       <Filter>Source Files\Graphics\Descriptors</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleSystem\Emitter.cpp">
+      <Filter>Source Files\ParticleSystem</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -157,6 +163,9 @@
     </ClInclude>
     <ClInclude Include="Graphics\Descriptors\Descriptor_Image.h">
       <Filter>Source Files\Graphics\Descriptors</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleSystem\Emitter.h">
+      <Filter>Source Files\ParticleSystem</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

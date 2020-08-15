@@ -1,5 +1,6 @@
 #include "ComputePass.h"
 #include "Descriptors/Descriptor_Buffer.h"
+
 namespace VKE
 {
 	bool FComputePass::SComputePipelineRequired = false;
@@ -28,6 +29,18 @@ namespace VKE
 		createCommandPool();
 		// . Create command buffer
 		createCommandBuffer();
+		
+		// . Setup Emitter
+		Emitter.Transform.SetPosition(glm::vec3(0.0, 1.0, 1.0));
+		Emitter.EmitterData.Radius = 0.2f;
+		Emitter.EmitterData.Angle = glm::radians(45.f);
+		Emitter.EmitterData.StartSpeedMin = 1.0f;
+		Emitter.EmitterData.StartSpeedMax = 1.0f;
+		Emitter.EmitterData.StartDelayRangeMin = 0.0f;
+		Emitter.EmitterData.StartDelayRangeMax = 2.0f;
+		Emitter.EmitterData.LifeTimeRangeMin = 1.0f;
+		Emitter.EmitterData.LifeTimeRangeMax = 1.0f;
+
 		// . create storage buffer and uniform buffer
 		createStorageBuffer();
 		createUniformBuffer();
@@ -164,7 +177,7 @@ namespace VKE
 		// Dispatch the compute job
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ComputePipeline);
 		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ComputePipelineLayout, 0, 1, &ComputeDescriptorSet.GetDescriptorSet(), 0, 0);
-		vkCmdDispatch(CommandBuffer, Particle_Count / 256, 1, 1);
+		vkCmdDispatch(CommandBuffer, Particle_Count / Dispatch_Size_X, 1, 1);
 
 		// Add barrier to ensure that compute shader has finished writing to the buffer
 		// Without this the (rendering) vertex shader may display incomplete results (partial data from last frame)
@@ -207,12 +220,11 @@ namespace VKE
 
 	void FComputePass::createStorageBuffer()
 	{
-		const glm::vec3 initialLocMin(-0.10, 1.50, -0.10), initialLocMax(0.10, 1.60, 0.10), initialVelMin(-1.00, 0, -1.00), initialVelMax(1.00, 1.00, 1.00);
+		
 		// Initialize the particle data
 		for (size_t i = 0; i < Particle_Count; ++i)
 		{
-			Particles[i].Pos = glm::vec4(RandRange(initialLocMin, initialLocMax), 1.0f);
-			Particles[i].Vel = glm::vec4(RandRange(initialVelMin, initialVelMax), 1.0f);
+			Emitter.NextParticle(Particles[i]);
 		}
 		// Create storage buffer
 		VkDeviceSize StorageBufferSize = sizeof(BufferFormats::FParticle) * Particle_Count;
@@ -280,12 +292,17 @@ namespace VKE
 
 	void FComputePass::createUniformBuffer()
 	{
-		// Binding = 1
+		// Binding = 1, dt, gravity
 		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FParticleSupportData), 1, VK_SHADER_STAGE_COMPUTE_BIT);
 
 		// Setup initial data
 		ParticleSupportData.dt = 0.0005f;
+		ParticleSupportData.useGravity = false;
 		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&ParticleSupportData);
+
+		// Binding = 2, emitter data
+		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FConeEmitter), 1, VK_SHADER_STAGE_COMPUTE_BIT);
+		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2)->UpdateBufferData(&Emitter.EmitterData);
 	}
 
 	void FComputePass::prepareDescriptors()
@@ -298,11 +315,11 @@ namespace VKE
 			PoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 			PoolSize[0].descriptorCount = 1;
 			PoolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			PoolSize[1].descriptorCount = 1;
+			PoolSize[1].descriptorCount = 2;
 
 			VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 			PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			PoolCreateInfo.maxSets = 2;
+			PoolCreateInfo.maxSets = 3;
 			PoolCreateInfo.poolSizeCount = DescriptorTypeCount;
 			PoolCreateInfo.pPoolSizes = PoolSize;
 

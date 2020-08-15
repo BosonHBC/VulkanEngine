@@ -4,9 +4,12 @@
 
 #include <algorithm>
 #include <fstream>
+#include <random>
 #include "stb_image.h"
 namespace VKE
 {
+	std::default_random_engine RndGenerator;
+	std::uniform_real_distribution<float> Float01Distribution(0.0f, 1.0f);
 
 	VkDeviceSize MinUniformBufferOffset = 0;
 
@@ -411,13 +414,17 @@ namespace VKE
 
 	float RandRange(float min, float max)
 	{
-		double zeroToOne = ((double)rand() / (RAND_MAX));
-		return static_cast<float>((zeroToOne * (max - min) + min));
+		return (Rand01() * (max - min) + min);
 	}
 
 	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max)
 	{
 		return glm::vec3(RandRange(min.x, max.x), RandRange(min.y, max.y), RandRange(min.z, max.z));
+	}
+
+	float Rand01()
+	{
+		return Float01Distribution(RndGenerator);
 	}
 
 	namespace FileIO {

@@ -13,8 +13,9 @@
 #include "Model/Model.h"
 
 namespace VKE {
-	const GLuint WIDTH = 800, HEIGHT = 600;
+	const GLuint WIDTH = 1280, HEIGHT = 720;
 	const std::string WINDOW_NAME = "Default";
+	uint64_t ElapsedFrame = 0;
 
 	//=================== Parameters =================== 
 	GLFWwindow* g_Window;

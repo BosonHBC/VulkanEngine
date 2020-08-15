@@ -42,8 +42,6 @@ namespace VKE
 		// Compute pass
 		FComputePass* pCompute = nullptr;
 
-		uint64_t ElapsedFrame = 0;
-
 		// Vulkan Components
 		// - Main Components
 		FMainDevice MainDevice;

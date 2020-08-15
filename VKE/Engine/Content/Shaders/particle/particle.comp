@@ -3,12 +3,31 @@
 const vec3 g = vec3( 0., -0.98, 0. );
 const float groundY = 0.0;
 const float firctionCoefficient = 0.5;
+
 #define DAMPING -0.1f
+#define PI 3.14159265359
+#define MinRadius 0.00001f
+
+struct sConeEmitter
+{
+	float Radius;
+	float Angle;				// in degree
+	float StartSpeedMin;
+	float StartSpeedMax;
+	float StartDelayRangeMin;
+	float StartDelayRangeMax;
+	float LifeTimeRangeMin;
+	float LifeTimeRangeMax;
+};
 
 struct sParticle
 {
-	vec4 Pos;
-	vec4 Vel;
+	vec3 Pos;
+	float ElpasedTime;
+	vec3 Vel;
+	float LifeTime;
+	float Volume;
+	float padding;
 };
 
 // Binding 0 : Position storage buffer
@@ -17,9 +36,14 @@ layout(std140, binding = 0) buffer s_Particle
    sParticle Particles[ ];
 };
 
-layout (binding = 1) uniform sParticleSupportData 
+layout (std140, binding = 1) uniform sParticleSupportData 
 {
 	float dt;
+	int bUseGravity;
+};
+layout (std140, binding = 2) uniform s_ConeEmitter 
+{
+	sConeEmitter EmitterData;
 };
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 uint hash( uint x ) {
@@ -60,25 +84,61 @@ float randomRange(float min, float max, float rnd)
 	return rnd * (max - min) + min;
 }
 
-layout( local_size_x = 256 ) in;
+layout( local_size_x = 128 ) in;
 
+void NextParticle(inout sParticle oParticle)
+{
+	float R = clamp(EmitterData.Radius * sqrt(random(oParticle.Pos)), MinRadius, EmitterData.Radius);
+	float theta = random(vec2(oParticle.Pos.x, oParticle.Pos.y)) * 2 * PI;
+		
+	vec3 oPos = vec3(0.0);
+	float sinTheta = sin(theta);
+	float cosTheta = cos(theta);
+	oPos.x += R * cosTheta;
+	oPos.z += R * sinTheta;
+	oParticle.Pos = oPos;
+
+	// Velocity
+	float PercentageToCenter = R / EmitterData.Radius;
+	float Alpha = PercentageToCenter * EmitterData.Angle;
+	float sinAlpha = sin(Alpha);
+	float StartSpeed = randomRange(EmitterData.StartSpeedMin, EmitterData.StartSpeedMax, random(vec2(oParticle.Pos.x, oParticle.Pos.z)));
+	oParticle.Vel = vec3(sinAlpha * cosTheta, cos(Alpha), sinAlpha * sinTheta) * StartSpeed;	// normalized * Start Speed
+
+	// Time
+	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
+	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
+}
 void main()
 {
 	uint gid = gl_GlobalInvocationID.x; // the .y and .z are both 1 in this case
-	vec3 p = Particles[ gid ].Pos.xyz;
-	vec3 v = Particles[ gid ].Vel.xyz;
+	Particles[ gid ].ElpasedTime += dt;
+	// Only update particles with ElpasedTime greater than 0
+	if(Particles[ gid ].ElpasedTime < 0)
+	{
+		return;
+	}
+	else if (Particles[ gid ].ElpasedTime >= Particles[gid].LifeTime)
+	{
+		NextParticle(Particles[ gid ]);
+	}
 
+	vec3 p = Particles[ gid ].Pos;
+	vec3 v = Particles[ gid ].Vel;
 	vec3 a = DAMPING * v;
 	if(p.y > groundY)
 	{
-		a += g;
+		if(bUseGravity > 0)
+		{
+			a += g;
+		}
 	}
 	else
 	{
 		// ground friction
-		//a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
+		a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
 	}
-	vec3 pp = p + v * dt + 0.5f * dt * dt * a;
+	vec3 pp = p + v * dt + 0.5 * dt * dt * a;
 	vec3 vp = v + a * dt;
 
 	if(pp.y <= groundY)
@@ -90,6 +150,6 @@ void main()
 			vp.y = 0;
 	}
 
-	Particles[ gid ].Pos.xyz = pp;
-	Particles[ gid ].Vel.xyz = vp;
+	Particles[ gid ].Pos = pp;
+	Particles[ gid ].Vel = vp;
 }

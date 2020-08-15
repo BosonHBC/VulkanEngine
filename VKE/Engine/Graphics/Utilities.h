@@ -32,6 +32,10 @@
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
 #define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
 
+#define VERTEX_BUFFER_BIND_ID 0
+#define INSTANCE_BUFFER_BIND_ID 1
+
+#define PI 3.14159265359f
 namespace VKE
 {
 	// ================================================
@@ -57,7 +61,7 @@ namespace VKE
 	// Max objects are allowed in the scene
 	const int MAX_OBJECTS = 20;
 	
-
+	extern uint64_t ElapsedFrame;
 	// =======================================
 	// =============== Structs =============== 
 	// =======================================
@@ -183,4 +187,6 @@ namespace VKE
 
 	float RandRange(float min, float max);
 	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max);
+
+	float Rand01();
 }

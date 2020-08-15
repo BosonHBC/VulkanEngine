@@ -9,8 +9,9 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-	
-   	int xHalf = 800 / 2;
+	outColor = vec4(subpassLoad(inputColor).rgb, 1.0f);
+   	return;
+	int xHalf = 800 / 2;
 	if(gl_FragCoord.x > xHalf)
 	{
 		vec3 iColor = subpassLoad(inputColor).rgb;

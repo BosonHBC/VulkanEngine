@@ -6,11 +6,12 @@
 #include "Buffer/Buffer.h"
 #include "BufferFormats.h"
 #include "Descriptors/DescriptorSet.h"
+#include "ParticleSystem/Emitter.h"
 
 namespace VKE
 {
-#define Particle_Count 256
-#define Dispatch_Size_X 256
+#define Particle_Count 128 * 1024
+#define Dispatch_Size_X 128
 	struct FComputePass
 	{
 		FComputePass() {}
@@ -35,6 +36,7 @@ namespace VKE
 		// *Actual data of particles and support data
 		BufferFormats::FParticle Particles[Particle_Count];
 		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
+		cEmitter Emitter;														// Emitter for this particles
 
 		// Pipeline related
 		VkPipelineLayout ComputePipelineLayout;
