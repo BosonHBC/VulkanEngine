@@ -120,7 +120,7 @@ namespace VKE
 		VkFormat ImageFormat;								// enum
 		uint32_t ImageIndex;						// current updating framebuffer index, also the index of next image to be drawn
 
-		void acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore);
+		VkResult acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore);
 	};
 
 	struct FShaderModuleScopeGuard

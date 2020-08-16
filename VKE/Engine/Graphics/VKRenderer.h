@@ -49,6 +49,7 @@ namespace VKE
 		VkSurfaceKHR Surface;								// KHR extension required
 
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
+		FSwapChainDetail SwapChainDetail;
 		FSwapChainData SwapChain;							// SwapChain data group
 		std::vector<VkFramebuffer> SwapChainFramebuffers;
 		std::vector<VkCommandBuffer> CommandBuffers;
@@ -90,6 +91,8 @@ namespace VKE
 		// -- Input Descriptor Set
 		std::vector<cDescriptorSet> InputDescriptorSets;
 
+		bool bMinimizing = false;
+
 		/** Create functions */
 		void createInstance();
 		void getPhysicalDevice();
@@ -110,13 +113,16 @@ namespace VKE
 		void createSynchronization();
 		void createGraphicsPipeline();
 
+		/** Handle SwapChain recreation*/
+		void recreateSwapChain();
+		void cleanupSwapChain();
 
 		/** intermediate functions */
-		void prepareForDraw();
+		VkResult prepareForDraw();
 		void recordCommands();
 		void updateUniformBuffers();
-		void presentFrame();
-
+		VkResult presentFrame();
+		void postPresentationStage();
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
 		bool checkValidationLayerSupport();
@@ -126,7 +132,7 @@ namespace VKE
 
 		/** Getters */
 		void getQueueFamilies(const VkPhysicalDevice& device);
-		FSwapChainDetail getSwapChainDetail(const VkPhysicalDevice& device);
+		void getSwapChainDetail(const VkPhysicalDevice& device);
 	};
 
 }

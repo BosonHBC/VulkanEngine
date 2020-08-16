@@ -21,10 +21,11 @@ namespace VKE
 
 	GLFWwindow* GetGLFWWindow();
 	cCamera* GetCurrentCamera();
-
+	glm::ivec2 GetWindowExtent();
 	double dt();
 
 	glm::vec2 GetMouseDelta();
 	extern uint64_t ElapsedFrame;
+	extern bool bWindowIconified;
 
 }

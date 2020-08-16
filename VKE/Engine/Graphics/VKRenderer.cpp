@@ -65,18 +65,18 @@ namespace VKE
 	{
 		RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
 		RenderList[0]->Transform.Update();
-		
+
 		if (pCompute)
 		{
 			pCompute->ParticleSupportData.dt = dt;
-			pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
-			pCompute->Emitter.Transform.Update();
+			//pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
+			//pCompute->Emitter.Transform.Update();
 		}
-			
+
 	}
 
 
-	void VKRenderer::prepareForDraw()
+	VkResult VKRenderer::prepareForDraw()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		// Wait for given fence to be opened from last draw before continuing
@@ -85,11 +85,11 @@ namespace VKE
 			std::numeric_limits<uint64_t>::max());						// No time-out
 		vkResetFences(MainDevice.LD, 1, &DrawFences[CurrentFrame]);		// Need to close(reset) this fence manually
 
-		/** I. get the next available image to draw to and signal(semaphore1) when we're finished with the image */
-		SwapChain.acquireNextImage(MainDevice, OnImageAvailables[CurrentFrame]);
+		/** get the next available image to draw to and signal(semaphore1) when we're finished with the image */
+		return SwapChain.acquireNextImage(MainDevice, OnImageAvailables[CurrentFrame]);
 	}
 
-	void VKRenderer::presentFrame()
+	VkResult VKRenderer::presentFrame()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		VkPresentInfoKHR PresentInfo = {};
@@ -101,16 +101,56 @@ namespace VKE
 		PresentInfo.pImageIndices = &SwapChain.ImageIndex;				// Index of images in swap chains to present
 
 		VkResult Result = vkQueuePresentKHR(MainDevice.presentationQueue, &PresentInfo);
-		RESULT_CHECK(Result, "Fail to Present Image");
+		if (!((Result == VK_SUCCESS) || (Result == VK_SUBOPTIMAL_KHR))) {
+			if (Result == VK_ERROR_OUT_OF_DATE_KHR) {
+				// Swap chain is no longer compatible with the surface and needs to be recreated
+				recreateSwapChain();
+				return Result;
+			}
+			else {
+				RESULT_CHECK(Result, "failed to present swap chain image!");
+				return Result;
+			}
+		}
 
 		Result = vkQueueWaitIdle(MainDevice.presentationQueue);
 		RESULT_CHECK(Result, "Fail to wait for queue");
+		return Result;
+	}
+
+	void VKRenderer::postPresentationStage()
+	{
+		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		// Wait for rendering finished
+		VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+		// Submit compute commands
+		VkSubmitInfo ComputeSubmitInfo = {};
+		ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		ComputeSubmitInfo.commandBufferCount = 1;
+		ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
+		ComputeSubmitInfo.waitSemaphoreCount = 1;
+		ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
+		ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
+		ComputeSubmitInfo.signalSemaphoreCount = 1;
+		ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
+		VkResult Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
+		RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
 	}
 
 	void VKRenderer::draw()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
-		prepareForDraw();
+		VkResult PrepareResult = prepareForDraw();
+		// Swap chain is out of date
+		if ((PrepareResult == VK_ERROR_OUT_OF_DATE_KHR) || (PrepareResult == VK_SUBOPTIMAL_KHR))
+		{
+			recreateSwapChain();
+			return;
+		}
+		else if (PrepareResult != VK_SUCCESS && PrepareResult != VK_SUBOPTIMAL_KHR) {
+			throw std::runtime_error("failed to acquire swap chain image!");
+		}
 		// Record graphic commands
 		recordCommands();
 		// Update uniform buffer
@@ -120,7 +160,6 @@ namespace VKE
 		VkSemaphore GraphicsWaitSemaphores[] = { pCompute->OnComputeFinished, OnImageAvailables[CurrentFrame] };
 		const uint32_t GraphicSignalSemaphoreCount = 2;
 		VkSemaphore GraphicsSignalSemaphores[] = { OnGraphicFinished[CurrentFrame], OnRenderFinisheds[CurrentFrame] };
-
 
 		/** II. submit command buffer to queue (graphic queue) for execution, make sure it waits for the image to be signaled as available before drawing,
 		 and signals (semaphore2) when it has finished rendering.*/
@@ -145,23 +184,10 @@ namespace VKE
 		RESULT_CHECK(Result, "Fail to submit command buffers to graphic queue");
 
 		/** III. present image to screen when it has signaled finished rendering */
-		presentFrame();
+		Result = presentFrame();
 
-		// Wait for rendering finished
-		VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-		// Submit compute commands
-		VkSubmitInfo ComputeSubmitInfo = {};
-		ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		ComputeSubmitInfo.commandBufferCount = 1;
-		ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
-		ComputeSubmitInfo.waitSemaphoreCount = 1;
-		ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
-		ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
-		ComputeSubmitInfo.signalSemaphoreCount = 1;
-		ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
-		Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
-		RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
+		/** IV. Submit compute queue*/
+		postPresentationStage();
 
 		// Increment Elapsed Frame
 		++ElapsedFrame;
@@ -196,11 +222,7 @@ namespace VKE
 			vkDestroySemaphore(MainDevice.LD, OnImageAvailables[i], nullptr);
 			vkDestroyFence(MainDevice.LD, DrawFences[i], nullptr);
 		}
-		vkDestroyCommandPool(MainDevice.LD, MainDevice.GraphicsCommandPool, nullptr);
-		for (auto& FrameBuffer : SwapChainFramebuffers)
-		{
-			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
-		}
+
 		// clean up depth buffer
 		{
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
@@ -224,25 +246,10 @@ namespace VKE
 			cDescriptorSet::CleanupDescriptorSetLayout(&MainDevice);
 		}
 
-		{
-			// Destroy pipelines first and then destroy render pass
-			vkDestroyPipeline(MainDevice.LD, PostProcessPipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, PostProcessPipelineLayout, nullptr);
+		cleanupSwapChain();
 
-			vkDestroyPipeline(MainDevice.LD, RenderParticlePipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, RenderParticlePipelineLayout, nullptr);
+		vkDestroyCommandPool(MainDevice.LD, MainDevice.GraphicsCommandPool, nullptr);
 
-			vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
-
-			vkDestroyRenderPass(MainDevice.LD, RenderPass, nullptr);
-		}
-
-		for (auto & Image : SwapChain.Images)
-		{
-			vkDestroyImageView(MainDevice.LD, Image.ImgView, nullptr);
-		}
-		vkDestroySwapchainKHR(MainDevice.LD, SwapChain.SwapChain, nullptr);
 		vkDestroySurfaceKHR(vkInstance, Surface, nullptr);
 		vkDestroyDevice(MainDevice.LD, nullptr);
 		vkDestroyInstance(vkInstance, nullptr);
@@ -426,9 +433,7 @@ namespace VKE
 
 	void VKRenderer::createSwapChain()
 	{
-		// Pick best settings that are supported
-		FSwapChainDetail SwapChainDetail = getSwapChainDetail(MainDevice.PD);
-
+		getSwapChainDetail(MainDevice.PD);
 		// Get Parameters for SwapChain
 		VkSurfaceFormatKHR SurfaceFormat = SwapChainDetail.getSurfaceFormat();
 		VkPresentModeKHR PresentMode = SwapChainDetail.getPresentationMode();
@@ -443,7 +448,10 @@ namespace VKE
 		SwapChainCreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
 		SwapChainCreateInfo.presentMode = PresentMode;
 		SwapChainCreateInfo.imageExtent = Resolution;
-
+		if (Resolution.width == 0)
+		{
+			printf("illegal");
+		}
 		/** Other values */
 		// Get 1 extra image to allow triple buffering
 		uint32_t MinImageCount = SwapChainDetail.SurfaceCapabilities.minImageCount + 1;
@@ -495,15 +503,15 @@ namespace VKE
 		std::vector<VkImage> Images(SwapChainImageCount);
 		vkGetSwapchainImagesKHR(MainDevice.LD, SwapChain.SwapChain, &SwapChainImageCount, Images.data());
 
-		SwapChain.Images.reserve(SwapChainImageCount);
+		SwapChain.Images.resize(SwapChainImageCount);
 
-		for (auto & Image : Images)
+		for (size_t i = 0; i < Images.size(); ++i)
 		{
 			FSwapChainImage SwapChainImage = {};
-			SwapChainImage.Image = Image;
-			SwapChainImage.ImgView = CreateImageViewFromImage(&MainDevice, Image, SwapChain.ImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			SwapChainImage.Image = Images[i];
+			SwapChainImage.ImgView = CreateImageViewFromImage(&MainDevice, Images[i], SwapChain.ImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
-			SwapChain.Images.push_back(SwapChainImage);
+			SwapChain.Images[i] = SwapChainImage;
 		}
 		assert(MAX_FRAME_DRAWS < Images.size());
 		printf("%d Image view has been created\n", SwapChainImageCount);
@@ -953,7 +961,7 @@ namespace VKE
 			ParticleInputAttributeDescriptions[0].location = 0;
 			ParticleInputAttributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including elapsed life time a Pos.w
 			ParticleInputAttributeDescriptions[0].offset = offsetof(BufferFormats::FParticle, Pos);
-			
+
 			ParticleInputAttributeDescriptions[1].binding = INSTANCE_BUFFER_BIND_ID;
 			ParticleInputAttributeDescriptions[1].location = 1;
 			ParticleInputAttributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
@@ -1042,6 +1050,49 @@ namespace VKE
 			RESULT_CHECK(Result, "Fail to create the third Graphics Pipelines.");
 		}
 
+	}
+
+	void VKRenderer::recreateSwapChain()
+	{
+		vkDeviceWaitIdle(MainDevice.LD);
+
+		//pCompute->recreateSwapChain();
+
+		cleanupSwapChain();
+
+		createSwapChain();
+		createRenderPass();
+		createGraphicsPipeline();
+		createFrameBuffer();
+		createCommandBuffers();
+	}
+
+	void VKRenderer::cleanupSwapChain()
+	{
+		for (auto& FrameBuffer : SwapChainFramebuffers)
+		{
+			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
+		}
+
+		vkFreeCommandBuffers(MainDevice.LD, MainDevice.GraphicsCommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
+
+		// Destroy pipelines first and then destroy render pass
+		vkDestroyPipeline(MainDevice.LD, PostProcessPipeline, nullptr);
+		vkDestroyPipelineLayout(MainDevice.LD, PostProcessPipelineLayout, nullptr);
+
+		vkDestroyPipeline(MainDevice.LD, RenderParticlePipeline, nullptr);
+		vkDestroyPipelineLayout(MainDevice.LD, RenderParticlePipelineLayout, nullptr);
+
+		vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
+		vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
+
+		vkDestroyRenderPass(MainDevice.LD, RenderPass, nullptr);
+
+		for (auto & Image : SwapChain.Images)
+		{
+			vkDestroyImageView(MainDevice.LD, Image.ImgView, nullptr);
+		}
+		vkDestroySwapchainKHR(MainDevice.LD, SwapChain.SwapChain, nullptr);
 	}
 
 	void VKRenderer::createFrameBufferImage()
@@ -1243,7 +1294,7 @@ namespace VKE
 			// Particle is drawn after all render objects
 			FDrawCall* ParticleDrawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (RenderList.size() *DBuffer->GetSlotSize()));
 			*ParticleDrawcall = pCompute->Emitter.Transform.M();
-			
+
 			// Copy Model data RenderList.Size() + Emitter.Size()
 			// Reuse void* Data
 			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + 1);
@@ -1251,7 +1302,6 @@ namespace VKE
 		}
 
 	}
-
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
 	{
@@ -1366,7 +1416,8 @@ namespace VKE
 		{
 			return false;
 		}
-		if (!getSwapChainDetail(device).IsValid())
+		getSwapChainDetail(device);
+		if (!SwapChainDetail.IsValid())
 		{
 			return false;
 		}
@@ -1585,7 +1636,7 @@ namespace VKE
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
 				0, 1, &DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
 				1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
-			
+
 			// Instance draw
 			// draw a quad
 			vkCmdDraw(CB, 6, Particle_Count, 0, 0);
@@ -1595,7 +1646,7 @@ namespace VKE
 
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipeline);
-			
+
 			pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->ParticleSupportData);
 			// No need to bind vertex buffer or index buffer
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipelineLayout,
@@ -1617,7 +1668,7 @@ namespace VKE
 			BufferBarrier.dstAccessMask = 0;
 			// Transfer ownership from graphic queue to compute queue
 			BufferBarrier.srcQueueFamilyIndex = GraphicFamilyIndex;
-			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;	
+			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;
 			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
 			BufferBarrier.offset = 0;
 			BufferBarrier.size = StorageBuffer.BufferSize();
@@ -1676,12 +1727,11 @@ namespace VKE
 
 	}
 
-	FSwapChainDetail VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)
+	void VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)
 	{
-		FSwapChainDetail SwapChainDetails;
-
+		
 		// Capabilities for the surface of this device
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Surface, &SwapChainDetails.SurfaceCapabilities);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Surface, &SwapChainDetail.SurfaceCapabilities);
 
 		// get list of support formats
 		{
@@ -1689,8 +1739,8 @@ namespace VKE
 			vkGetPhysicalDeviceSurfaceFormatsKHR(device, Surface, &FormatCount, nullptr);
 			if (FormatCount > 0)
 			{
-				SwapChainDetails.ImgFormats.resize(FormatCount);
-				vkGetPhysicalDeviceSurfaceFormatsKHR(device, Surface, &FormatCount, SwapChainDetails.ImgFormats.data());
+				SwapChainDetail.ImgFormats.resize(FormatCount);
+				vkGetPhysicalDeviceSurfaceFormatsKHR(device, Surface, &FormatCount, SwapChainDetail.ImgFormats.data());
 			}
 		}
 
@@ -1700,12 +1750,10 @@ namespace VKE
 			vkGetPhysicalDeviceSurfacePresentModesKHR(device, Surface, &ModeCount, nullptr);
 			if (ModeCount > 0)
 			{
-				SwapChainDetails.PresentationModes.resize(ModeCount);
-				vkGetPhysicalDeviceSurfacePresentModesKHR(device, Surface, &ModeCount, SwapChainDetails.PresentationModes.data());
+				SwapChainDetail.PresentationModes.resize(ModeCount);
+				vkGetPhysicalDeviceSurfacePresentModesKHR(device, Surface, &ModeCount, SwapChainDetail.PresentationModes.data());
 			}
 		}
-
-		return SwapChainDetails;
 	}
 
 

@@ -70,9 +70,9 @@ namespace VKE
 	}
 
 
-	void FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
+	VkResult FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
 	{
-		vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
+		return vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
 			std::numeric_limits<uint64_t>::max(),						// never timeout
 			PresentCompleteSemaphore,								// Signal us when that image is available to use
 			VK_NULL_HANDLE,

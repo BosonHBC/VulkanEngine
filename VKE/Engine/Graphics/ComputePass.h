@@ -56,6 +56,10 @@ namespace VKE
 		const cBuffer& GetStorageBuffer();
 
 		void undateUniformBuffer();
+
+		void recreateSwapChain();
+
+		void cleanupSwapChain();
 	private:
 
 		void createStorageBuffer();

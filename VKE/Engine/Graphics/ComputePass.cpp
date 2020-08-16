@@ -125,11 +125,9 @@ namespace VKE
 
 		vkDestroySemaphore(pMainDevice->LD, OnComputeFinished, nullptr);
 
+		cleanupSwapChain();
+
 		vkDestroyCommandPool(pMainDevice->LD, ComputeCommandPool, nullptr);
-
-		vkDestroyPipeline(pMainDevice->LD, ComputePipeline, nullptr);
-		vkDestroyPipelineLayout(pMainDevice->LD, ComputePipelineLayout, nullptr);
-
 		ComputeDescriptorSet.cleanUp();
 		vkDestroyDescriptorPool(pMainDevice->LD, DescriptorPool, nullptr);
 	}
@@ -216,6 +214,22 @@ namespace VKE
 	void FComputePass::undateUniformBuffer()
 	{
 		ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&ParticleSupportData);
+	}
+
+	void FComputePass::recreateSwapChain()
+	{
+		cleanupSwapChain();
+
+		createComputePipeline();
+		createCommandBuffer();
+		recordComputeCommands();
+	}
+
+	void FComputePass::cleanupSwapChain()
+	{
+		vkFreeCommandBuffers(pMainDevice->LD, ComputeCommandPool, 1, &CommandBuffer);
+		vkDestroyPipeline(pMainDevice->LD, ComputePipeline, nullptr);
+		vkDestroyPipelineLayout(pMainDevice->LD, ComputePipelineLayout, nullptr);
 	}
 
 	void FComputePass::createStorageBuffer()

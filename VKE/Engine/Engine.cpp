@@ -16,6 +16,7 @@ namespace VKE {
 	const GLuint WIDTH = 1280, HEIGHT = 720;
 	const std::string WINDOW_NAME = "Default";
 	uint64_t ElapsedFrame = 0;
+	bool bWindowIconified = false;
 
 	//=================== Parameters =================== 
 	GLFWwindow* g_Window;
@@ -32,6 +33,7 @@ namespace VKE {
 	// Input
 	void initInput();
 	void window_focus_callback(GLFWwindow* window, int focused);
+	void window_iconify_callback(GLFWwindow* window, int iconified);
 	void cleanupInput();
 	void quitApp();
 
@@ -68,15 +70,19 @@ namespace VKE {
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
-			g_Input->UpdateInput();
-			g_Camera->Update();
 
 			double now = glfwGetTime();
 			g_deltaTime = now - LastTime;
 			LastTime = now;
 
-			g_Renderer->tick((float)g_deltaTime);
-			g_Renderer->draw();
+			if (!bWindowIconified)
+			{
+				g_Input->UpdateInput();
+				g_Camera->Update();
+
+				g_Renderer->tick((float)g_deltaTime);
+				g_Renderer->draw();
+			}
 		}
 	}
 
@@ -99,6 +105,11 @@ namespace VKE {
 	cCamera* GetCurrentCamera()
 	{
 		return g_Camera;
+	}
+
+	glm::ivec2 GetWindowExtent()
+	{
+		return glm::ivec2(WIDTH, HEIGHT);
 	}
 
 	double dt()
@@ -126,6 +137,7 @@ namespace VKE {
 		g_Window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
 
 		glfwSetWindowFocusCallback(g_Window, window_focus_callback);
+		glfwSetWindowIconifyCallback(g_Window, window_iconify_callback);
 	}
 	void cleanupGLFW()
 	{
@@ -155,6 +167,10 @@ namespace VKE {
 		{
 			g_Input->bAppInFocus = focused;
 		}
+	}
+	void window_iconify_callback(GLFWwindow* window, int iconified)
+	{
+		bWindowIconified = iconified > 0;
 	}
 	void quitApp()
 	{
