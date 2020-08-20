@@ -79,16 +79,19 @@ namespace VKE
 		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself
 
 		// - Descriptors
-#pragma region Uniform Buffer / Dynamic Descripotor set
+		// First pass
 		VkDescriptorPool DescriptorPool;
 		std::vector<cDescriptorSet> DescriptorSets;
-#pragma endregion
+
 		// -- Push Constant
 		VkPushConstantRange PushConstantRange;
 		// -- Sampler Descriptor Set
 		VkDescriptorPool SamplerDescriptorPool;
+		// Second pass
+		cDescriptorSet ParticleDescriptorSet;
 
 		// -- Input Descriptor Set
+		// Third pass
 		std::vector<cDescriptorSet> InputDescriptorSets;
 
 		bool bMinimizing = false;

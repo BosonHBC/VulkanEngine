@@ -8,8 +8,9 @@ namespace VKE
 	enum EDescriptorSetType : uint8_t
 	{
 		FirstPass_vert,
-		SecondPass_frag,
+		ThirdPass_frag,
 		FirstPass_frag,
+		SecondPass_frag,
 		ComputePass,
 		Invalid = uint8_t(-1),
 	};
@@ -30,7 +31,7 @@ namespace VKE
 		cDescriptorSet(const cDescriptorSet& i_other) = default;
 		cDescriptorSet& operator = (const cDescriptorSet& i_other) = delete;
 		cDescriptorSet( cDescriptorSet&& i_other) = default;
-		cDescriptorSet& operator = (cDescriptorSet&& i_other) = delete;
+		cDescriptorSet& operator = (cDescriptorSet&& i_other) = default;
 		void cleanUp();
 
 		/** Getters */

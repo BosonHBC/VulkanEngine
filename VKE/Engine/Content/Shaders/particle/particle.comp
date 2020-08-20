@@ -84,7 +84,7 @@ float randomRange(float min, float max, float rnd)
 	return rnd * (max - min) + min;
 }
 
-layout( local_size_x = 128 ) in;
+layout( local_size_x = 16 ) in;
 
 void NextParticle(inout sParticle oParticle)
 {

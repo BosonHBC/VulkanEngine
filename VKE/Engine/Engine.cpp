@@ -183,7 +183,7 @@ namespace VKE {
 
 	void initCamera()
 	{
-		g_Camera = DBG_NEW cCamera(glm::vec3(0,2,5), 15.f, 0.0f, 2.0f, 0.1f);
+		g_Camera = DBG_NEW cCamera(glm::vec3(0,1,2.5), 15.f, 0.0f, 2.0f, 0.1f);
 		g_Camera->UpdateProjectionMatrix(glm::radians(45.f), (float)WIDTH / (float)HEIGHT);
 		g_Camera->Update();
 

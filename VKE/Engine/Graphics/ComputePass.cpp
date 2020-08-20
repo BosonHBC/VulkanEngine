@@ -34,12 +34,12 @@ namespace VKE
 		Emitter.Transform.SetPosition(glm::vec3(0.0, 1.0, 1.0));
 		Emitter.EmitterData.Radius = 0.2f;
 		Emitter.EmitterData.Angle = glm::radians(45.f);
-		Emitter.EmitterData.StartSpeedMin = 1.0f;
-		Emitter.EmitterData.StartSpeedMax = 1.0f;
+		Emitter.EmitterData.StartSpeedMin = 0.2f;
+		Emitter.EmitterData.StartSpeedMax = 0.2f;
 		Emitter.EmitterData.StartDelayRangeMin = 0.0f;
 		Emitter.EmitterData.StartDelayRangeMax = 2.0f;
-		Emitter.EmitterData.LifeTimeRangeMin = 1.0f;
-		Emitter.EmitterData.LifeTimeRangeMax = 1.0f;
+		Emitter.EmitterData.LifeTimeRangeMin = 5.0f;
+		Emitter.EmitterData.LifeTimeRangeMax = 5.0f;
 
 		// . create storage buffer and uniform buffer
 		createStorageBuffer();

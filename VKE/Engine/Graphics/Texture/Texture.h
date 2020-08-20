@@ -37,7 +37,6 @@ namespace VKE
 		FMainDevice* pMainDevice;
 		int Width, Height;
 
-		VkImageLayout ImageLayout;
 		cImageBuffer Buffer;
 		VkSampler Sampler;
 

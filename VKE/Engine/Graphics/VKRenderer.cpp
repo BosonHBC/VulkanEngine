@@ -23,6 +23,10 @@
 #include "assimp/postprocess.h"
 namespace VKE
 {
+
+	//** Global Variables * /
+	cModel* GQuadModel = nullptr;
+
 	int VKRenderer::init(GLFWwindow* iWindow)
 	{
 		window = iWindow;
@@ -35,15 +39,19 @@ namespace VKE
 			createSwapChain();
 			createFrameBufferImage();		// Need to get depth buffer image format before creating a render pass that needs a depth attachment
 			createRenderPass();
-			// Descriptor set and push constant related
-			{
-				CreateDescriptorSets();
-				createPushConstantRange();
-			}
 			createFrameBuffer();
 			createCommandPool();
 			createCommandBuffers();
 			createSynchronization();
+			
+			// Descriptor set and push constant related
+			{		
+				// Create Texture
+				cTexture::Load("DefaultWhite.png", MainDevice);
+				cTexture::Load("fireParticles/TXT_Sparks_01.png", MainDevice);
+				CreateDescriptorSets();
+				createPushConstantRange();
+			}
 			LoadAssets();
 			createGraphicsPipeline();
 			// Create compute pass
@@ -206,11 +214,14 @@ namespace VKE
 		cTexture::Free();
 
 		// Clean up render list
+		GQuadModel->cleanUp();
+		safe_delete(GQuadModel);
 		for (auto Model : RenderList)
 		{
 			Model->cleanUp();
 			safe_delete(Model);
 		}
+		
 		RenderList.clear();
 		// Clear all mesh assets
 		cMesh::Free();
@@ -241,8 +252,10 @@ namespace VKE
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
 				DescriptorSets[i].cleanUp();
+				
 				InputDescriptorSets[i].cleanUp();
 			}
+			ParticleDescriptorSet.cleanUp();
 			cDescriptorSet::CleanupDescriptorSetLayout(&MainDevice);
 		}
 
@@ -257,12 +270,6 @@ namespace VKE
 
 	void VKRenderer::LoadAssets()
 	{
-		// Create Texture
-		cTexture::Load("DefaultWhite.png", MainDevice);
-		cTexture::Load("brick.png", MainDevice);
-		cTexture::Load("panda.jpg", MainDevice);
-		cTexture::Load("teapot.png", MainDevice);
-
 		// Create Mesh
 		cModel* pContainerModel = nullptr;
 		cModel* pPlaneModel = nullptr;
@@ -276,6 +283,10 @@ namespace VKE
 		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
 
 		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));
+		
+		CreateModel("Quad.obj", GQuadModel);
+		GQuadModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1));
+
 	}
 
 	void VKRenderer::createInstance()
@@ -674,6 +685,7 @@ namespace VKE
 	{
 		// 1. Prepare DescriptorSet Info
 		size_t Count = SwapChain.Images.size();
+		ParticleDescriptorSet = cDescriptorSet(&MainDevice);
 		DescriptorSets.resize(Count, cDescriptorSet(&MainDevice));
 		InputDescriptorSets.resize(Count, cDescriptorSet(&MainDevice));
 		// Create Buffers
@@ -685,6 +697,9 @@ namespace VKE
 			InputDescriptorSets[i].CreateImageBufferDescriptor(&ColorBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			InputDescriptorSets[i].CreateImageBufferDescriptor(&DepthBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
+		cTexture* ParticleTestTex = cTexture::Get(1).get();
+		ParticleDescriptorSet.CreateImageBufferDescriptor(&ParticleTestTex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ParticleTestTex->GetImageInfo().imageLayout, ParticleTestTex->GetImageInfo().sampler);
+
 		// 2. Create Descriptor Pool
 		createDescriptorPool();
 		// 3. Create Descriptor Set Layout
@@ -693,9 +708,10 @@ namespace VKE
 			// UNIFORM DESCRIPTOR SET LAYOUT
 			DescriptorSets[i].CreateDescriptorSetLayout(FirstPass_vert);
 			// INPUT DESCRIPTOR LAYOUT
-			InputDescriptorSets[i].CreateDescriptorSetLayout(SecondPass_frag);
+			InputDescriptorSets[i].CreateDescriptorSetLayout(ThirdPass_frag);
 		}
-
+		// PARTICLE DESCRIPTOR LAYOUT
+		ParticleDescriptorSet.CreateDescriptorSetLayout(SecondPass_frag);
 		for (size_t i = 0; i < Count; ++i)
 		{
 			// 4. Allocate Descriptor sets
@@ -704,8 +720,9 @@ namespace VKE
 			// 5. Update set write info
 			DescriptorSets[i].BindDescriptorWithSet();
 			InputDescriptorSets[i].BindDescriptorWithSet();
-
 		}
+		ParticleDescriptorSet.AllocateDescriptorSet(SamplerDescriptorPool);
+		ParticleDescriptorSet.BindDescriptorWithSet();
 	}
 
 	void VKRenderer::createPushConstantRange()
@@ -754,29 +771,29 @@ namespace VKE
 																				// VK_VERTEX_INPUT_RATE_INSTANCE : Move to a vertex for the next instance
 		// How the data for an attribute is defined within a vertex
 		const uint32_t AttrubuteDescriptionCount = 3;
-		VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
+		VkVertexInputAttributeDescription VertexInputAttributeDescriptions[AttrubuteDescriptionCount];
 
 		// Position attribute
-		AttributeDescriptions[0].binding = VERTEX_BUFFER_BIND_ID;				// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
-		AttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
-		AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;			// format of the data, defnie the size of the data, 3 * 32 bit float data
-		AttributeDescriptions[0].offset = offsetof(FVertex, Position);			// Similar stride concept, position start at 0, but the following attribute data should has offset of sizeof(glm::vec3)
+		VertexInputAttributeDescriptions[0].binding = VERTEX_BUFFER_BIND_ID;				// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
+		VertexInputAttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
+		VertexInputAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;			// format of the data, defnie the size of the data, 3 * 32 bit float data
+		VertexInputAttributeDescriptions[0].offset = offsetof(FVertex, Position);			// Similar stride concept, position start at 0, but the following attribute data should has offset of sizeof(glm::vec3)
 		// Color attribute ...
-		AttributeDescriptions[1].binding = VERTEX_BUFFER_BIND_ID;
-		AttributeDescriptions[1].location = 1;
-		AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		AttributeDescriptions[1].offset = offsetof(FVertex, Color);
+		VertexInputAttributeDescriptions[1].binding = VERTEX_BUFFER_BIND_ID;
+		VertexInputAttributeDescriptions[1].location = 1;
+		VertexInputAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		VertexInputAttributeDescriptions[1].offset = offsetof(FVertex, Color);
 		// texture coordinate attribute
-		AttributeDescriptions[2].binding = VERTEX_BUFFER_BIND_ID;
-		AttributeDescriptions[2].location = 2;
-		AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		AttributeDescriptions[2].offset = offsetof(FVertex, TexCoord);
+		VertexInputAttributeDescriptions[2].binding = VERTEX_BUFFER_BIND_ID;
+		VertexInputAttributeDescriptions[2].location = 2;
+		VertexInputAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		VertexInputAttributeDescriptions[2].offset = offsetof(FVertex, TexCoord);
 
 		VertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
 		VertexInputCreateInfo.pVertexBindingDescriptions = &VertexBindDescription;				// list of vertex binding description data spacing, stride info
 		VertexInputCreateInfo.vertexAttributeDescriptionCount = AttrubuteDescriptionCount;
-		VertexInputCreateInfo.pVertexAttributeDescriptions = AttributeDescriptions;				// data format where to bind in shader
+		VertexInputCreateInfo.pVertexAttributeDescriptions = VertexInputAttributeDescriptions;				// data format where to bind in shader
 
 
 		// === Input Assembly ===
@@ -867,11 +884,10 @@ namespace VKE
 		ColorStateAttachments.colorBlendOp = VK_BLEND_OP_ADD;						// additive blending in PS.
 		// Blending color equation : (newColorAlpha * NewColor) + ((1 - newColorAlpha) * OldColor)
 
-		ColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		ColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		ColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		ColorStateAttachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		ColorStateAttachments.alphaBlendOp = VK_BLEND_OP_ADD;
 		// Blending alpha equation (1 * newAlpha) + (0 * oldAlpha)
-
 
 		ColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 		ColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;					// Alternative to calculation is to use logical operations
@@ -951,36 +967,71 @@ namespace VKE
 			{
 				VSCreateInfo, FSCreateInfo
 			};
+
 			VkVertexInputBindingDescription ParticleInstanceInputBindingDescription = {};
 			ParticleInstanceInputBindingDescription.binding = INSTANCE_BUFFER_BIND_ID;
 			ParticleInstanceInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
 			ParticleInstanceInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
 
-			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[2];
-			ParticleInputAttributeDescriptions[0].binding = INSTANCE_BUFFER_BIND_ID;
-			ParticleInputAttributeDescriptions[0].location = 0;
-			ParticleInputAttributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including elapsed life time a Pos.w
-			ParticleInputAttributeDescriptions[0].offset = offsetof(BufferFormats::FParticle, Pos);
+			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[5];
+			ParticleInputAttributeDescriptions[0] = VertexInputAttributeDescriptions[0];
+			ParticleInputAttributeDescriptions[1] = VertexInputAttributeDescriptions[1];
+			ParticleInputAttributeDescriptions[2] = VertexInputAttributeDescriptions[2];
 
-			ParticleInputAttributeDescriptions[1].binding = INSTANCE_BUFFER_BIND_ID;
-			ParticleInputAttributeDescriptions[1].location = 1;
-			ParticleInputAttributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
-			ParticleInputAttributeDescriptions[1].offset = offsetof(BufferFormats::FParticle, Vel);
+			ParticleInputAttributeDescriptions[3].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[3].location = 3;
+			ParticleInputAttributeDescriptions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including elapsed life time a Pos.w
+			ParticleInputAttributeDescriptions[3].offset = offsetof(BufferFormats::FParticle, Pos);
 
+			ParticleInputAttributeDescriptions[4].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[4].location = 4;
+			ParticleInputAttributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
+			ParticleInputAttributeDescriptions[4].offset = offsetof(BufferFormats::FParticle, Vel);
+
+			const uint32_t BindDescriptionCount = 2;
+			VkVertexInputBindingDescription BindingDescriptions[BindDescriptionCount] = { VertexBindDescription, ParticleInstanceInputBindingDescription };
 			// particle vertex data
-			VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-			VertexInputCreateInfo.pVertexBindingDescriptions = &ParticleInstanceInputBindingDescription;
-			VertexInputCreateInfo.vertexAttributeDescriptionCount = 2;
+			VertexInputCreateInfo.vertexBindingDescriptionCount = BindDescriptionCount;
+			VertexInputCreateInfo.pVertexBindingDescriptions = BindingDescriptions;
+			VertexInputCreateInfo.vertexAttributeDescriptionCount = 5;
 			VertexInputCreateInfo.pVertexAttributeDescriptions = ParticleInputAttributeDescriptions;
 
 			// Change back to point list
 			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;				// VK_PRIMITIVE_TOPOLOGY_POINT_LIST will draw point
 
+			// Change blending stage
+			VkPipelineColorBlendStateCreateInfo ParticleColorBlendStateCreateInfo = {};
+
+			// Blend attachment state (How blending is handled)
+			VkPipelineColorBlendAttachmentState ParticleColorStateAttachments = {};
+			ParticleColorStateAttachments.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT; // Color to apply blending to. use all channels to blend
+			ParticleColorStateAttachments.blendEnable = VK_TRUE;
+
+			// Pre-multiplied alpha
+			ParticleColorStateAttachments.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			ParticleColorStateAttachments.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			ParticleColorStateAttachments.colorBlendOp = VK_BLEND_OP_ADD;						// additive blending in PS.
+			// Blending color equation : (newColorAlpha * NewColor) + ((1 - newColorAlpha) * OldColor)
+
+			ParticleColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			ParticleColorStateAttachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			ParticleColorStateAttachments.alphaBlendOp = VK_BLEND_OP_ADD;
+			// Blending alpha equation (1 * newAlpha) + (0 * oldAlpha)
+
+			ParticleColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			ParticleColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;					// Alternative to calculation is to use logical operations
+			//ColorBlendStateCreateInfo.logicOp = VK_LOGIC_OP_COPY;
+			ParticleColorBlendStateCreateInfo.attachmentCount = 1;
+			ParticleColorBlendStateCreateInfo.pAttachments = &ParticleColorStateAttachments;
+
 			// Create Another pipeline layout
+			const uint32_t ParticleSetLayoutCount = 2;
+			VkDescriptorSetLayout ParticlePassLayouts[ParticleSetLayoutCount] = { DescriptorSets[0].GetDescriptorSetLayout(), ParticleDescriptorSet.GetDescriptorSetLayout() };
+
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
 			PipelineLayoutCreateInfo1.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			PipelineLayoutCreateInfo1.setLayoutCount = 1;
-			PipelineLayoutCreateInfo1.pSetLayouts = &DescriptorSets[0].GetDescriptorSetLayout();
+			PipelineLayoutCreateInfo1.setLayoutCount = ParticleSetLayoutCount;
+			PipelineLayoutCreateInfo1.pSetLayouts = ParticlePassLayouts;
 			PipelineLayoutCreateInfo1.pushConstantRangeCount = 0;
 			PipelineLayoutCreateInfo1.pPushConstantRanges = nullptr;
 
@@ -991,7 +1042,7 @@ namespace VKE
 			PipelineCreateInfo.pStages = ShaderStages1;
 			PipelineCreateInfo.layout = RenderParticlePipelineLayout;
 			PipelineCreateInfo.subpass = 1;	// Which sub-pass this pipeline is in 
-
+			PipelineCreateInfo.pColorBlendState = &ParticleColorBlendStateCreateInfo;
 			// Create the second pipeline 
 			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &RenderParticlePipeline);
 			RESULT_CHECK(Result, "Fail to create the second Graphics Pipelines.");
@@ -1044,7 +1095,7 @@ namespace VKE
 			PipelineCreateInfo.pStages = ShaderStages2;
 			PipelineCreateInfo.layout = PostProcessPipelineLayout;
 			PipelineCreateInfo.subpass = 2;	// Which sub-pass this pipeline is in 
-
+			PipelineCreateInfo.pColorBlendState = &ColorBlendStateCreateInfo;
 			// Create the third pipeline 
 			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &PostProcessPipeline);
 			RESULT_CHECK(Result, "Fail to create the third Graphics Pipelines.");
@@ -1626,24 +1677,33 @@ namespace VKE
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipeline);
 
-			// Bind storage buffer as a vertex buffer
+			std::shared_ptr<cMesh> QuadMesh = GQuadModel->GetMesh(0);
 			VkDeviceSize Offsets[] = { 0 };
+			// Bind vertex buffer
+			vkCmdBindVertexBuffers(CB, VERTEX_BUFFER_BIND_ID, 1, &QuadMesh->GetVertexBuffer(), Offsets);
+
+			// Bind instance data buffer as a vertex buffer
 			vkCmdBindVertexBuffers(CB, INSTANCE_BUFFER_BIND_ID, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
+
+			// Bind index buffer
+			vkCmdBindIndexBuffer(CB, QuadMesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 			// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
 			uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * RenderList.size();
 
+			const uint32_t DescriptorSetCount = 2;
+			// Two descriptor sets
+			VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), ParticleDescriptorSet.GetDescriptorSet() };
+
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
-				0, 1, &DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
+				0, DescriptorSetCount, DescriptorSetGroup,
 				1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
 
-			// Instance draw
-			// draw a quad
-			vkCmdDraw(CB, 6, Particle_Count, 0, 0);
+			// draw the quad with multiple instance
+			vkCmdDrawIndexed(CB, QuadMesh->GetIndexCount(), Particle_Count, 0, 0, 0);
 		}
 		// Start the third sub-pass
 		{
-
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipeline);
 
