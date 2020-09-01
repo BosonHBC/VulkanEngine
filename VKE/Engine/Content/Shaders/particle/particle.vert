@@ -39,6 +39,7 @@ void main()
     mat4 Model = mat4(1.0);
     Model[3] = vec4(pos.xyz, 1.0);
     mat4 ModelView = ViewMatrix * ModelMatrix * Model;
+   /*
     // Remove rotation to have a billboard effect
     // Column 0:
     ModelView[0][0] = 1;
@@ -52,6 +53,6 @@ void main()
     ModelView[2][0] = 0;
     ModelView[2][1] = 0;
     ModelView[2][2] = 1;
-
+*/
     gl_Position = ProjectionMatrix * ModelView * vec4(scale * vertexPos, 1.0);
 }

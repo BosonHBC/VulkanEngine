@@ -48,7 +48,7 @@ namespace VKE
 			{		
 				// Create Texture
 				cTexture::Load("DefaultWhite.png", MainDevice);
-				cTexture::Load("fireParticles/TXT_Sparks_01.png", MainDevice);
+				cTexture::Load("fireParticles/TXT_Sparks_01.tga", MainDevice);
 				CreateDescriptorSets();
 				createPushConstantRange();
 			}
@@ -947,7 +947,7 @@ namespace VKE
 		// PipelineCache can save the cache when the next time create a pipeline
 		Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &GraphicPipeline);
 		RESULT_CHECK(Result, "Fail to create Graphics Pipelines.");
-		/** 2. Create second Pipeline*/
+		/** 2. Create second Pipeline: Particle rendering*/
 		{
 			// === Read in SPIR-V code of shaders === 
 			auto VertexShaderCode1 = FileIO::ReadFile("Content/Shaders/particle/particle.vert.spv");
@@ -1009,14 +1009,14 @@ namespace VKE
 
 			// Pre-multiplied alpha
 			ParticleColorStateAttachments.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			ParticleColorStateAttachments.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			ParticleColorStateAttachments.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
 			ParticleColorStateAttachments.colorBlendOp = VK_BLEND_OP_ADD;						// additive blending in PS.
 			// Blending color equation : (newColorAlpha * NewColor) + ((1 - newColorAlpha) * OldColor)
 
 			ParticleColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			ParticleColorStateAttachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			ParticleColorStateAttachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 			ParticleColorStateAttachments.alphaBlendOp = VK_BLEND_OP_ADD;
-			// Blending alpha equation (1 * newAlpha) + (0 * oldAlpha)
+			// Blending alpha equation (1 * newAlpha) + (1 * oldAlpha)
 
 			ParticleColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 			ParticleColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;					// Alternative to calculation is to use logical operations

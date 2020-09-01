@@ -104,7 +104,7 @@ void NextParticle(inout sParticle oParticle)
 	float sinAlpha = sin(Alpha);
 	float StartSpeed = randomRange(EmitterData.StartSpeedMin, EmitterData.StartSpeedMax, random(vec2(oParticle.Pos.x, oParticle.Pos.z)));
 	oParticle.Vel = vec3(sinAlpha * cosTheta, cos(Alpha), sinAlpha * sinTheta) * StartSpeed;	// normalized * Start Speed
-
+	
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
 	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
