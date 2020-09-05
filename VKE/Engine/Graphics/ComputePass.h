@@ -10,7 +10,7 @@
 
 namespace VKE
 {
-#define Particle_Count 16
+#define Particle_Count 100
 #define Dispatch_Size_X 16
 	struct FComputePass
 	{

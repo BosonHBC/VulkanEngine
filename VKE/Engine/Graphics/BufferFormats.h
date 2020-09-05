@@ -51,15 +51,18 @@ namespace VKE
 		struct FParticle
 		{
 			glm::vec3 Pos;
-			float ElpasedTime;
-			glm::vec3 Vel;
-			float LifeTime;
+			float ElpasedTime;							
 			
-			float Volume;
-			float padding[3];
+			glm::vec3 Vel;
+			float LifeTime;								// Life time of this particle
+			
+			glm::vec4 ColorOverlay = glm::vec4(1.0);	// Particle Color multiplier
+			
+			float Volume = 1.0;							// Particle Size multiplier
+			int Padding[3];
 		};
 
-		/** Emitter Data*/
+		/** Emitter Data */
 		struct FConeEmitter
 		{
 			float Radius = 1.0f;
@@ -70,6 +73,8 @@ namespace VKE
 			float StartDelayRangeMax = 2.0f;
 			float LifeTimeRangeMin = 2.0f;
 			float LifeTimeRangeMax = 3.0f;
+			glm::vec4 ColorOverLifeTimeStart = glm::vec4(1.0);
+			glm::vec4 ColorOverLifeTimeEnd = glm::vec4(1.0);
 		};
 
 		/** Support data for particles */

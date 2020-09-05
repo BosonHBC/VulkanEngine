@@ -6,6 +6,7 @@ layout (location = 2) in vec2 texCoord;
 // Instanced attributes
 layout (location = 3) in vec4 pos;
 layout (location = 4) in vec4 vel;
+layout (location = 5) in vec4 particleColor;
 
 // Uniforms buffer
 layout(set = 0, binding = 0) uniform sFrameData
@@ -26,6 +27,7 @@ layout(set = 0, binding = 1) uniform sDrawcallData
 layout (location = 0) out float elapsedTime;
 layout (location = 1) out float lifeTime;
 layout (location = 2) out vec2 fragTexCoord;
+layout (location = 3) out vec4 fragParticleColor;
 
 void main()
 {
@@ -34,12 +36,12 @@ void main()
     elapsedTime = pos.w;
     lifeTime = vel.w;
     fragTexCoord = texCoord;
-
+    fragParticleColor = particleColor;
     // Model matrix for individual quad
     mat4 Model = mat4(1.0);
     Model[3] = vec4(pos.xyz, 1.0);
     mat4 ModelView = ViewMatrix * ModelMatrix * Model;
-   /*
+   
     // Remove rotation to have a billboard effect
     // Column 0:
     ModelView[0][0] = 1;
@@ -53,6 +55,6 @@ void main()
     ModelView[2][0] = 0;
     ModelView[2][1] = 0;
     ModelView[2][2] = 1;
-*/
+
     gl_Position = ProjectionMatrix * ModelView * vec4(scale * vertexPos, 1.0);
 }

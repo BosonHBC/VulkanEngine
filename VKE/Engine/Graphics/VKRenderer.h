@@ -32,9 +32,9 @@ namespace VKE
 
 		void LoadAssets();
 
-		bool CreateModel(const std::string& ifileName, cModel*& oModel);
+		bool CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel);
 		// Scene Objects
-		std::vector<cModel*> RenderList;
+		std::vector<std::shared_ptr<cModel>> RenderList;
 	private:
 		// GLFW window
 		GLFWwindow* window;

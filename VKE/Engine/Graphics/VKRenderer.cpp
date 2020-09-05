@@ -25,7 +25,7 @@ namespace VKE
 {
 
 	//** Global Variables * /
-	cModel* GQuadModel = nullptr;
+	std::shared_ptr<cModel> GQuadModel = nullptr;
 
 	int VKRenderer::init(GLFWwindow* iWindow)
 	{
@@ -71,8 +71,11 @@ namespace VKE
 
 	void VKRenderer::tick(float dt)
 	{
-		RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
-		RenderList[0]->Transform.Update();
+		if (RenderList.size() > 0 && RenderList[0])
+		{
+			RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
+			RenderList[0]->Transform.Update();
+		}
 
 		if (pCompute)
 		{
@@ -80,7 +83,6 @@ namespace VKE
 			//pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
 			//pCompute->Emitter.Transform.Update();
 		}
-
 	}
 
 
@@ -212,17 +214,15 @@ namespace VKE
 		safe_delete(pCompute);
 
 		cTexture::Free();
-
 		// Clean up render list
-		GQuadModel->cleanUp();
-		safe_delete(GQuadModel);
 		for (auto Model : RenderList)
 		{
 			Model->cleanUp();
-			safe_delete(Model);
 		}
-		
 		RenderList.clear();
+
+		GQuadModel->cleanUp();		
+
 		// Clear all mesh assets
 		cMesh::Free();
 
@@ -271,18 +271,16 @@ namespace VKE
 	void VKRenderer::LoadAssets()
 	{
 		// Create Mesh
-		cModel* pContainerModel = nullptr;
-		cModel* pPlaneModel = nullptr;
+		std::shared_ptr<cModel> pContainerModel = nullptr;
+		std::shared_ptr<cModel> pPlaneModel = nullptr;
 
-		CreateModel("Container.obj", pContainerModel);
+		/*CreateModel("Container.obj", pContainerModel);
 		RenderList.push_back(pContainerModel);
+		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));*/
 
-		CreateModel("Plane.obj", pPlaneModel);
+		/*CreateModel("Plane.obj", pPlaneModel);
 		RenderList.push_back(pPlaneModel);
-
-		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
-
-		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));
+		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));*/
 		
 		CreateModel("Quad.obj", GQuadModel);
 		GQuadModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1));
@@ -973,7 +971,8 @@ namespace VKE
 			ParticleInstanceInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
 			ParticleInstanceInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
 
-			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[5];
+			const uint32_t ParticleInputAttributeDescriptionCount = 6;
+			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[ParticleInputAttributeDescriptionCount];
 			ParticleInputAttributeDescriptions[0] = VertexInputAttributeDescriptions[0];
 			ParticleInputAttributeDescriptions[1] = VertexInputAttributeDescriptions[1];
 			ParticleInputAttributeDescriptions[2] = VertexInputAttributeDescriptions[2];
@@ -988,17 +987,26 @@ namespace VKE
 			ParticleInputAttributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
 			ParticleInputAttributeDescriptions[4].offset = offsetof(BufferFormats::FParticle, Vel);
 
+			ParticleInputAttributeDescriptions[5].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[5].location = 5;
+			ParticleInputAttributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;				
+			ParticleInputAttributeDescriptions[5].offset = offsetof(BufferFormats::FParticle, ColorOverlay);
+
 			const uint32_t BindDescriptionCount = 2;
 			VkVertexInputBindingDescription BindingDescriptions[BindDescriptionCount] = { VertexBindDescription, ParticleInstanceInputBindingDescription };
 			// particle vertex data
 			VertexInputCreateInfo.vertexBindingDescriptionCount = BindDescriptionCount;
 			VertexInputCreateInfo.pVertexBindingDescriptions = BindingDescriptions;
-			VertexInputCreateInfo.vertexAttributeDescriptionCount = 5;
+			VertexInputCreateInfo.vertexAttributeDescriptionCount = ParticleInputAttributeDescriptionCount;
 			VertexInputCreateInfo.pVertexAttributeDescriptions = ParticleInputAttributeDescriptions;
 
-			// Change back to point list
-			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;				// VK_PRIMITIVE_TOPOLOGY_POINT_LIST will draw point
-
+			// No longer drawing point, instead is drawing bill board
+			//InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+			
+			// Disable DepthTest and DepthWrite for particles
+			DepthStencilCreateInfo.depthTestEnable = VK_FALSE;
+			DepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
+			
 			// Change blending stage
 			VkPipelineColorBlendStateCreateInfo ParticleColorBlendStateCreateInfo = {};
 
@@ -1498,7 +1506,7 @@ namespace VKE
 		throw std::runtime_error("Fail to find a matching format!");
 	}
 
-	bool VKRenderer::CreateModel(const std::string& ifileName, cModel*& oModel)
+	bool VKRenderer::CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel)
 	{
 		// Import model "scene"
 		Assimp::Importer Importer;
@@ -1546,7 +1554,7 @@ namespace VKE
 				Mesh->CreateDescriptorSet(SamplerDescriptorPool);
 			}
 		}
-		oModel = DBG_NEW cModel(Meshes);
+		oModel = std::make_shared<cModel>(Meshes);
 
 		return true;
 	}
@@ -1569,7 +1577,7 @@ namespace VKE
 		const uint32_t ClearColorCount = 3;
 		VkClearValue ClearValues[ClearColorCount] = {};
 		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };							// SwapChain image clear color, doesn't make any difference if the image is drawn properly
-		ClearValues[1].color = { 0.4f, 0.4f, 0.4f, 1.0f };							// Color attachment clear value
+		ClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };							// Color attachment clear value
 		ClearValues[2].depthStencil.depth = 1.0f;									// Depth attachment clear value
 
 		RenderPassBeginInfo.pClearValues = ClearValues;								// List of clear values 
@@ -1616,13 +1624,6 @@ namespace VKE
 		// Start the first sub-pass
 		// Bind Pipeline to be used in render pass
 		vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicPipeline);
-		/*
-			Deferred shading example:
-			G-Buffer pipeline, stores all data to multiple attachments
-			Switch to another pipeline, do lighting
-			Switch to another pipeline, do HDR
-			...
-		*/
 
 		// Draw all models in the render list
 		for (size_t j = 0; j < RenderList.size(); ++j)

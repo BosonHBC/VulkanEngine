@@ -11,23 +11,28 @@ const float firctionCoefficient = 0.5;
 struct sConeEmitter
 {
 	float Radius;
-	float Angle;				// in degree
+	float Angle;				// in radians
 	float StartSpeedMin;
 	float StartSpeedMax;
 	float StartDelayRangeMin;
 	float StartDelayRangeMax;
 	float LifeTimeRangeMin;
 	float LifeTimeRangeMax;
+	vec4 ColorOverLifeTimeStart;
+	vec4 ColorOverLifeTimeEnd;
 };
 
 struct sParticle
 {
 	vec3 Pos;
 	float ElpasedTime;
+	
 	vec3 Vel;
 	float LifeTime;
+
+	vec4 ColorOverlay;
+
 	float Volume;
-	float padding;
 };
 
 // Binding 0 : Position storage buffer
@@ -84,6 +89,11 @@ float randomRange(float min, float max, float rnd)
 	return rnd * (max - min) + min;
 }
 
+vec4 LerpV4(in vec4 a,in vec4 b, float t)
+{
+	return (b - a) * t + a;
+}
+
 layout( local_size_x = 16 ) in;
 
 void NextParticle(inout sParticle oParticle)
@@ -109,23 +119,27 @@ void NextParticle(inout sParticle oParticle)
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
 	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
 }
+
+const float frequency = 5;
 void main()
 {
 	uint gid = gl_GlobalInvocationID.x; // the .y and .z are both 1 in this case
-	Particles[ gid ].ElpasedTime += dt;
+	Particles[gid].ElpasedTime += dt;
 	// Only update particles with ElpasedTime greater than 0
-	if(Particles[ gid ].ElpasedTime < 0)
+	if(Particles[gid].ElpasedTime < 0)
 	{
 		return;
 	}
-	else if (Particles[ gid ].ElpasedTime >= Particles[gid].LifeTime)
+	else if (Particles[gid].ElpasedTime >= Particles[gid].LifeTime)
 	{
-		NextParticle(Particles[ gid ]);
+		NextParticle(Particles[gid]);
 	}
+	
+	float lifePercent = Particles[gid].ElpasedTime / Particles[gid].LifeTime;
 
-	vec3 p = Particles[ gid ].Pos;
-	vec3 v = Particles[ gid ].Vel;
-	vec3 a = DAMPING * v;
+	vec3 p = Particles[gid].Pos;
+	vec3 v = Particles[gid].Vel;
+	vec3 a = DAMPING * v + vec3(0, 0.25, 0.0);
 	if(p.y > groundY)
 	{
 		if(bUseGravity > 0)
@@ -138,6 +152,10 @@ void main()
 		// ground friction
 		a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
 	}
+
+	vec3 aNoise = vec3(randomRange(-10, 10, random(v)), 0, randomRange(-10, 10, random(p)));
+	a += aNoise;
+
 	vec3 pp = p + v * dt + 0.5 * dt * dt * a;
 	vec3 vp = v + a * dt;
 
@@ -150,6 +168,9 @@ void main()
 			vp.y = 0;
 	}
 
-	Particles[ gid ].Pos = pp;
-	Particles[ gid ].Vel = vp;
+	// update particle data
+	Particles[gid].Pos = pp;
+	Particles[gid].Vel = vp;
+	
+	Particles[gid].ColorOverlay = LerpV4(EmitterData.ColorOverLifeTimeStart, EmitterData.ColorOverLifeTimeEnd, lifePercent);
 }
