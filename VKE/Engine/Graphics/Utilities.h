@@ -47,6 +47,8 @@ namespace VKE
 	// ================================================
 	// =============== Global Variables =============== 
 	// ================================================
+	const extern GLuint WIDTH, HEIGHT;
+
 	const std::vector<const char*> ValidationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};

@@ -10,7 +10,7 @@
 #include "Descriptors/Descriptor_Buffer.h"
 #include "Descriptors/Descriptor_Dynamic.h"
 #include "Descriptors/Descriptor_Image.h"
-
+#include "Editor/Editor.h"
 // system
 #include <stdexcept>
 #include "stdlib.h"
@@ -1741,7 +1741,7 @@ namespace VKE
 		// Rendering
 		ImGui::Render();
 		ImDrawData* draw_data = ImGui::GetDrawData();
-		ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
+		ImGui_ImplVulkanH_Window* wd = Editor::GetMainWindowData();
 		wd->FrameIndex = SwapChain.ImageIndex;
 		ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
 		{

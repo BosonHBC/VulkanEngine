@@ -171,7 +171,7 @@ namespace VKE {
 
 			// ---------------------
 			/** Core update function to check and update binding maps. Should be called in a Tick function*/
-			void UpdateInput();
+			void Update();
 
 			bool bAppInFocus = true;
 

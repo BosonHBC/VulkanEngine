@@ -1,6 +1,5 @@
 #pragma once
 #include "glm/glm.hpp"
-#include "imgui/imgui_impl_vulkan.h"
 
 // Plug-ins
 #define STB_IMAGE_IMPLEMENTATION
@@ -25,6 +24,4 @@ namespace VKE
 	glm::vec2 GetMouseDelta();
 	extern uint64_t ElapsedFrame;
 	extern bool bWindowIconified;
-	extern ImGui_ImplVulkanH_Window g_MainWindowData;
-
 }
