@@ -36,6 +36,11 @@
 #define INSTANCE_BUFFER_BIND_ID 1
 
 #define PI 3.14159265359f
+
+#define ACCESSOR_INLINE(ClassName, PropertyName) \
+	const ClassName& Get##PropertyName() const { return PropertyName; }
+#define ACCESSOR_PTR_INLINE(ClassName, PropertyName) \
+	ClassName* Get##PropertyName() { return PropertyName; }
 namespace VKE
 {
 	// ================================================
@@ -56,8 +61,8 @@ namespace VKE
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
-	// Maximum 2 image on the queue
-	const int MAX_FRAME_DRAWS = 2;
+	// Maximum 3 image on the queue
+	const int MAX_FRAME_DRAWS = 3;
 	// Max objects are allowed in the scene
 	const int MAX_OBJECTS = 20;
 	

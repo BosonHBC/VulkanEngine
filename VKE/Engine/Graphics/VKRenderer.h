@@ -35,9 +35,28 @@ namespace VKE
 		bool CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel);
 		// Scene Objects
 		std::vector<std::shared_ptr<cModel>> RenderList;
+	
+		// Accessors
+		ACCESSOR_INLINE(VkInstance, vkInstance);
+		ACCESSOR_INLINE(VkSurfaceKHR, Surface);
+		ACCESSOR_INLINE(FMainDevice, MainDevice);
+		ACCESSOR_INLINE(FSwapChainData, SwapChain);
+		ACCESSOR_INLINE(FSwapChainDetail, SwapChainDetail);
+		ACCESSOR_INLINE(VkPipelineCache, PipelineCache);
+		ACCESSOR_INLINE(VkDescriptorPool, DescriptorPool);
+		ACCESSOR_PTR_INLINE(VkAllocationCallbacks, Allocator);
+		ACCESSOR_INLINE(std::vector<VkFramebuffer>, SwapChainFramebuffers);
+		ACCESSOR_INLINE(std::vector<VkCommandBuffer>, CommandBuffers);
+		ACCESSOR_INLINE(std::vector<VkSemaphore>, OnImageAvailables);
+		ACCESSOR_INLINE(std::vector <VkSemaphore>, OnRenderFinisheds);
+		ACCESSOR_INLINE(std::vector<VkFence>, DrawFences);
+		ACCESSOR_INLINE(std::vector <cImageBuffer>, ColorBuffers);
 	private:
 		// GLFW window
 		GLFWwindow* window;
+
+		// Custom Allocator
+		VkAllocationCallbacks*   Allocator = nullptr;
 
 		// Compute pass
 		FComputePass* pCompute = nullptr;
@@ -59,7 +78,8 @@ namespace VKE
 
 		// -Pipeline
 		VkRenderPass RenderPass;
-		
+
+		VkPipelineCache PipelineCache = VK_NULL_HANDLE;
 		// first pass
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;

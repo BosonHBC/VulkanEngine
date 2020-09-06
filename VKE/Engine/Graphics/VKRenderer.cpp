@@ -522,7 +522,7 @@ namespace VKE
 
 			SwapChain.Images[i] = SwapChainImage;
 		}
-		assert(MAX_FRAME_DRAWS < Images.size());
+		assert(MAX_FRAME_DRAWS <= Images.size());
 		printf("%d Image view has been created\n", SwapChainImageCount);
 	}
 
@@ -1297,18 +1297,27 @@ namespace VKE
 	void VKRenderer::createDescriptorPool()
 	{
 		// Type of descriptors + how many DESCRIPTORS, not DESCRIPTOR Sets (combined makes the pool size)
-		const uint32_t DescriptorTypeCount = 3;
-		VkDescriptorPoolSize PoolSize[DescriptorTypeCount] = {};
-		PoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		PoolSize[0].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
-		PoolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		PoolSize[1].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
-		PoolSize[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		PoolSize[2].descriptorCount = static_cast<uint32_t>(ColorBuffers.size() + DepthBuffers.size());
+		// in order to enable imgui, needs a larger descriptor pool
+		const uint32_t DescriptorTypeCount = 11;
+		const uint32_t MaxDescriptorsPerType = 1000;
+		VkDescriptorPoolSize PoolSize[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MaxDescriptorsPerType }
+		};
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size() + ColorBuffers.size());
+		PoolCreateInfo.maxSets = DescriptorTypeCount * MaxDescriptorsPerType;
 		PoolCreateInfo.poolSizeCount = DescriptorTypeCount;
 		PoolCreateInfo.pPoolSizes = PoolSize;
 
