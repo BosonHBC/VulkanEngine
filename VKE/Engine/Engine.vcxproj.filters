@@ -57,9 +57,6 @@
     <ClCompile Include="Graphics\VKRenderer.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Utilities.cpp">
-      <Filter>Source Files\Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="Transform\Transform.cpp">
       <Filter>Source Files\Transform</Filter>
     </ClCompile>
@@ -123,15 +120,18 @@
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
       <Filter>Source Files\ImGUI</Filter>
     </ClCompile>
+    <ClCompile Include="Time.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\Utilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\VKRenderer.h">
-      <Filter>Source Files\Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\Utilities.h">
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Transform\Transform.h">
@@ -211,6 +211,12 @@
     </ClInclude>
     <ClInclude Include="imgui\imgui_impl_vulkan.h">
       <Filter>Source Files\ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Time.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Utilities.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

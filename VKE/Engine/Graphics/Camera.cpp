@@ -1,9 +1,12 @@
 #include "Camera.h"
 #include "Engine.h"
+#include "Utilities.h"
+#include "Time.h"
 
 #include "glfw/glfw3.h"
 
 #include "stdio.h"
+#include "imgui/imgui.h"
 namespace VKE
 {
 	void cCamera::Update()
@@ -32,7 +35,7 @@ namespace VKE
 	{
 		if (!IsFloatZero(iAxis))
 		{
-			Transform.Translate(-Transform.Right() * m_translationSpeed  * iAxis * (float)dt());
+			Transform.Translate(-Transform.Right() * m_translationSpeed  * iAxis * (float)Time::DT);
 			bNeedUpdateCamera = true;
 		}
 	}
@@ -41,7 +44,7 @@ namespace VKE
 	{
 		if (!IsFloatZero(iAxis))
 		{
-			Transform.Translate(Transform.Forward() * m_translationSpeed * iAxis* (float)dt());
+			Transform.Translate(Transform.Forward() * m_translationSpeed * iAxis* (float)Time::DT);
 			bNeedUpdateCamera = true;
 		}
 	}
@@ -51,13 +54,21 @@ namespace VKE
 	{
 		if (!IsFloatZero(iAxis))
 		{
-			Transform.Translate(m_worldUp * m_translationSpeed * iAxis* (float)dt());
+			Transform.Translate(m_worldUp * m_translationSpeed * iAxis* (float)Time::DT);
 			bNeedUpdateCamera = true;
 		}
 	}
 
 	void cCamera::TurnCamera()
 	{
+		if (ImGui::GetIO().WantCaptureMouse) 
+			return;
+
+		if (!IsFloatZero(ImGui::GetIO().MouseWheel))
+		{
+			Transform.Translate(Transform.Forward() * ImGui::GetIO().MouseWheel * 3.0f * (float)Time::DT);
+			bNeedUpdateCamera = true;
+		}
 		glm::vec2 dMouse = GetMouseDelta();
 		if (!IsFloatZero(dMouse.x) || !IsFloatZero(dMouse.y))
 		{

@@ -837,6 +837,14 @@ void ImGui_ImplVulkan_Shutdown()
 
 void ImGui_ImplVulkan_Cleanup_External(const VkDevice& Device, const VkAllocationCallbacks* Allocator)
 {
+	ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
+	ImGui_ImplVulkanH_DestroyWindowRenderBuffers(v->Device, &g_MainWindowRenderBuffers, v->Allocator);
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
+	if (g_FontView) { vkDestroyImageView(Device, g_FontView, Allocator); g_FontView = VK_NULL_HANDLE; }
+	if (g_FontImage) { vkDestroyImage(Device, g_FontImage, Allocator); g_FontImage = VK_NULL_HANDLE; }
+	if (g_FontMemory) { vkFreeMemory(Device, g_FontMemory, Allocator); g_FontMemory = VK_NULL_HANDLE; }
+	if (g_FontSampler) { vkDestroySampler(Device, g_FontSampler, Allocator); g_FontSampler = VK_NULL_HANDLE; }
+
 	vkDestroyPipeline(Device, g_Pipeline, Allocator);
 	vkDestroyPipelineLayout(Device, g_PipelineLayout, Allocator);
 	vkDestroyDescriptorSetLayout(Device, g_DescriptorSetLayout, Allocator);

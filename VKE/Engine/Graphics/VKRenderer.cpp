@@ -1,7 +1,7 @@
 #include "VKRenderer.h"
 
 #include "ComputePass.h"
-
+// Engine
 #include "Camera.h"
 #include "Mesh/Mesh.h"
 #include "Texture/Texture.h"
@@ -11,16 +11,24 @@
 #include "Descriptors/Descriptor_Dynamic.h"
 #include "Descriptors/Descriptor_Image.h"
 
+// system
 #include <stdexcept>
 #include "stdlib.h"
 #include <set>
 #include "assert.h"
 
+// glm
 #include "glm/gtc/matrix_transform.hpp"
 
+// assimp
 #include "assimp/Importer.hpp"
 #include <assimp/scene.h>
 #include "assimp/postprocess.h"
+
+// imgui
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_vulkan.h"
+#include "imgui/imgui_impl_glfw.h"
 namespace VKE
 {
 
@@ -1152,6 +1160,7 @@ namespace VKE
 			vkDestroyImageView(MainDevice.LD, Image.ImgView, nullptr);
 		}
 		vkDestroySwapchainKHR(MainDevice.LD, SwapChain.SwapChain, nullptr);
+
 	}
 
 	void VKRenderer::createFrameBufferImage()
@@ -1627,7 +1636,7 @@ namespace VKE
 				0, nullptr);				// Not a Image memory barrier
 		}
 
-		// Begin Render Pass
+		// Begin first Render Pass
 		vkCmdBeginRenderPass(CB, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		// Start the first sub-pass
@@ -1727,6 +1736,30 @@ namespace VKE
 		}
 		// End Render Pass
 		vkCmdEndRenderPass(CB);
+		
+		// Begin second (imgui) render pass
+		// Rendering
+		ImGui::Render();
+		ImDrawData* draw_data = ImGui::GetDrawData();
+		ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
+		wd->FrameIndex = SwapChain.ImageIndex;
+		ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
+		{
+			VkRenderPassBeginInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			info.renderPass = wd->RenderPass;
+			info.framebuffer = fd->Framebuffer;
+			info.renderArea.extent.width = wd->Width;
+			info.renderArea.extent.height = wd->Height;
+			info.clearValueCount = 1;
+			info.pClearValues = &wd->ClearValue;
+			vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+		}
+
+		// Record dear imgui primitives into command buffer
+		ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
+		// End imgui render pass
+		vkCmdEndRenderPass(fd->CommandBuffer);
 
 		// Release barrier
 		if (pCompute->needSynchronization())
@@ -1755,7 +1788,6 @@ namespace VKE
 
 		Result = vkEndCommandBuffer(CB);
 		RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", SwapChain.ImageIndex);
-
 	}
 
 

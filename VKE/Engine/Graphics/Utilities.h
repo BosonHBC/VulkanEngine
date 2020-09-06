@@ -36,6 +36,7 @@
 #define INSTANCE_BUFFER_BIND_ID 1
 
 #define PI 3.14159265359f
+#define IsFloatZero(x) (x > -0.0001f && x < 0.0001f)
 
 #define ACCESSOR_INLINE(ClassName, PropertyName) \
 	const ClassName& Get##PropertyName() const { return PropertyName; }

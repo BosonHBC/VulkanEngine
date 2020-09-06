@@ -182,6 +182,7 @@
     <ClCompile Include="Input\InputDelegate.cpp" />
     <ClCompile Include="Input\UserInput.cpp" />
     <ClCompile Include="ParticleSystem\Emitter.cpp" />
+    <ClCompile Include="Time.cpp" />
     <ClCompile Include="Transform\Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -213,6 +214,7 @@
     <ClInclude Include="Input\InputDelegate.h" />
     <ClInclude Include="Input\UserInput.h" />
     <ClInclude Include="ParticleSystem\Emitter.h" />
+    <ClInclude Include="Time.h" />
     <ClInclude Include="Transform\Transform.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

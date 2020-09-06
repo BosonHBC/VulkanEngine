@@ -4,7 +4,8 @@
 #include "Graphics/VKRenderer.h"
 #include "Input/UserInput.h"
 #include "Camera.h"
-
+#include "Time.h"
+// glm
 #include "glm/glm.hpp"
 #include "glm/mat4x4.hpp"
 // Systems
@@ -13,7 +14,6 @@
 #include "Model/Model.h"
 // Imgui
 #include "imgui/imgui.h"
-#include "imgui/imgui_impl_vulkan.h"
 #include "imgui/imgui_impl_glfw.h"
 
 namespace VKE {
@@ -25,7 +25,6 @@ namespace VKE {
 	//=================== Parameters =================== 
 	GLFWwindow* g_Window;
 	VKRenderer* g_Renderer;
-	double g_deltaTime;
 	UserInput::FUserInput* g_Input;
 	cCamera* g_Camera;
 
@@ -51,6 +50,7 @@ namespace VKE {
 	// Imgui
 	void initImgui();
 	void cleanupImgui();
+	void check_vk_result(VkResult err);
 
 	int init()
 	{
@@ -77,22 +77,74 @@ namespace VKE {
 		}
 
 		double LastTime = glfwGetTime();
-
+		
+		bool show_demo_window = true;
+		bool show_another_window = false;
+		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
 
 			double now = glfwGetTime();
-			g_deltaTime = now - LastTime;
+			Time::DT = now - LastTime;
+			
 			LastTime = now;
-
+			// not minimized
 			if (!bWindowIconified)
 			{
+				// imgui stuffs
+				// Start the Dear ImGui frame
+				ImGui_ImplVulkan_NewFrame();
+				ImGui_ImplGlfw_NewFrame();
+				ImGui::NewFrame();
+
+				// Imgui windows
+				{
+					// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+					if (show_demo_window)
+						ImGui::ShowDemoWindow(&show_demo_window);
+
+					// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+					{
+						static float f = 0.0f;
+						static int counter = 0;
+
+						ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+						ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+						ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+						ImGui::Checkbox("Another Window", &show_another_window);
+
+						ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+						ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+						if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+							counter++;
+						ImGui::SameLine();
+						ImGui::Text("counter = %d", counter);
+
+						ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+						ImGui::End();
+					}
+
+					// 3. Show another simple window.
+					if (show_another_window)
+					{
+						ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+						ImGui::Text("Hello from another window!");
+						if (ImGui::Button("Close Me"))
+							show_another_window = false;
+						ImGui::End();
+					}
+				}
+
+				g_Renderer->tick((float)Time::DT);
+				g_Renderer->draw();
+
 				g_Input->UpdateInput();
 				g_Camera->Update();
 
-				g_Renderer->tick((float)g_deltaTime);
-				g_Renderer->draw();
+
 			}
 		}
 	}
@@ -123,11 +175,6 @@ namespace VKE {
 	glm::ivec2 GetWindowExtent()
 	{
 		return glm::ivec2(WIDTH, HEIGHT);
-	}
-
-	double dt()
-	{
-		return g_deltaTime;
 	}
 
 	glm::vec2 GetMouseDelta()
@@ -213,7 +260,7 @@ namespace VKE {
 		safe_delete(g_Camera);
 	}
 
-	static void check_vk_result(VkResult err)
+	void check_vk_result(VkResult err)
 	{
 		if (err == 0)
 			return;
@@ -255,8 +302,16 @@ namespace VKE {
 		wd->Swapchain = g_Renderer->GetSwapChain().SwapChain;
 		wd->Surface = g_Renderer->GetSurface();
 		wd->SurfaceFormat = g_Renderer->GetSwapChainDetail().getSurfaceFormat();
-		wd->PresentMode = g_Renderer->GetSwapChainDetail().getPresentationMode();
-		
+		wd->PresentMode = g_Renderer->GetSwapChainDetail().getPresentationMode();	
+		// Set up clearing value
+		wd->ClearEnable = false;
+		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+		memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
+		wd->FrameIndex = 0;		// would change during rendering
+		wd->ImageCount = 3;
+		wd->SemaphoreIndex = 0; // would change during rendering
+		wd->Frames = DBG_NEW ImGui_ImplVulkanH_Frame[wd->ImageCount];
+		wd->FrameSemaphores = DBG_NEW ImGui_ImplVulkanH_FrameSemaphores[wd->ImageCount];
 		// Create the Render Pass
 		{
 			VkAttachmentDescription attachment = {};
@@ -293,18 +348,52 @@ namespace VKE {
 			VkResult Result = vkCreateRenderPass(MainDevice.LD, &info, g_Renderer->GetAllocator(), &wd->RenderPass);
 			RESULT_CHECK(Result, "Fail to create render pass for imgui");
 		}
+		// Get VkImages
+		std::vector<VkImage> imguiImages(wd->ImageCount, VK_NULL_HANDLE);
+		{
+			VkResult err = vkGetSwapchainImagesKHR(MainDevice.LD, wd->Swapchain, &wd->ImageCount, imguiImages.data());
+			check_vk_result(err);
+		}
+		std::vector<VkImageView> imguiImageViews(wd->ImageCount, VK_NULL_HANDLE);
+		// Create The Image Views
+		{
+			VkImageViewCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			info.format = wd->SurfaceFormat.format;
+			info.components.r = VK_COMPONENT_SWIZZLE_R;
+			info.components.g = VK_COMPONENT_SWIZZLE_G;
+			info.components.b = VK_COMPONENT_SWIZZLE_B;
+			info.components.a = VK_COMPONENT_SWIZZLE_A;
+			VkImageSubresourceRange image_range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+			info.subresourceRange = image_range;
+			for (uint32_t i = 0; i < wd->ImageCount; i++)
+			{
+				info.image = imguiImages[i];
+				VkResult err = vkCreateImageView(MainDevice.LD, &info, g_Renderer->GetAllocator(), &imguiImageViews[i]);
+				RESULT_CHECK(err, "Fail to create imgui image views");
+			}
+		}
 		
-		// Set up clearing value
-		wd->ClearEnable = true;
-		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-		memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
-
-		wd->FrameIndex = 0;		// would change during rendering
-		wd->ImageCount = 3;
-		wd->SemaphoreIndex = 0; // would change during rendering
-		wd->Frames = DBG_NEW ImGui_ImplVulkanH_Frame[wd->ImageCount];
-		wd->FrameSemaphores = DBG_NEW ImGui_ImplVulkanH_FrameSemaphores[wd->ImageCount];
-
+		std::vector<VkFramebuffer> imguiFrameBuffers(wd->ImageCount, VK_NULL_HANDLE);
+		// Create Framebuffer
+		{
+			VkImageView attachment[1];
+			VkFramebufferCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			info.renderPass = wd->RenderPass;
+			info.attachmentCount = 1;
+			info.pAttachments = attachment;
+			info.width = wd->Width;
+			info.height = wd->Height;
+			info.layers = 1;
+			for (uint32_t i = 0; i < wd->ImageCount; i++)
+			{
+				attachment[0] = imguiImageViews[i];
+				VkResult err = vkCreateFramebuffer(MainDevice.LD, &info, g_Renderer->GetAllocator(), &imguiFrameBuffers[i]);
+				check_vk_result(err);
+			}
+		}
 		for (size_t i = 0; i < wd->ImageCount; ++i)
 		{
 			wd->Frames[i] = 
@@ -312,9 +401,9 @@ namespace VKE {
 				MainDevice.GraphicsCommandPool,
 				g_Renderer->GetCommandBuffers()[i],
 				g_Renderer->GetDrawFences()[i],
-				g_Renderer->GetColorBuffers()[i].GetImage(),
-				g_Renderer->GetColorBuffers()[i].GetImageView(),
-				g_Renderer->GetSwapChainFramebuffers()[i]
+				imguiImages[i],
+				imguiImageViews[i],
+				imguiFrameBuffers[i]
 			};
 			wd->FrameSemaphores[i] = 
 			{
@@ -339,6 +428,36 @@ namespace VKE {
 		init_info.CheckVkResultFn = check_vk_result;
 		// Create descriptor set, pipeline layout, pipeline, needs to be cleanup separately
 		ImGui_ImplVulkan_Init(&init_info, wd->RenderPass);
+
+		// Upload Fonts
+		{
+			// Use any command queue
+			VkCommandPool command_pool = wd->Frames[wd->FrameIndex].CommandPool;
+			VkCommandBuffer command_buffer = wd->Frames[wd->FrameIndex].CommandBuffer;
+
+			VkResult err = vkResetCommandPool(MainDevice.LD, command_pool, 0);
+			check_vk_result(err);
+			VkCommandBufferBeginInfo begin_info = {};
+			begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			err = vkBeginCommandBuffer(command_buffer, &begin_info);
+			check_vk_result(err);
+
+			ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+
+			VkSubmitInfo end_info = {};
+			end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			end_info.commandBufferCount = 1;
+			end_info.pCommandBuffers = &command_buffer;
+			err = vkEndCommandBuffer(command_buffer);
+			check_vk_result(err);
+			err = vkQueueSubmit(MainDevice.graphicQueue, 1, &end_info, VK_NULL_HANDLE);
+			check_vk_result(err);
+
+			err = vkDeviceWaitIdle(MainDevice.LD);
+			check_vk_result(err);
+			ImGui_ImplVulkan_DestroyFontUploadObjects();
+		}
 	}
 
 	void cleanupImgui()
@@ -347,12 +466,23 @@ namespace VKE {
 		// wait until the device is not doing anything (nothing on any queue)
 		vkDeviceWaitIdle(MainDevice.LD);
 		ImGui_ImplVulkan_Cleanup_External(MainDevice.LD, g_Renderer->GetAllocator());
+		
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
-		
+
+		// Imgui stuffs
+		ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
+		for (size_t i = 0; i < wd->ImageCount; ++i)
+		{
+			vkDestroyFramebuffer(MainDevice.LD, wd->Frames[i].Framebuffer, g_Renderer->GetAllocator());
+		}
+		vkDestroyRenderPass(MainDevice.LD, wd->RenderPass, g_Renderer->GetAllocator());
+		for (size_t i = 0; i < wd->ImageCount; ++i)
+		{
+			vkDestroyImageView(MainDevice.LD, wd->Frames[i].BackbufferView, g_Renderer->GetAllocator());
+		}
+
 		delete[] g_MainWindowData.Frames;
 		delete[] g_MainWindowData.FrameSemaphores;
-		// destroy newly created render pass
-		vkDestroyRenderPass(MainDevice.LD, g_MainWindowData.RenderPass, g_Renderer->GetAllocator());
 	}
 }
