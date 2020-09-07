@@ -79,7 +79,7 @@ namespace VKE {
 			if (!bWindowIconified)
 			{
 				// update editor
-				Editor::Update();
+				Editor::Update(g_Renderer);
 
 				g_Input->Update();
 

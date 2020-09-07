@@ -51,15 +51,15 @@ namespace VKE
 		ACCESSOR_INLINE(std::vector <VkSemaphore>, OnRenderFinisheds);
 		ACCESSOR_INLINE(std::vector<VkFence>, DrawFences);
 		ACCESSOR_INLINE(std::vector <cImageBuffer>, ColorBuffers);
+
+		// Compute pass
+		FComputePass* pCompute = nullptr;
 	private:
 		// GLFW window
 		GLFWwindow* window;
 
 		// Custom Allocator
 		VkAllocationCallbacks*   Allocator = nullptr;
-
-		// Compute pass
-		FComputePass* pCompute = nullptr;
 
 		// Vulkan Components
 		// - Main Components

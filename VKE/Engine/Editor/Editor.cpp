@@ -1,6 +1,9 @@
 #include "Editor.h"
 #include "VKRenderer.h"
 #include "Utilities.h"
+#include "ComputePass.h"
+#include "ParticleSystem/Emitter.h"
+#include "Descriptors/Descriptor_Buffer.h"
 // System
 #include "stdio.h"
 #include "assert.h"
@@ -13,45 +16,53 @@ namespace VKE
 	namespace Editor
 	{
 		bool GShow_demo_window = false;
-		
+
 		// Imgui
 		ImGui_ImplVulkanH_Window g_MainWindowData;
 
-		void Update()
+		void Update(VKRenderer* Renderer)
 		{
 			// Start the Dear ImGui frame
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
+			FComputePass* CP = Renderer->pCompute;
+
 			// Imgui windows
-			{
+
 				// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-				if (GShow_demo_window)
-					ImGui::ShowDemoWindow(&GShow_demo_window);
+			if (GShow_demo_window)
+				ImGui::ShowDemoWindow(&GShow_demo_window);
 
-				// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+			// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+			{
+				static float f = 0.0f;
+				static int counter = 0;
+
+				ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+				ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+				ImGui::Checkbox("Demo Window", &GShow_demo_window);      // Edit bool storing our window open/close state
+				//ImGui::Checkbox("Another Window", &show_another_window);
+
+				if (ImGui::SliderFloat("float", &CP->Emitters[0].EmitterData.Angle, 0.0f, glm::radians(90.f)))
 				{
-					static float f = 0.0f;
-					static int counter = 0;
-
-					ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-					ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-					ImGui::Checkbox("Demo Window", &GShow_demo_window);      // Edit bools storing our window open/close state
-					//ImGui::Checkbox("Another Window", &show_another_window);
-
-					ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-					//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-					if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-						counter++;
-					ImGui::SameLine();
-					ImGui::Text("counter = %d", counter);
-
-					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-					ImGui::End();
+					CP->Emitters[0].bNeedUpdate = true;
+					CP->Emitters[0].UpdateEmitterData(CP->Emitters[0].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2));
 				}
+				//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+				if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+					counter++;
+				ImGui::SameLine();
+				ImGui::Text("counter = %d", counter);
+
+				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+				ImGui::End();
 			}
+
+			
+
 		}
 
 		void Init(GLFWwindow* Window, VKRenderer* Renderer)

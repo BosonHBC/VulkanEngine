@@ -37,6 +37,8 @@
 
 #define PI 3.14159265359f
 #define IsFloatZero(x) (x > -0.0001f && x < 0.0001f)
+#define Particle_Count 100
+#define Dispatch_Size_X 16
 
 #define ACCESSOR_INLINE(ClassName, PropertyName) \
 	const ClassName& Get##PropertyName() const { return PropertyName; }
@@ -99,6 +101,8 @@ namespace VKE
 		VkQueue presentationQueue;				// Presentation Queue
 		FQueueFamilyIndices QueueFamilyIndices;		// Queue families
 		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
+
+		bool NeedSynchronization() const{ return QueueFamilyIndices.computeFamily != QueueFamilyIndices.graphicFamily; }
 	};
 
 	struct FSwapChainDetail

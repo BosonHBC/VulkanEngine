@@ -46,7 +46,18 @@ namespace VKE
 			T* Descriptor = dynamic_cast<T*>(Descriptors[Idx]);
 			return Descriptor;
 		}
+		
+		template <class T>
+		const T* const GetDescriptorAt_Immutable(size_t Idx) const
+		{
+			if (Idx >= Descriptors.size())
+			{
+				return nullptr;
+			}
 
+			T* Descriptor = dynamic_cast<T*>(Descriptors[Idx]);
+			return Descriptor;
+		}
 		const VkDescriptorSetLayout& GetDescriptorSetLayout() const;
 		const VkDescriptorSet& GetDescriptorSet() const { return DescriptorSet; }
 

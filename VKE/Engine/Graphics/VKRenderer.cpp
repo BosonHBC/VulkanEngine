@@ -65,7 +65,9 @@ namespace VKE
 			// Create compute pass
 			pCompute = DBG_NEW FComputePass();
 			if (pCompute)
+			{
 				pCompute->init(&MainDevice);
+			}
 		}
 		catch (const std::runtime_error &e)
 		{
@@ -85,9 +87,12 @@ namespace VKE
 			RenderList[0]->Transform.Update();
 		}
 
-		if (pCompute)
+		if (pCompute && pCompute->bNeedComputePass)
 		{
-			pCompute->ParticleSupportData.dt = dt;
+			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
+			{
+				pCompute->Emitters[i].ParticleSupportData.dt = dt;
+			}
 			//pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
 			//pCompute->Emitter.Transform.Update();
 		}
@@ -139,21 +144,26 @@ namespace VKE
 	void VKRenderer::postPresentationStage()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
-		// Wait for rendering finished
-		VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		if (pCompute && pCompute->bNeedComputePass)
+		{
+			// re-record commands
+			pCompute->recordComputeCommands();
+			// Wait for rendering finished
+			VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
-		// Submit compute commands
-		VkSubmitInfo ComputeSubmitInfo = {};
-		ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		ComputeSubmitInfo.commandBufferCount = 1;
-		ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
-		ComputeSubmitInfo.waitSemaphoreCount = 1;
-		ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
-		ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
-		ComputeSubmitInfo.signalSemaphoreCount = 1;
-		ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
-		VkResult Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
-		RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
+			// Submit compute commands
+			VkSubmitInfo ComputeSubmitInfo = {};
+			ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			ComputeSubmitInfo.commandBufferCount = 1;
+			ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
+			ComputeSubmitInfo.waitSemaphoreCount = 1;
+			ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
+			ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
+			ComputeSubmitInfo.signalSemaphoreCount = 1;
+			ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
+			VkResult Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
+			RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
+		}
 	}
 
 	void VKRenderer::draw()
@@ -218,9 +228,11 @@ namespace VKE
 
 		// Cleanup compute pass
 		if (pCompute)
+		{
 			pCompute->cleanUp();
-		safe_delete(pCompute);
-
+			safe_delete(pCompute);
+		}
+		
 		cTexture::Free();
 		// Clean up render list
 		for (auto Model : RenderList)
@@ -1123,8 +1135,6 @@ namespace VKE
 	{
 		vkDeviceWaitIdle(MainDevice.LD);
 
-		//pCompute->recreateSwapChain();
-
 		cleanupSwapChain();
 
 		createSwapChain();
@@ -1368,13 +1378,16 @@ namespace VKE
 				FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (i *DBuffer->GetSlotSize()));
 				*Drawcall = RenderList[i]->Transform.M();
 			}
-			// Particle is drawn after all render objects
-			FDrawCall* ParticleDrawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (RenderList.size() *DBuffer->GetSlotSize()));
-			*ParticleDrawcall = pCompute->Emitter.Transform.M();
-
+			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
+			{
+				// Particle is drawn after all render objects
+				FDrawCall* ParticleDrawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + ((RenderList.size() + i) * DBuffer->GetSlotSize()));
+				*ParticleDrawcall = pCompute->Emitters[i].Transform.M();
+			}
+			
 			// Copy Model data RenderList.Size() + Emitter.Size()
 			// Reuse void* Data
-			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + 1);
+			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + pCompute->Emitters.size());
 			DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
 		}
 
@@ -1607,24 +1620,18 @@ namespace VKE
 		VkResult Result = vkBeginCommandBuffer(CB, &BufferBeginInfo);
 		RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", SwapChain.ImageIndex);
 
-		const int& GraphicFamilyIndex = MainDevice.QueueFamilyIndices.graphicFamily;
-		const int& ComputeFamilyIndex = MainDevice.QueueFamilyIndices.computeFamily;
-		const cBuffer& StorageBuffer = pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(0)->GetBuffer();
-
 		/** Record part */
 		// Acquire barrier
 		if (pCompute->needSynchronization())
 		{
-			VkBufferMemoryBarrier BufferBarrier = {};
-			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-			BufferBarrier.srcAccessMask = 0;
-			BufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-			// Transfer ownership from compute queue to graphic queue
-			BufferBarrier.srcQueueFamilyIndex = ComputeFamilyIndex;
-			BufferBarrier.dstQueueFamilyIndex = GraphicFamilyIndex;
-			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
-			BufferBarrier.offset = 0;
-			BufferBarrier.size = StorageBuffer.BufferSize();
+			const uint32_t BarrierCount = 1;
+			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
+			
+			// Let graphic queue own the buffers
+			for (uint32_t i = 0; i < BarrierCount; ++i)
+			{
+				BufferBarriers[i] = pCompute->Emitters[i].GraphicOwnBarrier(0, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT);
+			}
 
 			// Block the vertex input stage until compute shader has finished
 			vkCmdPipelineBarrier(CB,
@@ -1632,7 +1639,7 @@ namespace VKE
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				0,							// No Dependency flag
 				0, nullptr,					// Not a Memory barrier
-				1, &BufferBarrier,			// A Buffer memory Barrier
+				BarrierCount, BufferBarriers,			// A Buffer memory Barrier
 				0, nullptr);				// Not a Image memory barrier
 		}
 
@@ -1700,33 +1707,36 @@ namespace VKE
 			VkDeviceSize Offsets[] = { 0 };
 			// Bind vertex buffer
 			vkCmdBindVertexBuffers(CB, VERTEX_BUFFER_BIND_ID, 1, &QuadMesh->GetVertexBuffer(), Offsets);
-
-			// Bind instance data buffer as a vertex buffer
-			vkCmdBindVertexBuffers(CB, INSTANCE_BUFFER_BIND_ID, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
-
 			// Bind index buffer
 			vkCmdBindIndexBuffer(CB, QuadMesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
+			{
+				// Update descriptor data
+				pCompute->Emitters[i].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->Emitters[i].ParticleSupportData);
 
-			// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
-			uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * RenderList.size();
+				// Bind instance data buffer as a vertex buffer
+				vkCmdBindVertexBuffers(CB, INSTANCE_BUFFER_BIND_ID, 1, &pCompute->Emitters[i].GetStorageBuffer().GetvkBuffer(), Offsets);
 
-			const uint32_t DescriptorSetCount = 2;
-			// Two descriptor sets
-			VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), ParticleDescriptorSet.GetDescriptorSet() };
+				// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
+				uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * (RenderList.size() + i);
 
-			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
-				0, DescriptorSetCount, DescriptorSetGroup,
-				1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
+				const uint32_t DescriptorSetCount = 2;
+				// Two descriptor sets
+				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), ParticleDescriptorSet.GetDescriptorSet() };
 
-			// draw the quad with multiple instance
-			vkCmdDrawIndexed(CB, QuadMesh->GetIndexCount(), Particle_Count, 0, 0, 0);
+				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
+					0, DescriptorSetCount, DescriptorSetGroup,
+					1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
+
+				// draw the quad with multiple instance
+				vkCmdDrawIndexed(CB, QuadMesh->GetIndexCount(), Particle_Count, 0, 0, 0);
+			}
 		}
 		// Start the third sub-pass
 		{
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipeline);
 
-			pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->ParticleSupportData);
 			// No need to bind vertex buffer or index buffer
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipelineLayout,
 				0, 1, &InputDescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
@@ -1764,17 +1774,14 @@ namespace VKE
 		// Release barrier
 		if (pCompute->needSynchronization())
 		{
-			VkBufferMemoryBarrier BufferBarrier = {};
-			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-			// The storage buffer is used as vertex input
-			BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-			BufferBarrier.dstAccessMask = 0;
-			// Transfer ownership from graphic queue to compute queue
-			BufferBarrier.srcQueueFamilyIndex = GraphicFamilyIndex;
-			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;
-			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
-			BufferBarrier.offset = 0;
-			BufferBarrier.size = StorageBuffer.BufferSize();
+			const uint32_t BarrierCount = 1;
+			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
+
+			// Let compute queue own the buffers
+			for (uint32_t i = 0; i < BarrierCount; ++i)
+			{
+				BufferBarriers[i] = pCompute->Emitters[i].ComputeOwnBarrier(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, 0);
+			}
 
 			// Block the compute shader until vertex shader finished reading the storage buffer
 			vkCmdPipelineBarrier(CB,
@@ -1782,7 +1789,7 @@ namespace VKE
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				0,							// No Dependency flag
 				0, nullptr,					// Not a Memory barrier
-				1, &BufferBarrier,			// A Buffer memory Barrier
+				BarrierCount, BufferBarriers,			// A Buffer memory Barrier
 				0, nullptr);				// Not a Image memory barrier
 		}
 

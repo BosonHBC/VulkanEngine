@@ -12,7 +12,7 @@ namespace VKE
 		* Renderer: Which vkRenderer this editor would use to render
 		*/
 		void Init(GLFWwindow* Window, VKRenderer* Renderer);
-		void Update();
+		void Update(VKRenderer* Renderer);
 		void CleanUp(VKRenderer* Renderer);
 
 		ImGui_ImplVulkanH_Window* GetMainWindowData();

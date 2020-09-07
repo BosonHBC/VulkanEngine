@@ -132,6 +132,9 @@
     <ClCompile Include="Editor\Editor.cpp">
       <Filter>Source Files\Editor</Filter>
     </ClCompile>
+    <ClCompile Include="ParticleSystem\ParticleSystem.cpp">
+      <Filter>Source Files\ParticleSystem</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h">
@@ -226,6 +229,9 @@
     </ClInclude>
     <ClInclude Include="Editor\Editor.h">
       <Filter>Source Files\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleSystem\ParticleSystem.h">
+      <Filter>Source Files\ParticleSystem</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
