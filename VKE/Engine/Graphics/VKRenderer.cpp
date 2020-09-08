@@ -61,13 +61,14 @@ namespace VKE
 				createPushConstantRange();
 			}
 			LoadAssets();
-			createGraphicsPipeline();
 			// Create compute pass
 			pCompute = DBG_NEW FComputePass();
 			if (pCompute)
 			{
 				pCompute->init(&MainDevice);
 			}
+			createGraphicsPipeline();
+
 		}
 		catch (const std::runtime_error &e)
 		{
@@ -275,7 +276,7 @@ namespace VKE
 				
 				InputDescriptorSets[i].cleanUp();
 			}
-			ParticleDescriptorSet.cleanUp();
+			
 			cDescriptorSet::CleanupDescriptorSetLayout(&MainDevice);
 		}
 
@@ -703,7 +704,6 @@ namespace VKE
 	{
 		// 1. Prepare DescriptorSet Info
 		size_t Count = SwapChain.Images.size();
-		ParticleDescriptorSet = cDescriptorSet(&MainDevice);
 		DescriptorSets.resize(Count, cDescriptorSet(&MainDevice));
 		InputDescriptorSets.resize(Count, cDescriptorSet(&MainDevice));
 		// Create Buffers
@@ -715,8 +715,6 @@ namespace VKE
 			InputDescriptorSets[i].CreateImageBufferDescriptor(&ColorBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			InputDescriptorSets[i].CreateImageBufferDescriptor(&DepthBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
-		cTexture* ParticleTestTex = cTexture::Get(1).get();
-		ParticleDescriptorSet.CreateImageBufferDescriptor(&ParticleTestTex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ParticleTestTex->GetImageInfo().imageLayout, ParticleTestTex->GetImageInfo().sampler);
 
 		// 2. Create Descriptor Pool
 		createDescriptorPool();
@@ -728,8 +726,7 @@ namespace VKE
 			// INPUT DESCRIPTOR LAYOUT
 			InputDescriptorSets[i].CreateDescriptorSetLayout(ThirdPass_frag);
 		}
-		// PARTICLE DESCRIPTOR LAYOUT
-		ParticleDescriptorSet.CreateDescriptorSetLayout(SecondPass_frag);
+
 		for (size_t i = 0; i < Count; ++i)
 		{
 			// 4. Allocate Descriptor sets
@@ -739,8 +736,6 @@ namespace VKE
 			DescriptorSets[i].BindDescriptorWithSet();
 			InputDescriptorSets[i].BindDescriptorWithSet();
 		}
-		ParticleDescriptorSet.AllocateDescriptorSet(SamplerDescriptorPool);
-		ParticleDescriptorSet.BindDescriptorWithSet();
 	}
 
 	void VKRenderer::createPushConstantRange()
@@ -1054,7 +1049,7 @@ namespace VKE
 
 			// Create Another pipeline layout
 			const uint32_t ParticleSetLayoutCount = 2;
-			VkDescriptorSetLayout ParticlePassLayouts[ParticleSetLayoutCount] = { DescriptorSets[0].GetDescriptorSetLayout(), ParticleDescriptorSet.GetDescriptorSetLayout() };
+			VkDescriptorSetLayout ParticlePassLayouts[ParticleSetLayoutCount] = { cDescriptorSet::GetDescriptorSetLayout(EDescriptorSetType::FirstPass_vert), cDescriptorSet::GetDescriptorSetLayout(EDescriptorSetType::ParticlePass_frag) };
 
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
 			PipelineLayoutCreateInfo1.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1592,6 +1587,7 @@ namespace VKE
 
 	void VKRenderer::recordCommands()
 	{
+		const uint32_t EmitterCount = pCompute->Emitters.size();
 		VkCommandBuffer& CB = CommandBuffers[SwapChain.ImageIndex];
 		// Begin info can be the same
 		VkCommandBufferBeginInfo BufferBeginInfo = {};
@@ -1624,11 +1620,10 @@ namespace VKE
 		// Acquire barrier
 		if (pCompute->needSynchronization())
 		{
-			const uint32_t BarrierCount = 1;
-			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
 			
 			// Let graphic queue own the buffers
-			for (uint32_t i = 0; i < BarrierCount; ++i)
+			for (uint32_t i = 0; i < EmitterCount; ++i)
 			{
 				BufferBarriers[i] = pCompute->Emitters[i].GraphicOwnBarrier(0, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT);
 			}
@@ -1637,10 +1632,10 @@ namespace VKE
 			vkCmdPipelineBarrier(CB,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-				0,							// No Dependency flag
-				0, nullptr,					// Not a Memory barrier
-				BarrierCount, BufferBarriers,			// A Buffer memory Barrier
-				0, nullptr);				// Not a Image memory barrier
+				0,										// No Dependency flag
+				0, nullptr,								// Not a Memory barrier
+				EmitterCount, BufferBarriers.data(),	// A Buffer memory Barrier
+				0, nullptr);							// Not a Image memory barrier
 		}
 
 		// Begin first Render Pass
@@ -1709,7 +1704,7 @@ namespace VKE
 			vkCmdBindVertexBuffers(CB, VERTEX_BUFFER_BIND_ID, 1, &QuadMesh->GetVertexBuffer(), Offsets);
 			// Bind index buffer
 			vkCmdBindIndexBuffer(CB, QuadMesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
+			for (size_t i = 0; i < EmitterCount; ++i)
 			{
 				// Update descriptor data
 				pCompute->Emitters[i].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->Emitters[i].ParticleSupportData);
@@ -1722,11 +1717,11 @@ namespace VKE
 
 				const uint32_t DescriptorSetCount = 2;
 				// Two descriptor sets
-				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), ParticleDescriptorSet.GetDescriptorSet() };
-
+				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), pCompute->Emitters[i].RenderDescriptorSet.GetDescriptorSet() };
+	
 				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
 					0, DescriptorSetCount, DescriptorSetGroup,
-					1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
+					1, &ParticleDynamicOffset);
 
 				// draw the quad with multiple instance
 				vkCmdDrawIndexed(CB, QuadMesh->GetIndexCount(), Particle_Count, 0, 0, 0);
@@ -1774,11 +1769,10 @@ namespace VKE
 		// Release barrier
 		if (pCompute->needSynchronization())
 		{
-			const uint32_t BarrierCount = 1;
-			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
 
 			// Let compute queue own the buffers
-			for (uint32_t i = 0; i < BarrierCount; ++i)
+			for (uint32_t i = 0; i < EmitterCount; ++i)
 			{
 				BufferBarriers[i] = pCompute->Emitters[i].ComputeOwnBarrier(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, 0);
 			}
@@ -1787,10 +1781,10 @@ namespace VKE
 			vkCmdPipelineBarrier(CB,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				0,							// No Dependency flag
-				0, nullptr,					// Not a Memory barrier
-				BarrierCount, BufferBarriers,			// A Buffer memory Barrier
-				0, nullptr);				// Not a Image memory barrier
+				0,										// No Dependency flag
+				0, nullptr,								// Not a Memory barrier
+				EmitterCount, BufferBarriers.data(),	// A Buffer memory Barrier
+				0, nullptr);							// Not a Image memory barrier
 		}
 
 		Result = vkEndCommandBuffer(CB);

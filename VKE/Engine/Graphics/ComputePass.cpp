@@ -32,8 +32,8 @@ namespace VKE
 		
 		// . Setup Emitter
 
-		Emitters.resize(1);
-		Emitters[0].Transform.SetPosition(glm::vec3(0.0, 1.0, 1.0));
+		Emitters.resize(2);
+		Emitters[0].Transform.SetPosition(glm::vec3(0.0, 0.0, 0.0));
 		Emitters[0].EmitterData.Radius = 0.2f;
 		Emitters[0].EmitterData.Angle = glm::radians(10.f);
 		Emitters[0].EmitterData.StartSpeedMin = 1.0f;
@@ -44,10 +44,23 @@ namespace VKE
 		Emitters[0].EmitterData.LifeTimeRangeMax = 1.5f;
 		Emitters[0].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f);
 		Emitters[0].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f);
+		
+		Emitters[1].Transform.SetPosition(glm::vec3(1.0, 0.0, 0.0));
+		Emitters[1].EmitterData.Radius = 0.1f;
+		Emitters[1].EmitterData.Angle = glm::radians(30.f);
+		Emitters[1].EmitterData.StartSpeedMin = 1.0f;
+		Emitters[1].EmitterData.StartSpeedMax = 1.5f;
+		Emitters[1].EmitterData.StartDelayRangeMin = 0.0f;
+		Emitters[1].EmitterData.StartDelayRangeMax = 2.0f;
+		Emitters[1].EmitterData.LifeTimeRangeMin = 1.5f;
+		Emitters[1].EmitterData.LifeTimeRangeMax = 1.5f;
+		Emitters[1].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f);
+		Emitters[1].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f);
 		for (size_t i = 0; i < Emitters.size(); ++i)
 		{
 			// . initialize data, create storage buffer and uniform buffer
-			Emitters[0].init(iMainDevice);
+			Emitters[i].init(iMainDevice);
+			Emitters[i].Transform.Update();
 		}
 		// . set up descriptor set related
 		prepareDescriptors();
@@ -73,15 +86,15 @@ namespace VKE
 		// . Record command lines
 		recordComputeCommands();
 
+		const uint32_t EmitterCount = Emitters.size();
 		// If graphics and compute queue family indices differ, acquire and immediately release the storage buffer, so that the initial acquire from the graphics command buffers are matched up properly
 		if (needSynchronization())
 		{
 			// Create a transient command buffer for setting up the initial buffer transfer state
 			VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(pMainDevice->LD, ComputeCommandPool);
 			
-			const uint32_t BarrierCount = 1;
-			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
-			for (uint32_t i = 0; i < BarrierCount; ++i)
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
+			for (uint32_t i = 0; i < EmitterCount; ++i)
 			{
 				BufferBarriers[i] = Emitters[i].ComputeOwnBarrier(0, VK_ACCESS_SHADER_WRITE_BIT);
 			}
@@ -91,10 +104,10 @@ namespace VKE
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				0,
 				0, nullptr,
-				BarrierCount, BufferBarriers,
+				EmitterCount, BufferBarriers.data(),
 				0, nullptr);
 			
-			for (uint32_t i = 0; i < BarrierCount; ++i)
+			for (uint32_t i = 0; i < EmitterCount; ++i)
 			{
 				BufferBarriers[i] = Emitters[i].GraphicOwnBarrier(VK_ACCESS_SHADER_WRITE_BIT, 0);
 			}
@@ -105,7 +118,7 @@ namespace VKE
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				0,
 				0, nullptr,
-				BarrierCount, BufferBarriers,
+				EmitterCount, BufferBarriers.data(),
 				0, nullptr);
 
 			EndCommandBuffer(TransferCommandBuffer, pMainDevice->LD, ComputeQueue, ComputeCommandPool);
@@ -134,6 +147,7 @@ namespace VKE
 
 	void FComputePass::recordComputeCommands()
 	{
+		const uint32_t EmitterCount = Emitters.size();
 		VkCommandBufferBeginInfo BufferBeginInfo = {};
 		BufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		//BufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -147,11 +161,10 @@ namespace VKE
 		// Add memory barrier to ensure that the (graphics) vertex shader has fetched attributes before compute starts to write to the buffer
 		if (needSynchronization())
 		{
-			const uint32_t BarrierCount = 1;
-			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
 
 			// Let compute queue own the buffers
-			for (uint32_t i = 0; i < BarrierCount; ++i)
+			for (uint32_t i = 0; i < EmitterCount; ++i)
 			{
 				// Compute shader will write data to the storage buffer
 				BufferBarriers[i] = Emitters[i].ComputeOwnBarrier(0, VK_ACCESS_SHADER_WRITE_BIT);
@@ -160,10 +173,10 @@ namespace VKE
 			vkCmdPipelineBarrier(CommandBuffer,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				0,								// No Dependency flag
-				0, nullptr,						// Not a Memory barrier
-				BarrierCount, BufferBarriers,	// Buffer memory Barriers
-				0, nullptr);					// Not a Image memory barrier
+				0,										// No Dependency flag
+				0, nullptr,								// Not a Memory barrier
+				EmitterCount, BufferBarriers.data(),	// Buffer memory Barriers
+				0, nullptr);							// Not a Image memory barrier
 		}
 
 		// Dispatch the compute job
@@ -178,11 +191,10 @@ namespace VKE
 		// Without this the (rendering) vertex shader may display incomplete results (partial data from last frame)
 		if (needSynchronization())
 		{
-			const uint32_t BarrierCount = 1;
-			VkBufferMemoryBarrier BufferBarriers[BarrierCount] = {};
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
 
 			// Let graphic queue own the buffers
-			for (uint32_t i = 0; i < BarrierCount; ++i)
+			for (uint32_t i = 0; i < EmitterCount; ++i)
 			{
 				BufferBarriers[i] = Emitters[i].GraphicOwnBarrier(VK_ACCESS_SHADER_WRITE_BIT, 0);
 			}
@@ -193,7 +205,7 @@ namespace VKE
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				0,
 				0, nullptr,
-				BarrierCount, BufferBarriers,
+				EmitterCount, BufferBarriers.data(),
 				0, nullptr);
 		}
 		Result = vkEndCommandBuffer(CommandBuffer);
@@ -222,16 +234,19 @@ namespace VKE
 		// 1. Create descriptor pools
 		//-------------------------------------------------------
 		{
-			const uint32_t DescriptorTypeCount = 2;
+			const uint32_t DescriptorTypeCount = 3;
+			const uint32_t MaxDescriptorsPerType = 10;
 			VkDescriptorPoolSize PoolSize[DescriptorTypeCount] = {};
 			PoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			PoolSize[0].descriptorCount = 10;
+			PoolSize[0].descriptorCount = MaxDescriptorsPerType;
 			PoolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			PoolSize[1].descriptorCount = 10;
+			PoolSize[1].descriptorCount = MaxDescriptorsPerType;
+			PoolSize[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			PoolSize[2].descriptorCount = MaxDescriptorsPerType;
 
 			VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 			PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			PoolCreateInfo.maxSets = 3;
+			PoolCreateInfo.maxSets = DescriptorTypeCount * MaxDescriptorsPerType;
 			PoolCreateInfo.poolSizeCount = DescriptorTypeCount;
 			PoolCreateInfo.pPoolSizes = PoolSize;
 
@@ -244,6 +259,10 @@ namespace VKE
 			Emitters[i].ComputeDescriptorSet.CreateDescriptorSetLayout(ComputePass);
 			Emitters[i].ComputeDescriptorSet.AllocateDescriptorSet(DescriptorPool);
 			Emitters[i].ComputeDescriptorSet.BindDescriptorWithSet();
+
+			Emitters[i].RenderDescriptorSet.CreateDescriptorSetLayout(ParticlePass_frag);
+			Emitters[i].RenderDescriptorSet.AllocateDescriptorSet(DescriptorPool);
+			Emitters[i].RenderDescriptorSet.BindDescriptorWithSet();
 		}
 		
 

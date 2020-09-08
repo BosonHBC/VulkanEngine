@@ -10,7 +10,7 @@ namespace VKE
 		FirstPass_vert,
 		ThirdPass_frag,
 		FirstPass_frag,
-		SecondPass_frag,
+		ParticlePass_frag,
 		ComputePass,
 		Invalid = uint8_t(-1),
 	};

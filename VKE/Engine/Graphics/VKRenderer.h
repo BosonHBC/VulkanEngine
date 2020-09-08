@@ -107,8 +107,6 @@ namespace VKE
 		VkPushConstantRange PushConstantRange;
 		// -- Sampler Descriptor Set
 		VkDescriptorPool SamplerDescriptorPool;
-		// Second pass
-		cDescriptorSet ParticleDescriptorSet;
 
 		// -- Input Descriptor Set
 		// Third pass

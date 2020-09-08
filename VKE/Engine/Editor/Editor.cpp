@@ -7,10 +7,13 @@
 // System
 #include "stdio.h"
 #include "assert.h"
+#include <algorithm>
 // imgui
 #include "imgui/imgui_impl_vulkan.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
+// glm
+#include "glm/glm.hpp"
 namespace VKE
 {
 	namespace Editor
@@ -45,11 +48,6 @@ namespace VKE
 				ImGui::Checkbox("Demo Window", &GShow_demo_window);      // Edit bool storing our window open/close state
 				//ImGui::Checkbox("Another Window", &show_another_window);
 
-				if (ImGui::SliderFloat("float", &CP->Emitters[0].EmitterData.Angle, 0.0f, glm::radians(90.f)))
-				{
-					CP->Emitters[0].bNeedUpdate = true;
-					CP->Emitters[0].UpdateEmitterData(CP->Emitters[0].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2));
-				}
 				//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
 				if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
@@ -61,6 +59,38 @@ namespace VKE
 				ImGui::End();
 			}
 
+			{
+				ImGui::Begin("Particles");
+				static int currentParticle = 0;
+
+				ImGui::InputInt("Current Index", &currentParticle);
+				currentParticle = glm::clamp(currentParticle, 0, static_cast<int>(CP->Emitters.size()- 1));
+				bool NeedToUpdateParticle = false;
+				for (size_t i = 0; i < CP->Emitters.size(); ++i)
+				{
+					if (currentParticle != i)
+					{
+						continue;
+					}
+
+					if (ImGui::SliderFloat("Cone Angle", &CP->Emitters[i].EmitterData.Angle, 0.01f, glm::radians(90.f)))
+					{
+						NeedToUpdateParticle = true;
+					}
+
+					if (ImGui::SliderFloat("Cone Radius", &CP->Emitters[i].EmitterData.Radius, 0.01f, 5.f))
+					{
+						NeedToUpdateParticle = true;
+					}
+
+					if (NeedToUpdateParticle)
+					{
+						CP->Emitters[i].bNeedUpdate = true;
+						CP->Emitters[i].UpdateEmitterData(CP->Emitters[i].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2));
+					}
+				}
+				ImGui::End();
+			}
 			
 
 		}

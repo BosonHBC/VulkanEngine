@@ -1,5 +1,6 @@
 #include "Emitter.h"
 #include "Utilities.h"
+#include "Texture/Texture.h"
 #include "Descriptors/Descriptor_Buffer.h"
 
 namespace VKE
@@ -18,7 +19,7 @@ namespace VKE
 	void cEmitter::init(FMainDevice* const iMainDevice)
 	{
 		ComputeDescriptorSet.pMainDevice = iMainDevice;
-
+		RenderDescriptorSet.pMainDevice = iMainDevice;
 		// Create storage buffer
 		// Initialize the particle data
 		for (size_t i = 0; i < Particle_Count; ++i)
@@ -100,6 +101,11 @@ namespace VKE
 
 		// Binding = 2, emitter data
 		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FConeEmitter), 1, VK_SHADER_STAGE_COMPUTE_BIT);
+
+		// Particle DescriptorSet
+		cTexture* ParticleTestTex = cTexture::Get(1).get();
+		RenderDescriptorSet.CreateImageBufferDescriptor(&ParticleTestTex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ParticleTestTex->GetImageInfo().imageLayout, ParticleTestTex->GetImageInfo().sampler);
+
 		// Update initial particle data
 		UpdateEmitterData(ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2));
 	}
@@ -107,6 +113,7 @@ namespace VKE
 	void cEmitter::cleanUp()
 	{
 		ComputeDescriptorSet.cleanUp();
+		RenderDescriptorSet.cleanUp();
 	}
 
 	void cEmitter::NextParticle(BufferFormats::FParticle& oParticle)

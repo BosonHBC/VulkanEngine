@@ -25,7 +25,8 @@ namespace VKE
 		BufferFormats::FConeEmitter EmitterData;
 		bool bNeedUpdate = true;
 
-		cDescriptorSet ComputeDescriptorSet;
+		cDescriptorSet ComputeDescriptorSet;		// Used in compute shader Storage buffer, uniform buffer
+		cDescriptorSet RenderDescriptorSet;		// Used in vertex / fragment shader when rendering, currently is for sampler
 
 		void NextParticle(BufferFormats::FParticle& oParticle);
 		void UpdateEmitterData(cDescriptor_Buffer* Descriptor);
