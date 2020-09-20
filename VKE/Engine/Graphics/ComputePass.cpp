@@ -32,30 +32,57 @@ namespace VKE
 		
 		// . Setup Emitter
 
-		Emitters.resize(2);
-		Emitters[0].Transform.SetPosition(glm::vec3(0.0, 0.0, 0.0));
-		Emitters[0].EmitterData.Radius = 0.2f;
+		Emitters.resize(3);
+		Emitters[0].Transform.SetPosition(glm::vec3(0.0, 0.1, 0.0));
+		Emitters[0].EmitterData.Radius = 0.15f;
 		Emitters[0].EmitterData.Angle = glm::radians(10.f);
 		Emitters[0].EmitterData.StartSpeedMin = 1.0f;
 		Emitters[0].EmitterData.StartSpeedMax = 1.5f;
 		Emitters[0].EmitterData.StartDelayRangeMin = 0.0f;
 		Emitters[0].EmitterData.StartDelayRangeMax = 2.0f;
-		Emitters[0].EmitterData.LifeTimeRangeMin = 1.5f;
-		Emitters[0].EmitterData.LifeTimeRangeMax = 1.5f;
+		Emitters[0].EmitterData.LifeTimeRangeMin = 1.2f;
+		Emitters[0].EmitterData.LifeTimeRangeMax = 1.2f;
+		Emitters[0].EmitterData.StartColor = glm::vec4(1.0f);
 		Emitters[0].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f);
 		Emitters[0].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f);
-		
-		Emitters[1].Transform.SetPosition(glm::vec3(1.0, 0.0, 0.0));
+		Emitters[0].EmitterData.StartSizeMin = 0.1f;
+		Emitters[0].EmitterData.StartSizeMax = 0.2f;
+		Emitters[0].EmitterData.NoiseMin = -30.0f;
+		Emitters[0].EmitterData.NoiseMax = 30.0f;
+
+		Emitters[1].Transform.SetPosition(glm::vec3(0.0, -0.1, 0.0));
 		Emitters[1].EmitterData.Radius = 0.1f;
-		Emitters[1].EmitterData.Angle = glm::radians(30.f);
+		Emitters[1].EmitterData.Angle = glm::radians(5.f);
 		Emitters[1].EmitterData.StartSpeedMin = 1.0f;
 		Emitters[1].EmitterData.StartSpeedMax = 1.5f;
 		Emitters[1].EmitterData.StartDelayRangeMin = 0.0f;
-		Emitters[1].EmitterData.StartDelayRangeMax = 2.0f;
-		Emitters[1].EmitterData.LifeTimeRangeMin = 1.5f;
-		Emitters[1].EmitterData.LifeTimeRangeMax = 1.5f;
-		Emitters[1].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f);
+		Emitters[1].EmitterData.StartDelayRangeMax = 1.0f;
+		Emitters[1].EmitterData.LifeTimeRangeMin = 0.7f;
+		Emitters[1].EmitterData.LifeTimeRangeMax = 0.8f;
+		Emitters[1].EmitterData.StartColor = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
+		Emitters[1].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f) ;
 		Emitters[1].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f);
+		Emitters[1].EmitterData.StartSizeMin = 0.8f;
+		Emitters[1].EmitterData.StartSizeMax = 0.9f;
+		Emitters[1].EmitterData.NoiseMin = -5.0f;
+		Emitters[1].EmitterData.NoiseMax = 5.0f;
+
+		Emitters[2].Transform.SetPosition(glm::vec3(1.0, -0.1, 0.0));
+		Emitters[2].EmitterData.Radius = 0.1f;
+		Emitters[2].EmitterData.Angle = glm::radians(5.f);
+		Emitters[2].EmitterData.StartSpeedMin = 1.0f;
+		Emitters[2].EmitterData.StartSpeedMax = 1.5f;
+		Emitters[2].EmitterData.StartDelayRangeMin = 0.0f;
+		Emitters[2].EmitterData.StartDelayRangeMax = 1.0f;
+		Emitters[2].EmitterData.LifeTimeRangeMin = 0.7f;
+		Emitters[2].EmitterData.LifeTimeRangeMax = 0.8f;
+		Emitters[2].EmitterData.StartColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+		Emitters[2].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f) * glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
+		Emitters[2].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f) * glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
+		Emitters[2].EmitterData.StartSizeMin = 0.8f;
+		Emitters[2].EmitterData.StartSizeMax = 0.9f;
+		Emitters[2].EmitterData.NoiseMin = -5.0f;
+		Emitters[2].EmitterData.NoiseMax = 5.0f;
 		for (size_t i = 0; i < Emitters.size(); ++i)
 		{
 			// . initialize data, create storage buffer and uniform buffer

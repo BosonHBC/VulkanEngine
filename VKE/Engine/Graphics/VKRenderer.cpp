@@ -986,7 +986,7 @@ namespace VKE
 			ParticleInstanceInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
 			ParticleInstanceInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
 
-			const uint32_t ParticleInputAttributeDescriptionCount = 6;
+			const uint32_t ParticleInputAttributeDescriptionCount = 7;
 			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[ParticleInputAttributeDescriptionCount];
 			ParticleInputAttributeDescriptions[0] = VertexInputAttributeDescriptions[0];
 			ParticleInputAttributeDescriptions[1] = VertexInputAttributeDescriptions[1];
@@ -1006,6 +1006,11 @@ namespace VKE
 			ParticleInputAttributeDescriptions[5].location = 5;
 			ParticleInputAttributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;				
 			ParticleInputAttributeDescriptions[5].offset = offsetof(BufferFormats::FParticle, ColorOverlay);
+
+			ParticleInputAttributeDescriptions[6].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[6].location = 6;
+			ParticleInputAttributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			ParticleInputAttributeDescriptions[6].offset = offsetof(BufferFormats::FParticle, Volume);
 
 			const uint32_t BindDescriptionCount = 2;
 			VkVertexInputBindingDescription BindingDescriptions[BindDescriptionCount] = { VertexBindDescription, ParticleInstanceInputBindingDescription };

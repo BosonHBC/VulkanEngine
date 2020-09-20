@@ -128,6 +128,9 @@ namespace VKE
 		oPos.x += R * cosTheta;
 		oPos.z += R * sinTheta;
 		oParticle.Pos = oPos;
+		
+		// Size
+		oParticle.Volume = RandRange(EmitterData.StartSizeMin, EmitterData.StartSizeMax);
 
 		// Velocity
 		float PercentageToCenter = R / EmitterData.Radius;

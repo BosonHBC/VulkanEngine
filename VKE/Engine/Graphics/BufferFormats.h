@@ -69,12 +69,20 @@ namespace VKE
 			float Angle = 45.f;		// in degree
 			float StartSpeedMin = 1.0f;
 			float StartSpeedMax = 1.0f;
+
 			float StartDelayRangeMin = 0.0f;
 			float StartDelayRangeMax = 2.0f;
 			float LifeTimeRangeMin = 2.0f;
 			float LifeTimeRangeMax = 3.0f;
+
+			glm::vec4 StartColor = glm::vec4(1.0);
 			glm::vec4 ColorOverLifeTimeStart = glm::vec4(1.0);
 			glm::vec4 ColorOverLifeTimeEnd = glm::vec4(1.0);
+
+			float StartSizeMin = 1.0;
+			float StartSizeMax = 1.0;
+			float NoiseMin = 0.0f;
+			float NoiseMax = 0.0f;
 		};
 
 		/** Support data for particles */

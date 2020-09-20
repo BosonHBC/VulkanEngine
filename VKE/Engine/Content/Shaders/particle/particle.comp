@@ -18,8 +18,14 @@ struct sConeEmitter
 	float StartDelayRangeMax;
 	float LifeTimeRangeMin;
 	float LifeTimeRangeMax;
+	vec4 StartColor;
 	vec4 ColorOverLifeTimeStart;
 	vec4 ColorOverLifeTimeEnd;
+	float StartSizeMin;
+	float StartSizeMax;
+	float NoiseMin;
+	float NoiseMax;
+
 };
 
 struct sParticle
@@ -108,6 +114,9 @@ void NextParticle(inout sParticle oParticle)
 	oPos.z += R * sinTheta;
 	oParticle.Pos = oPos;
 
+	// Volume
+	oParticle.Volume = randomRange(EmitterData.StartSizeMin, EmitterData.StartSizeMax,random(vec2(oParticle.Pos.z, oParticle.Pos.y)));
+
 	// Velocity
 	float PercentageToCenter = R / EmitterData.Radius;
 	float Alpha = PercentageToCenter * EmitterData.Angle;
@@ -118,6 +127,11 @@ void NextParticle(inout sParticle oParticle)
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
 	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
+}
+
+bool isFloatZero(float f)
+{
+	return abs(f) < 0.0001;
 }
 
 const float frequency = 5;
@@ -153,9 +167,13 @@ void main()
 		a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
 	}
 
-	vec3 aNoise = vec3(randomRange(-10, 10, random(v)), 0, randomRange(-10, 10, random(p)));
-	a += aNoise;
-
+	// Enable noise if there is one
+	if(!isFloatZero(EmitterData.NoiseMin) || !isFloatZero(EmitterData.NoiseMax))
+	{
+		vec3 aNoise = vec3(randomRange(EmitterData.NoiseMin, EmitterData.NoiseMax, random(v)), 0, randomRange(EmitterData.NoiseMin, EmitterData.NoiseMax, random(p)));
+		a += aNoise;
+	}
+	
 	vec3 pp = p + v * dt + 0.5 * dt * dt * a;
 	vec3 vp = v + a * dt;
 
@@ -172,5 +190,5 @@ void main()
 	Particles[gid].Pos = pp;
 	Particles[gid].Vel = vp;
 	
-	Particles[gid].ColorOverlay = LerpV4(EmitterData.ColorOverLifeTimeStart, EmitterData.ColorOverLifeTimeEnd, lifePercent);
+	Particles[gid].ColorOverlay = LerpV4(EmitterData.StartColor * EmitterData.ColorOverLifeTimeStart, EmitterData.StartColor * EmitterData.ColorOverLifeTimeEnd, lifePercent);
 }
