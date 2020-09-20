@@ -55,8 +55,9 @@ namespace VKE
 			// Descriptor set and push constant related
 			{		
 				// Create Texture
-				cTexture::Load("DefaultWhite.png", MainDevice);
+				cTexture::Load("DefaultWhite.png", MainDevice);	// ID = 0, default white texture
 				cTexture::Load("fireParticles/TXT_Sparks_01.tga", MainDevice);
+				cTexture::Load("fireParticles/TXT_Fire_01.tga", MainDevice);
 				CreateDescriptorSets();
 				createPushConstantRange();
 			}

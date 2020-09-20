@@ -12,6 +12,7 @@
 #include "imgui/imgui_impl_vulkan.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_internal.h"
 // glm
 #include "glm/glm.hpp"
 namespace VKE
@@ -19,7 +20,7 @@ namespace VKE
 	namespace Editor
 	{
 		bool GShow_demo_window = false;
-
+		bool GbMovingWindow = false;
 		// Imgui
 		ImGui_ImplVulkanH_Window g_MainWindowData;
 

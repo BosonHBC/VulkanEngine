@@ -25,6 +25,8 @@ struct sConeEmitter
 	float StartSizeMax;
 	float NoiseMin;
 	float NoiseMax;
+	float StartRotationMin;
+	float StartRotationMax;
 
 };
 
@@ -39,6 +41,7 @@ struct sParticle
 	vec4 ColorOverlay;
 
 	float Volume;
+	float RotationAlongZ;
 };
 
 // Binding 0 : Position storage buffer
@@ -83,6 +86,10 @@ float floatConstruct( uint m ) {
     float  f = uintBitsToFloat( m );       // Range [1:2]
     return f - 1.0;                        // Range [0:1]
 }
+bool isFloatZero(float f)
+{
+	return abs(f) < 0.0001;
+}
 
 // Pseudo-random value in half-open range [0:1].
 float random( float x ) { return floatConstruct(hash(floatBitsToUint(x))); }
@@ -91,7 +98,10 @@ float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 
 float randomRange(float min, float max, float rnd)
-{
+{	
+	// if min and max is almost the same, no need to get random between
+	if(isFloatZero(max - min)) 
+		return min;
 	return rnd * (max - min) + min;
 }
 
@@ -116,6 +126,8 @@ void NextParticle(inout sParticle oParticle)
 
 	// Volume
 	oParticle.Volume = randomRange(EmitterData.StartSizeMin, EmitterData.StartSizeMax,random(vec2(oParticle.Pos.z, oParticle.Pos.y)));
+	// Rotation
+	oParticle.RotationAlongZ = randomRange(EmitterData.StartRotationMin, EmitterData.StartRotationMax,random(vec2(oParticle.Pos.x, oParticle.Pos.y)));
 
 	// Velocity
 	float PercentageToCenter = R / EmitterData.Radius;
@@ -127,11 +139,6 @@ void NextParticle(inout sParticle oParticle)
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
 	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
-}
-
-bool isFloatZero(float f)
-{
-	return abs(f) < 0.0001;
 }
 
 const float frequency = 5;

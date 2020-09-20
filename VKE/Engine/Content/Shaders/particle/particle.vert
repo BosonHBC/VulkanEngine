@@ -7,7 +7,7 @@ layout (location = 2) in vec2 texCoord;
 layout (location = 3) in vec4 pos;
 layout (location = 4) in vec4 vel;
 layout (location = 5) in vec4 particleColor;
-layout (location = 6) in vec4 volume;
+layout (location = 6) in vec4 volume;       // volume.x -> size, volume.y -> rotation along Z axis
 
 // Uniforms buffer
 layout(set = 0, binding = 0) uniform sFrameData
@@ -33,6 +33,7 @@ layout (location = 3) out vec4 fragParticleColor;
 void main()
 {
     float scale = volume.x;
+    float rotationAlongZ = volume.y;
     // pass particle time to FS
     elapsedTime = pos.w;
     lifeTime = vel.w;
@@ -43,19 +44,20 @@ void main()
     Model[3] = vec4(pos.xyz, 1.0);
     mat4 ModelView = ViewMatrix * ModelMatrix * Model;
    
-    // Remove rotation to have a billboard effect
+    // Bill board effect
+    // Remove rotation on X, Y axis, but keep the Z axis rotation if there is one
     // Column 0:
-    ModelView[0][0] = 1;
-    ModelView[0][1] = 0;
+    ModelView[0][0] = cos(rotationAlongZ);
+    ModelView[0][1] = sin(rotationAlongZ);
     ModelView[0][2] = 0;
     // Column 1:
-    ModelView[1][0] = 0;
-    ModelView[1][1] = 1;
+    ModelView[1][0] = -sin(rotationAlongZ);
+    ModelView[1][1] = cos(rotationAlongZ);
     ModelView[1][2] = 0;
     // Column 2:
     ModelView[2][0] = 0;
     ModelView[2][1] = 0;
-    ModelView[2][2] = 1;
+    ModelView[2][2] = 1.0;
 
     gl_Position = ProjectionMatrix * ModelView * vec4(scale * vertexPos, 1.0);
 }

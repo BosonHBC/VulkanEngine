@@ -8,6 +8,11 @@
 
 namespace VKE
 {
+	enum EDefaultTextureID : uint8_t
+	{
+		White = 0,
+		Count = 1,
+	};
 	class cTexture
 	{
 	public:

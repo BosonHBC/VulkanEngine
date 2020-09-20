@@ -75,12 +75,13 @@ namespace VKE {
 			Time::DT = now - LastTime;
 			
 			LastTime = now;
+			
+			// update editor
+			Editor::Update(g_Renderer);
+			
 			// not minimized
-			if (!bWindowIconified)
+			if (!bWindowIconified && !Editor::GbMovingWindow)
 			{
-				// update editor
-				Editor::Update(g_Renderer);
-
 				g_Input->Update();
 
 				g_Camera->Update();

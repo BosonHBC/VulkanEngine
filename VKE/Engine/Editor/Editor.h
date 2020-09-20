@@ -15,6 +15,9 @@ namespace VKE
 		void Update(VKRenderer* Renderer);
 		void CleanUp(VKRenderer* Renderer);
 
+		/** if the window is moving by the mouse*/
+		extern bool GbMovingWindow;
+
 		ImGui_ImplVulkanH_Window* GetMainWindowData();
 	}
 }

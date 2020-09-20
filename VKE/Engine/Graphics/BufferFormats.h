@@ -59,7 +59,8 @@ namespace VKE
 			glm::vec4 ColorOverlay = glm::vec4(1.0);	// Particle Color multiplier
 			
 			float Volume = 1.0;							// Particle Size multiplier
-			int Padding[3];
+			float RotationAlongZ = 0.0;					// Billboard rotation
+			int Padding[2];
 		};
 
 		/** Emitter Data */
@@ -83,6 +84,9 @@ namespace VKE
 			float StartSizeMax = 1.0;
 			float NoiseMin = 0.0f;
 			float NoiseMax = 0.0f;
+
+			float StartRotationMin = 0.0f;
+			float StartRotationMax = 0.0f;
 		};
 
 		/** Support data for particles */

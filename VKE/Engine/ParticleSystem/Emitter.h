@@ -1,6 +1,7 @@
 #pragma once
 #include "Transform/Transform.h"
 #include "BufferFormats.h"
+#include "Texture/Texture.h"
 #include "Utilities.h"
 #include "Descriptors/DescriptorSet.h"
 #include "Buffer/Buffer.h"
@@ -21,12 +22,13 @@ namespace VKE
 
 		BufferFormats::FParticle Particles[Particle_Count];
 		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
+		std::shared_ptr<cTexture> TextureToUse;									// Texture to use in this emitter
 		cTransform Transform;
 		BufferFormats::FConeEmitter EmitterData;
 		bool bNeedUpdate = true;
 
 		cDescriptorSet ComputeDescriptorSet;		// Used in compute shader Storage buffer, uniform buffer
-		cDescriptorSet RenderDescriptorSet;		// Used in vertex / fragment shader when rendering, currently is for sampler
+		cDescriptorSet RenderDescriptorSet;			// Used in vertex / fragment shader when rendering, currently is for sampler
 
 		void NextParticle(BufferFormats::FParticle& oParticle);
 		void UpdateEmitterData(cDescriptor_Buffer* Descriptor);

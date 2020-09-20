@@ -102,12 +102,18 @@ namespace VKE
 		// Binding = 2, emitter data
 		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FConeEmitter), 1, VK_SHADER_STAGE_COMPUTE_BIT);
 
-		// Particle DescriptorSet
-		cTexture* ParticleTestTex = cTexture::Get(1).get();
-		RenderDescriptorSet.CreateImageBufferDescriptor(&ParticleTestTex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ParticleTestTex->GetImageInfo().imageLayout, ParticleTestTex->GetImageInfo().sampler);
-
 		// Update initial particle data
 		UpdateEmitterData(ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2));
+
+		// Particle DescriptorSet
+
+		if (!TextureToUse.get())
+		{
+			printf("Warning: no texture is used in this emitter! Use DefaultWhite texture instead.\n");
+			TextureToUse = cTexture::Get(EDefaultTextureID::White);
+		}
+		cTexture* ParticleTestTex = TextureToUse.get();
+		RenderDescriptorSet.CreateImageBufferDescriptor(&ParticleTestTex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ParticleTestTex->GetImageInfo().imageLayout, ParticleTestTex->GetImageInfo().sampler);
 	}
 
 	void cEmitter::cleanUp()
@@ -131,6 +137,9 @@ namespace VKE
 		
 		// Size
 		oParticle.Volume = RandRange(EmitterData.StartSizeMin, EmitterData.StartSizeMax);
+
+		// Rotation
+		oParticle.RotationAlongZ = glm::radians(RandRange(EmitterData.StartRotationMin, EmitterData.StartRotationMax));	// convert to radians
 
 		// Velocity
 		float PercentageToCenter = R / EmitterData.Radius;
