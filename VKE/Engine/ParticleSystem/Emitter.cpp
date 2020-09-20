@@ -151,6 +151,15 @@ namespace VKE
 		// Time
 		oParticle.LifeTime = RandRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax);
 		oParticle.ElpasedTime = -RandRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax);
+
+		// Texture sub tiling
+		if (EmitterData.bEnableSubTexture)
+		{
+			const int SubTextures = EmitterData.TileWidth * EmitterData.TileWidth;
+			// e.g. if TileWidth == 2, then TileID's range is [0, 1, 2, 3]
+			oParticle.TileID = static_cast<float>(RandRange(0, SubTextures - 1));
+		}
+		oParticle.TileWidth = static_cast<float>(EmitterData.TileWidth);
 	}
 
 	void cEmitter::UpdateEmitterData(cDescriptor_Buffer* Descriptor)

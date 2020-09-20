@@ -60,7 +60,8 @@ namespace VKE
 			
 			float Volume = 1.0;							// Particle Size multiplier
 			float RotationAlongZ = 0.0;					// Billboard rotation
-			int Padding[2];
+			float TileID = 0;								// Which sub texture to use, from left to right, top to bottom
+			float TileWidth = 1;							 // how many sub-divisions per texture, tileWidth * tileWidth = totalTiles, assuming tileX == tileY
 		};
 
 		/** Emitter Data */
@@ -87,13 +88,17 @@ namespace VKE
 
 			float StartRotationMin = 0.0f;
 			float StartRotationMax = 0.0f;
+			int bEnableSubTexture = false;
+			int TileWidth = 1;
 		};
 
 		/** Support data for particles */
 		struct FParticleSupportData
 		{
 			float dt;
-			unsigned int useGravity;
+			int useGravity;
+			float EmitRateOverTime = 10.f;			// numbers of particle will emit per second
+			float EmitTimer = 0.0;					// Elapsed time since last particle emission
 		};
 	}
 }

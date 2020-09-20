@@ -14,20 +14,25 @@ struct sConeEmitter
 	float Angle;				// in radians
 	float StartSpeedMin;
 	float StartSpeedMax;
+	
 	float StartDelayRangeMin;
 	float StartDelayRangeMax;
 	float LifeTimeRangeMin;
 	float LifeTimeRangeMax;
+	
 	vec4 StartColor;
 	vec4 ColorOverLifeTimeStart;
 	vec4 ColorOverLifeTimeEnd;
+	
 	float StartSizeMin;
 	float StartSizeMax;
 	float NoiseMin;
 	float NoiseMax;
+	
 	float StartRotationMin;
 	float StartRotationMax;
-
+	int bEnableSubTexture;
+	int TileWidth;
 };
 
 struct sParticle
@@ -42,6 +47,8 @@ struct sParticle
 
 	float Volume;
 	float RotationAlongZ;
+	float TileID;		
+	float TileWidth;
 };
 
 // Binding 0 : Position storage buffer
@@ -54,6 +61,8 @@ layout (std140, binding = 1) uniform sParticleSupportData
 {
 	float dt;
 	int bUseGravity;
+	float EmitRateOverTime;		// numbers of particle will emit per second
+	float EmitTimer;			// Elapsed time since last particle emission
 };
 layout (std140, binding = 2) uniform s_ConeEmitter 
 {
@@ -97,6 +106,8 @@ float random( vec2  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 
+
+
 float randomRange(float min, float max, float rnd)
 {	
 	// if min and max is almost the same, no need to get random between
@@ -104,7 +115,15 @@ float randomRange(float min, float max, float rnd)
 		return min;
 	return rnd * (max - min) + min;
 }
-
+int randomRange(int min, int max, float rnd)
+{
+	int result = int(randomRange(float(min), float(max) + 1.0, rnd));
+	if (result > max)
+	{
+		result = max;
+	}
+	return result;
+}
 vec4 LerpV4(in vec4 a,in vec4 b, float t)
 {
 	return (b - a) * t + a;
@@ -139,6 +158,15 @@ void NextParticle(inout sParticle oParticle)
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
 	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
+
+	// Texture sub tiling
+	if (EmitterData.bEnableSubTexture > 0)
+	{
+		const int SubTextures = EmitterData.TileWidth * EmitterData.TileWidth;
+		// e.g. if TileWidth == 2, then TileID's range is [0, 1, 2, 3]
+		oParticle.TileID = randomRange(0, SubTextures - 1, random(vec4(oParticle.Pos.x ,oParticle.Vel.z, oParticle.Pos.y ,oParticle.Vel.x)));
+	}
+	oParticle.TileWidth = EmitterData.TileWidth;
 }
 
 const float frequency = 5;

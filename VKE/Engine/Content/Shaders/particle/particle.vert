@@ -7,7 +7,8 @@ layout (location = 2) in vec2 texCoord;
 layout (location = 3) in vec4 pos;
 layout (location = 4) in vec4 vel;
 layout (location = 5) in vec4 particleColor;
-layout (location = 6) in vec4 volume;       // volume.x -> size, volume.y -> rotation along Z axis
+// volume.x -> size, volume.y -> rotation along Z axis, volume.z -> texture index, volume.z -> tiling
+layout (location = 6) in vec4 volume;       
 
 // Uniforms buffer
 layout(set = 0, binding = 0) uniform sFrameData
@@ -32,12 +33,19 @@ layout (location = 3) out vec4 fragParticleColor;
 
 void main()
 {
+    int tileID = int(volume.z);      // Which sub texture to use, from left to right, top to bottom
+    int tileWidth = int(volume.w);   // how many sub-divisions per texture, tileWidth * tileWidth = totalTiles, assuming tileX == tileY
+    
+    // shrink then offset(from top left to bottom right)
+    float subWidth = (1.0 / float(tileWidth));
+    vec2 TexCoord = texCoord / tileWidth + vec2(subWidth * (tileID % tileWidth), subWidth * (tileID / tileWidth));
+    
     float scale = volume.x;
     float rotationAlongZ = volume.y;
     // pass particle time to FS
     elapsedTime = pos.w;
     lifeTime = vel.w;
-    fragTexCoord = texCoord;
+    fragTexCoord = TexCoord;
     fragParticleColor = particleColor;
     // Model matrix for individual quad
     mat4 Model = mat4(1.0);
