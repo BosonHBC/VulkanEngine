@@ -33,6 +33,14 @@ layout (location = 3) out vec4 fragParticleColor;
 
 void main()
 {
+    // pass particle time to FS
+    elapsedTime = pos.w;
+    lifeTime = vel.w;
+    if(elapsedTime < 0)
+    {
+        // this particle would be discared
+        return;
+    }
     int tileID = int(volume.z);      // Which sub texture to use, from left to right, top to bottom
     int tileWidth = int(volume.w);   // how many sub-divisions per texture, tileWidth * tileWidth = totalTiles, assuming tileX == tileY
     
@@ -42,9 +50,7 @@ void main()
     
     float scale = volume.x;
     float rotationAlongZ = volume.y;
-    // pass particle time to FS
-    elapsedTime = pos.w;
-    lifeTime = vel.w;
+
     fragTexCoord = TexCoord;
     fragParticleColor = particleColor;
     // Model matrix for individual quad

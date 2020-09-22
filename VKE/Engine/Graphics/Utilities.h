@@ -37,8 +37,8 @@
 
 #define PI 3.14159265359f
 #define IsFloatZero(x) (x > -0.0001f && x < 0.0001f)
-#define Particle_Count 100
-#define Dispatch_Size_X 16
+#define Particle_Count 64
+#define Dispatch_Size_X 32
 
 #define ACCESSOR_INLINE(ClassName, PropertyName) \
 	const ClassName& Get##PropertyName() const { return PropertyName; }
@@ -197,7 +197,9 @@ namespace VKE
 		void freeLoadedTextureData(unsigned char* Data);
 	}
 
+
 	float RandRange(float min, float max);
+	int RandRangeInt(int min, int max);
 	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max);
 
 	float Rand01();

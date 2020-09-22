@@ -75,7 +75,6 @@ namespace VKE {
 			Time::DT = now - LastTime;
 			
 			LastTime = now;
-			
 			// update editor
 			Editor::Update(g_Renderer);
 			

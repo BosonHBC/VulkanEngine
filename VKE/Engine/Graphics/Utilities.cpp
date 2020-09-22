@@ -412,7 +412,7 @@ namespace VKE
 		EndCommandBuffer(CommandBuffer, LD, Queue, CommandPool);
 	}
 
-	int RandRange(int min, int max)
+	int RandRangeInt(int min, int max)
 	{
 		int result = static_cast<int>(RandRange(static_cast<float>(min), static_cast<float>(max) + 1.0f));
 		// when RandRange_float returns 1.0, result would be max + 1, clamp that

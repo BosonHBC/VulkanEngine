@@ -63,18 +63,18 @@ namespace VKE
 		Emitters[1].EmitterData.StartDelayRangeMax = 1.0f;
 		Emitters[1].EmitterData.LifeTimeRangeMin = 0.7f;
 		Emitters[1].EmitterData.LifeTimeRangeMax = 0.8f;
-		Emitters[1].EmitterData.StartColor = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
+		Emitters[1].EmitterData.StartColor = glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
 		Emitters[1].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f) ;
 		Emitters[1].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f);
-		Emitters[1].EmitterData.StartSizeMin = 0.8f;
-		Emitters[1].EmitterData.StartSizeMax = 0.9f;
+		Emitters[1].EmitterData.StartSizeMin = 0.7f;
+		Emitters[1].EmitterData.StartSizeMax = 0.8f;
 		Emitters[1].EmitterData.NoiseMin = -5.0f;
 		Emitters[1].EmitterData.NoiseMax = 5.0f;
 		Emitters[1].EmitterData.bEnableSubTexture = false;
 		Emitters[1].EmitterData.TileWidth = 1;
 
 		Emitters[2].TextureToUse = cTexture::Get(2);	// Fire * 4
-		Emitters[2].Transform.SetPosition(glm::vec3(1.0, 0.1, 0.0));
+		Emitters[2].Transform.SetPosition(glm::vec3(0.0, 0.1, 0.0));
 		Emitters[2].EmitterData.Radius = 0.1f;
 		Emitters[2].EmitterData.Angle = glm::radians(5.f);
 		Emitters[2].EmitterData.StartSpeedMin = 1.0f;
@@ -83,11 +83,11 @@ namespace VKE
 		Emitters[2].EmitterData.StartDelayRangeMax = 1.0f;
 		Emitters[2].EmitterData.LifeTimeRangeMin = 0.7f;
 		Emitters[2].EmitterData.LifeTimeRangeMax = 0.8f;
-		Emitters[2].EmitterData.StartColor = glm::vec4(1.0f, 0.86f, 0.74f, 1.0f);
+		Emitters[2].EmitterData.StartColor = glm::vec4(1.0f, 0.86f, 0.74f, 1.0f) * 0.8f;
 		Emitters[2].EmitterData.ColorOverLifeTimeStart = glm::vec4(1.0, 0.76f, 0.125, 1.0f);
 		Emitters[2].EmitterData.ColorOverLifeTimeEnd = glm::vec4(1.0, 0.10f, 0.0, 0.0f);
-		Emitters[2].EmitterData.StartSizeMin = 0.4f;
-		Emitters[2].EmitterData.StartSizeMax = 0.45f;
+		Emitters[2].EmitterData.StartSizeMin = 0.35f;
+		Emitters[2].EmitterData.StartSizeMax = 0.5f;
 		Emitters[2].EmitterData.NoiseMin = -5.0f;
 		Emitters[2].EmitterData.NoiseMax = 5.0f;
 		Emitters[2].EmitterData.StartRotationMin = -45.f;

@@ -157,7 +157,7 @@ namespace VKE
 		{
 			const int SubTextures = EmitterData.TileWidth * EmitterData.TileWidth;
 			// e.g. if TileWidth == 2, then TileID's range is [0, 1, 2, 3]
-			oParticle.TileID = static_cast<float>(RandRange(0, SubTextures - 1));
+			oParticle.TileID = static_cast<float>(RandRangeInt(0, SubTextures - 1));
 		}
 		oParticle.TileWidth = static_cast<float>(EmitterData.TileWidth);
 	}

@@ -94,6 +94,7 @@ namespace VKE
 			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
 			{
 				pCompute->Emitters[i].ParticleSupportData.dt = dt;
+				pCompute->Emitters[i].ParticleSupportData.EmitTimer += dt;
 			}
 			//pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
 			//pCompute->Emitter.Transform.Update();
@@ -1025,7 +1026,7 @@ namespace VKE
 			//InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 			
 			// Disable DepthTest and DepthWrite for particles
-			DepthStencilCreateInfo.depthTestEnable = VK_FALSE;
+			DepthStencilCreateInfo.depthTestEnable = VK_TRUE;
 			DepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
 			
 			// Change blending stage

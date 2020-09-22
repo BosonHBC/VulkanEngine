@@ -129,8 +129,6 @@ vec4 LerpV4(in vec4 a,in vec4 b, float t)
 	return (b - a) * t + a;
 }
 
-layout( local_size_x = 16 ) in;
-
 void NextParticle(inout sParticle oParticle)
 {
 	float R = clamp(EmitterData.Radius * sqrt(random(oParticle.Pos)), MinRadius, EmitterData.Radius);
@@ -157,7 +155,7 @@ void NextParticle(inout sParticle oParticle)
 	
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
-	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
+	oParticle.ElpasedTime = 0.0f;
 
 	// Texture sub tiling
 	if (EmitterData.bEnableSubTexture > 0)
@@ -169,10 +167,11 @@ void NextParticle(inout sParticle oParticle)
 	oParticle.TileWidth = EmitterData.TileWidth;
 }
 
-const float frequency = 5;
+layout( local_size_x = 32 ) in;
 void main()
 {
 	uint gid = gl_GlobalInvocationID.x; // the .y and .z are both 1 in this case
+
 	Particles[gid].ElpasedTime += dt;
 	// Only update particles with ElpasedTime greater than 0
 	if(Particles[gid].ElpasedTime < 0)
@@ -181,6 +180,7 @@ void main()
 	}
 	else if (Particles[gid].ElpasedTime >= Particles[gid].LifeTime)
 	{
+		// disable this particle
 		NextParticle(Particles[gid]);
 	}
 	
