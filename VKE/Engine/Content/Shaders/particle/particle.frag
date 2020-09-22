@@ -3,6 +3,14 @@ layout(location = 0) out vec4 outColor;
 
 layout (location = 0) in float elapsedTime;
 layout (location = 1) in float lifeTime;
+layout (location = 2) in vec2 fragTexCoord;
+layout (location = 3) in vec4 fragParticleColor;
+
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler;
+
+const float FadeInPercent = 0.1;
+const float FadeOutPercent = 0.1;
+
 void main(){
 
     // particle that are not supposed to render
@@ -11,9 +19,9 @@ void main(){
         discard;
         return;
     }
-    float alpha = 0.5;
 
     float lifePercentage = elapsedTime / lifeTime;
 
-    outColor = vec4(1, 0, 0, clamp(1.0 - lifePercentage, 0.0, 1.0));
+    vec4 textureColor = texture(TextureSampler, fragTexCoord);
+    outColor = textureColor * fragParticleColor;
 }

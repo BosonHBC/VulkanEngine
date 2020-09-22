@@ -32,15 +32,34 @@ namespace VKE
 
 		void LoadAssets();
 
-		bool CreateModel(const std::string& ifileName, cModel*& oModel);
+		bool CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel);
 		// Scene Objects
-		std::vector<cModel*> RenderList;
+		std::vector<std::shared_ptr<cModel>> RenderList;
+	
+		// Accessors
+		ACCESSOR_INLINE(VkInstance, vkInstance);
+		ACCESSOR_INLINE(VkSurfaceKHR, Surface);
+		ACCESSOR_INLINE(FMainDevice, MainDevice);
+		ACCESSOR_INLINE(FSwapChainData, SwapChain);
+		ACCESSOR_INLINE(FSwapChainDetail, SwapChainDetail);
+		ACCESSOR_INLINE(VkPipelineCache, PipelineCache);
+		ACCESSOR_INLINE(VkDescriptorPool, DescriptorPool);
+		ACCESSOR_PTR_INLINE(VkAllocationCallbacks, Allocator);
+		ACCESSOR_INLINE(std::vector<VkFramebuffer>, SwapChainFramebuffers);
+		ACCESSOR_INLINE(std::vector<VkCommandBuffer>, CommandBuffers);
+		ACCESSOR_INLINE(std::vector<VkSemaphore>, OnImageAvailables);
+		ACCESSOR_INLINE(std::vector <VkSemaphore>, OnRenderFinisheds);
+		ACCESSOR_INLINE(std::vector<VkFence>, DrawFences);
+		ACCESSOR_INLINE(std::vector <cImageBuffer>, ColorBuffers);
+
+		// Compute pass
+		FComputePass* pCompute = nullptr;
 	private:
 		// GLFW window
 		GLFWwindow* window;
 
-		// Compute pass
-		FComputePass* pCompute = nullptr;
+		// Custom Allocator
+		VkAllocationCallbacks*   Allocator = nullptr;
 
 		// Vulkan Components
 		// - Main Components
@@ -49,6 +68,7 @@ namespace VKE
 		VkSurfaceKHR Surface;								// KHR extension required
 
 		// SwapChainImages, SwapChainFramebuffers, CommandBuffers are all 1 to 1 correspondent
+		FSwapChainDetail SwapChainDetail;
 		FSwapChainData SwapChain;							// SwapChain data group
 		std::vector<VkFramebuffer> SwapChainFramebuffers;
 		std::vector<VkCommandBuffer> CommandBuffers;
@@ -58,7 +78,8 @@ namespace VKE
 
 		// -Pipeline
 		VkRenderPass RenderPass;
-		
+
+		VkPipelineCache PipelineCache = VK_NULL_HANDLE;
 		// first pass
 		VkPipeline GraphicPipeline;
 		VkPipelineLayout PipelineLayout;
@@ -78,17 +99,20 @@ namespace VKE
 		std::vector<VkFence> DrawFences;								// Fence allow to block the program by ourself
 
 		// - Descriptors
-#pragma region Uniform Buffer / Dynamic Descripotor set
+		// First pass
 		VkDescriptorPool DescriptorPool;
 		std::vector<cDescriptorSet> DescriptorSets;
-#pragma endregion
+
 		// -- Push Constant
 		VkPushConstantRange PushConstantRange;
 		// -- Sampler Descriptor Set
 		VkDescriptorPool SamplerDescriptorPool;
 
 		// -- Input Descriptor Set
+		// Third pass
 		std::vector<cDescriptorSet> InputDescriptorSets;
+
+		bool bMinimizing = false;
 
 		/** Create functions */
 		void createInstance();
@@ -110,13 +134,16 @@ namespace VKE
 		void createSynchronization();
 		void createGraphicsPipeline();
 
+		/** Handle SwapChain recreation*/
+		void recreateSwapChain();
+		void cleanupSwapChain();
 
 		/** intermediate functions */
-		void prepareForDraw();
+		VkResult prepareForDraw();
 		void recordCommands();
 		void updateUniformBuffers();
-		void presentFrame();
-
+		VkResult presentFrame();
+		void postPresentationStage();
 		/** Support functions */
 		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
 		bool checkValidationLayerSupport();
@@ -126,7 +153,7 @@ namespace VKE
 
 		/** Getters */
 		void getQueueFamilies(const VkPhysicalDevice& device);
-		FSwapChainDetail getSwapChainDetail(const VkPhysicalDevice& device);
+		void getSwapChainDetail(const VkPhysicalDevice& device);
 	};
 
 }

@@ -8,6 +8,11 @@
 
 namespace VKE
 {
+	enum EDefaultTextureID : uint8_t
+	{
+		White = 0,
+		Count = 1,
+	};
 	class cTexture
 	{
 	public:
@@ -37,7 +42,6 @@ namespace VKE
 		FMainDevice* pMainDevice;
 		int Width, Height;
 
-		VkImageLayout ImageLayout;
 		cImageBuffer Buffer;
 		VkSampler Sampler;
 

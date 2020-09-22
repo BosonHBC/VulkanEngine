@@ -4,7 +4,9 @@
 #include "Graphics/VKRenderer.h"
 #include "Input/UserInput.h"
 #include "Camera.h"
-
+#include "Editor/Editor.h"
+#include "Time.h"
+// glm
 #include "glm/glm.hpp"
 #include "glm/mat4x4.hpp"
 // Systems
@@ -16,22 +18,23 @@ namespace VKE {
 	const GLuint WIDTH = 1280, HEIGHT = 720;
 	const std::string WINDOW_NAME = "Default";
 	uint64_t ElapsedFrame = 0;
+	bool bWindowIconified = false;
 
 	//=================== Parameters =================== 
 	GLFWwindow* g_Window;
 	VKRenderer* g_Renderer;
-	double g_deltaTime;
 	UserInput::FUserInput* g_Input;
 	cCamera* g_Camera;
 
 	//=================== Function declarations =================== 
-	
+
 	// GLFW
 	void initGLFW();
 	void cleanupGLFW();
 	// Input
 	void initInput();
 	void window_focus_callback(GLFWwindow* window, int focused);
+	void window_iconify_callback(GLFWwindow* window, int iconified);
 	void cleanupInput();
 	void quitApp();
 
@@ -45,13 +48,13 @@ namespace VKE {
 		initGLFW();
 		initInput();
 		initCamera();
-
+		
 		g_Renderer = DBG_NEW VKRenderer();
 		if (g_Renderer->init(g_Window) == EXIT_FAILURE)
 		{
 			return EXIT_FAILURE;
 		}
-		
+		Editor::Init(g_Window, g_Renderer);
 
 		return result;
 	}
@@ -64,24 +67,34 @@ namespace VKE {
 		}
 
 		double LastTime = glfwGetTime();
-
 		while (!glfwWindowShouldClose(g_Window))
 		{
 			glfwPollEvents();
-			g_Input->UpdateInput();
-			g_Camera->Update();
 
 			double now = glfwGetTime();
-			g_deltaTime = now - LastTime;
+			Time::DT = now - LastTime;
+			
 			LastTime = now;
+			// update editor
+			Editor::Update(g_Renderer);
+			
+			// not minimized
+			if (!bWindowIconified && !Editor::GbMovingWindow)
+			{
+				g_Input->Update();
 
-			g_Renderer->tick((float)g_deltaTime);
-			g_Renderer->draw();
+				g_Camera->Update();
+
+				g_Renderer->tick((float)Time::DT);
+				g_Renderer->draw();
+			}
 		}
 	}
 
 	void cleanup()
 	{
+		Editor::CleanUp(g_Renderer);
+
 		g_Renderer->cleanUp();
 		safe_delete(g_Renderer);
 
@@ -101,9 +114,9 @@ namespace VKE {
 		return g_Camera;
 	}
 
-	double dt()
+	glm::ivec2 GetWindowExtent()
 	{
-		return g_deltaTime;
+		return glm::ivec2(WIDTH, HEIGHT);
 	}
 
 	glm::vec2 GetMouseDelta()
@@ -126,6 +139,7 @@ namespace VKE {
 		g_Window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
 
 		glfwSetWindowFocusCallback(g_Window, window_focus_callback);
+		glfwSetWindowIconifyCallback(g_Window, window_iconify_callback);
 	}
 	void cleanupGLFW()
 	{
@@ -156,6 +170,10 @@ namespace VKE {
 			g_Input->bAppInFocus = focused;
 		}
 	}
+	void window_iconify_callback(GLFWwindow* window, int iconified)
+	{
+		bWindowIconified = iconified > 0;
+	}
 	void quitApp()
 	{
 		glfwSetWindowShouldClose(g_Window, true);
@@ -167,11 +185,11 @@ namespace VKE {
 
 	void initCamera()
 	{
-		g_Camera = DBG_NEW cCamera(glm::vec3(0,2,5), 15.f, 0.0f, 2.0f, 0.1f);
+		g_Camera = DBG_NEW cCamera(glm::vec3(0, 1, 2.5), 15.f, 0.0f, 2.0f, 0.1f);
 		g_Camera->UpdateProjectionMatrix(glm::radians(45.f), (float)WIDTH / (float)HEIGHT);
 		g_Camera->Update();
 
-		g_Input->BindAction("TurnCamera",UserInput::EIT_OnHold, g_Camera, &cCamera::TurnCamera);
+		g_Input->BindAction("TurnCamera", UserInput::EIT_OnHold, g_Camera, &cCamera::TurnCamera);
 		g_Input->BindAction("ZoomCamera", UserInput::EIT_OnHold, g_Camera, &cCamera::ZoomCamera);
 
 		g_Input->BindAxis("MoveRight", g_Camera, &cCamera::MoveRight);

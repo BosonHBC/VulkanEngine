@@ -51,32 +51,54 @@ namespace VKE
 		struct FParticle
 		{
 			glm::vec3 Pos;
-			float ElpasedTime;
-			glm::vec3 Vel;
-			float LifeTime;
+			float ElpasedTime;							
 			
-			float Volume;
-			float padding[3];
+			glm::vec3 Vel;
+			float LifeTime;								// Life time of this particle
+			
+			glm::vec4 ColorOverlay = glm::vec4(1.0);	// Particle Color multiplier
+			
+			float Volume = 1.0;							// Particle Size multiplier
+			float RotationAlongZ = 0.0;					// Billboard rotation
+			float TileID = 0;								// Which sub texture to use, from left to right, top to bottom
+			float TileWidth = 1;							 // how many sub-divisions per texture, tileWidth * tileWidth = totalTiles, assuming tileX == tileY
 		};
 
-		/** Emitter Data*/
+		/** Emitter Data */
 		struct FConeEmitter
 		{
 			float Radius = 1.0f;
 			float Angle = 45.f;		// in degree
 			float StartSpeedMin = 1.0f;
 			float StartSpeedMax = 1.0f;
+
 			float StartDelayRangeMin = 0.0f;
 			float StartDelayRangeMax = 2.0f;
 			float LifeTimeRangeMin = 2.0f;
 			float LifeTimeRangeMax = 3.0f;
+
+			glm::vec4 StartColor = glm::vec4(1.0);
+			glm::vec4 ColorOverLifeTimeStart = glm::vec4(1.0);
+			glm::vec4 ColorOverLifeTimeEnd = glm::vec4(1.0);
+
+			float StartSizeMin = 1.0;
+			float StartSizeMax = 1.0;
+			float NoiseMin = 0.0f;
+			float NoiseMax = 0.0f;
+
+			float StartRotationMin = 0.0f;
+			float StartRotationMax = 0.0f;
+			int bEnableSubTexture = false;
+			int TileWidth = 1;
 		};
 
 		/** Support data for particles */
 		struct FParticleSupportData
 		{
 			float dt;
-			unsigned int useGravity;
+			int useGravity;
+			float EmitRateOverTime = 10.f;			// numbers of particle will emit per second
+			float EmitTimer = 0.0;					// Elapsed time since last particle emission
 		};
 	}
 }

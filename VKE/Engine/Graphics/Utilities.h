@@ -36,11 +36,21 @@
 #define INSTANCE_BUFFER_BIND_ID 1
 
 #define PI 3.14159265359f
+#define IsFloatZero(x) (x > -0.0001f && x < 0.0001f)
+#define Particle_Count 64
+#define Dispatch_Size_X 32
+
+#define ACCESSOR_INLINE(ClassName, PropertyName) \
+	const ClassName& Get##PropertyName() const { return PropertyName; }
+#define ACCESSOR_PTR_INLINE(ClassName, PropertyName) \
+	ClassName* Get##PropertyName() { return PropertyName; }
 namespace VKE
 {
 	// ================================================
 	// =============== Global Variables =============== 
 	// ================================================
+	const extern GLuint WIDTH, HEIGHT;
+
 	const std::vector<const char*> ValidationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};
@@ -56,8 +66,8 @@ namespace VKE
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
-	// Maximum 2 image on the queue
-	const int MAX_FRAME_DRAWS = 2;
+	// Maximum 3 image on the queue
+	const int MAX_FRAME_DRAWS = 3;
 	// Max objects are allowed in the scene
 	const int MAX_OBJECTS = 20;
 	
@@ -91,6 +101,8 @@ namespace VKE
 		VkQueue presentationQueue;				// Presentation Queue
 		FQueueFamilyIndices QueueFamilyIndices;		// Queue families
 		VkCommandPool GraphicsCommandPool;		// Command Pool only used for graphic command
+
+		bool NeedSynchronization() const{ return QueueFamilyIndices.computeFamily != QueueFamilyIndices.graphicFamily; }
 	};
 
 	struct FSwapChainDetail
@@ -120,7 +132,7 @@ namespace VKE
 		VkFormat ImageFormat;								// enum
 		uint32_t ImageIndex;						// current updating framebuffer index, also the index of next image to be drawn
 
-		void acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore);
+		VkResult acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore);
 	};
 
 	struct FShaderModuleScopeGuard
@@ -185,7 +197,9 @@ namespace VKE
 		void freeLoadedTextureData(unsigned char* Data);
 	}
 
+
 	float RandRange(float min, float max);
+	int RandRangeInt(int min, int max);
 	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max);
 
 	float Rand01();

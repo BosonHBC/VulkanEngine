@@ -1,7 +1,7 @@
 #include "VKRenderer.h"
 
 #include "ComputePass.h"
-
+// Engine
 #include "Camera.h"
 #include "Mesh/Mesh.h"
 #include "Texture/Texture.h"
@@ -10,19 +10,31 @@
 #include "Descriptors/Descriptor_Buffer.h"
 #include "Descriptors/Descriptor_Dynamic.h"
 #include "Descriptors/Descriptor_Image.h"
-
+#include "Editor/Editor.h"
+// system
 #include <stdexcept>
 #include "stdlib.h"
 #include <set>
 #include "assert.h"
 
+// glm
 #include "glm/gtc/matrix_transform.hpp"
 
+// assimp
 #include "assimp/Importer.hpp"
 #include <assimp/scene.h>
 #include "assimp/postprocess.h"
+
+// imgui
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_vulkan.h"
+#include "imgui/imgui_impl_glfw.h"
 namespace VKE
 {
+
+	//** Global Variables * /
+	std::shared_ptr<cModel> GQuadModel = nullptr;
+
 	int VKRenderer::init(GLFWwindow* iWindow)
 	{
 		window = iWindow;
@@ -35,21 +47,29 @@ namespace VKE
 			createSwapChain();
 			createFrameBufferImage();		// Need to get depth buffer image format before creating a render pass that needs a depth attachment
 			createRenderPass();
-			// Descriptor set and push constant related
-			{
-				CreateDescriptorSets();
-				createPushConstantRange();
-			}
 			createFrameBuffer();
 			createCommandPool();
 			createCommandBuffers();
 			createSynchronization();
+			
+			// Descriptor set and push constant related
+			{		
+				// Create Texture
+				cTexture::Load("DefaultWhite.png", MainDevice);	// ID = 0, default white texture
+				cTexture::Load("fireParticles/TXT_Sparks_01.tga", MainDevice);
+				cTexture::Load("fireParticles/TXT_Fire_01.tga", MainDevice);
+				CreateDescriptorSets();
+				createPushConstantRange();
+			}
 			LoadAssets();
-			createGraphicsPipeline();
 			// Create compute pass
 			pCompute = DBG_NEW FComputePass();
 			if (pCompute)
+			{
 				pCompute->init(&MainDevice);
+			}
+			createGraphicsPipeline();
+
 		}
 		catch (const std::runtime_error &e)
 		{
@@ -63,20 +83,26 @@ namespace VKE
 
 	void VKRenderer::tick(float dt)
 	{
-		RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
-		RenderList[0]->Transform.Update();
-		
-		if (pCompute)
+		if (RenderList.size() > 0 && RenderList[0])
 		{
-			pCompute->ParticleSupportData.dt = dt;
-			pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
-			pCompute->Emitter.Transform.Update();
+			RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
+			RenderList[0]->Transform.Update();
 		}
-			
+
+		if (pCompute && pCompute->bNeedComputePass)
+		{
+			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
+			{
+				pCompute->Emitters[i].ParticleSupportData.dt = dt;
+				pCompute->Emitters[i].ParticleSupportData.EmitTimer += dt;
+			}
+			//pCompute->Emitter.Transform.gRotate(cTransform::WorldRight, dt);
+			//pCompute->Emitter.Transform.Update();
+		}
 	}
 
 
-	void VKRenderer::prepareForDraw()
+	VkResult VKRenderer::prepareForDraw()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		// Wait for given fence to be opened from last draw before continuing
@@ -85,11 +111,11 @@ namespace VKE
 			std::numeric_limits<uint64_t>::max());						// No time-out
 		vkResetFences(MainDevice.LD, 1, &DrawFences[CurrentFrame]);		// Need to close(reset) this fence manually
 
-		/** I. get the next available image to draw to and signal(semaphore1) when we're finished with the image */
-		SwapChain.acquireNextImage(MainDevice, OnImageAvailables[CurrentFrame]);
+		/** get the next available image to draw to and signal(semaphore1) when we're finished with the image */
+		return SwapChain.acquireNextImage(MainDevice, OnImageAvailables[CurrentFrame]);
 	}
 
-	void VKRenderer::presentFrame()
+	VkResult VKRenderer::presentFrame()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		VkPresentInfoKHR PresentInfo = {};
@@ -101,16 +127,61 @@ namespace VKE
 		PresentInfo.pImageIndices = &SwapChain.ImageIndex;				// Index of images in swap chains to present
 
 		VkResult Result = vkQueuePresentKHR(MainDevice.presentationQueue, &PresentInfo);
-		RESULT_CHECK(Result, "Fail to Present Image");
+		if (!((Result == VK_SUCCESS) || (Result == VK_SUBOPTIMAL_KHR))) {
+			if (Result == VK_ERROR_OUT_OF_DATE_KHR) {
+				// Swap chain is no longer compatible with the surface and needs to be recreated
+				recreateSwapChain();
+				return Result;
+			}
+			else {
+				RESULT_CHECK(Result, "failed to present swap chain image!");
+				return Result;
+			}
+		}
 
 		Result = vkQueueWaitIdle(MainDevice.presentationQueue);
 		RESULT_CHECK(Result, "Fail to wait for queue");
+		return Result;
+	}
+
+	void VKRenderer::postPresentationStage()
+	{
+		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		if (pCompute && pCompute->bNeedComputePass)
+		{
+			// re-record commands
+			pCompute->recordComputeCommands();
+			// Wait for rendering finished
+			VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+			// Submit compute commands
+			VkSubmitInfo ComputeSubmitInfo = {};
+			ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			ComputeSubmitInfo.commandBufferCount = 1;
+			ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
+			ComputeSubmitInfo.waitSemaphoreCount = 1;
+			ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
+			ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
+			ComputeSubmitInfo.signalSemaphoreCount = 1;
+			ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
+			VkResult Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
+			RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
+		}
 	}
 
 	void VKRenderer::draw()
 	{
 		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
-		prepareForDraw();
+		VkResult PrepareResult = prepareForDraw();
+		// Swap chain is out of date
+		if ((PrepareResult == VK_ERROR_OUT_OF_DATE_KHR) || (PrepareResult == VK_SUBOPTIMAL_KHR))
+		{
+			recreateSwapChain();
+			return;
+		}
+		else if (PrepareResult != VK_SUCCESS && PrepareResult != VK_SUBOPTIMAL_KHR) {
+			throw std::runtime_error("failed to acquire swap chain image!");
+		}
 		// Record graphic commands
 		recordCommands();
 		// Update uniform buffer
@@ -120,7 +191,6 @@ namespace VKE
 		VkSemaphore GraphicsWaitSemaphores[] = { pCompute->OnComputeFinished, OnImageAvailables[CurrentFrame] };
 		const uint32_t GraphicSignalSemaphoreCount = 2;
 		VkSemaphore GraphicsSignalSemaphores[] = { OnGraphicFinished[CurrentFrame], OnRenderFinisheds[CurrentFrame] };
-
 
 		/** II. submit command buffer to queue (graphic queue) for execution, make sure it waits for the image to be signaled as available before drawing,
 		 and signals (semaphore2) when it has finished rendering.*/
@@ -145,23 +215,10 @@ namespace VKE
 		RESULT_CHECK(Result, "Fail to submit command buffers to graphic queue");
 
 		/** III. present image to screen when it has signaled finished rendering */
-		presentFrame();
+		Result = presentFrame();
 
-		// Wait for rendering finished
-		VkPipelineStageFlags ComputeWaitStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-		// Submit compute commands
-		VkSubmitInfo ComputeSubmitInfo = {};
-		ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		ComputeSubmitInfo.commandBufferCount = 1;
-		ComputeSubmitInfo.pCommandBuffers = &pCompute->CommandBuffer;
-		ComputeSubmitInfo.waitSemaphoreCount = 1;
-		ComputeSubmitInfo.pWaitSemaphores = &OnGraphicFinished[CurrentFrame];
-		ComputeSubmitInfo.pWaitDstStageMask = &ComputeWaitStageMask;
-		ComputeSubmitInfo.signalSemaphoreCount = 1;
-		ComputeSubmitInfo.pSignalSemaphores = &pCompute->OnComputeFinished;
-		Result = vkQueueSubmit(pCompute->ComputeQueue, 1, &ComputeSubmitInfo, DrawFences[CurrentFrame]);
-		RESULT_CHECK(Result, "Fail to submit compute command buffers to compute queue");
+		/** IV. Submit compute queue*/
+		postPresentationStage();
 
 		// Increment Elapsed Frame
 		++ElapsedFrame;
@@ -174,18 +231,21 @@ namespace VKE
 
 		// Cleanup compute pass
 		if (pCompute)
+		{
 			pCompute->cleanUp();
-		safe_delete(pCompute);
-
+			safe_delete(pCompute);
+		}
+		
 		cTexture::Free();
-
 		// Clean up render list
 		for (auto Model : RenderList)
 		{
 			Model->cleanUp();
-			safe_delete(Model);
 		}
 		RenderList.clear();
+
+		GQuadModel->cleanUp();		
+
 		// Clear all mesh assets
 		cMesh::Free();
 
@@ -196,11 +256,7 @@ namespace VKE
 			vkDestroySemaphore(MainDevice.LD, OnImageAvailables[i], nullptr);
 			vkDestroyFence(MainDevice.LD, DrawFences[i], nullptr);
 		}
-		vkDestroyCommandPool(MainDevice.LD, MainDevice.GraphicsCommandPool, nullptr);
-		for (auto& FrameBuffer : SwapChainFramebuffers)
-		{
-			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
-		}
+
 		// clean up depth buffer
 		{
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
@@ -219,30 +275,17 @@ namespace VKE
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
 				DescriptorSets[i].cleanUp();
+				
 				InputDescriptorSets[i].cleanUp();
 			}
+			
 			cDescriptorSet::CleanupDescriptorSetLayout(&MainDevice);
 		}
 
-		{
-			// Destroy pipelines first and then destroy render pass
-			vkDestroyPipeline(MainDevice.LD, PostProcessPipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, PostProcessPipelineLayout, nullptr);
+		cleanupSwapChain();
 
-			vkDestroyPipeline(MainDevice.LD, RenderParticlePipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, RenderParticlePipelineLayout, nullptr);
+		vkDestroyCommandPool(MainDevice.LD, MainDevice.GraphicsCommandPool, nullptr);
 
-			vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
-			vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
-
-			vkDestroyRenderPass(MainDevice.LD, RenderPass, nullptr);
-		}
-
-		for (auto & Image : SwapChain.Images)
-		{
-			vkDestroyImageView(MainDevice.LD, Image.ImgView, nullptr);
-		}
-		vkDestroySwapchainKHR(MainDevice.LD, SwapChain.SwapChain, nullptr);
 		vkDestroySurfaceKHR(vkInstance, Surface, nullptr);
 		vkDestroyDevice(MainDevice.LD, nullptr);
 		vkDestroyInstance(vkInstance, nullptr);
@@ -250,25 +293,21 @@ namespace VKE
 
 	void VKRenderer::LoadAssets()
 	{
-		// Create Texture
-		cTexture::Load("DefaultWhite.png", MainDevice);
-		cTexture::Load("brick.png", MainDevice);
-		cTexture::Load("panda.jpg", MainDevice);
-		cTexture::Load("teapot.png", MainDevice);
-
 		// Create Mesh
-		cModel* pContainerModel = nullptr;
-		cModel* pPlaneModel = nullptr;
+		std::shared_ptr<cModel> pContainerModel = nullptr;
+		std::shared_ptr<cModel> pPlaneModel = nullptr;
 
-		CreateModel("Container.obj", pContainerModel);
+		/*CreateModel("Container.obj", pContainerModel);
 		RenderList.push_back(pContainerModel);
+		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));*/
 
-		CreateModel("Plane.obj", pPlaneModel);
+		/*CreateModel("Plane.obj", pPlaneModel);
 		RenderList.push_back(pPlaneModel);
+		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));*/
+		
+		CreateModel("Quad.obj", GQuadModel);
+		GQuadModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1));
 
-		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));
-
-		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));
 	}
 
 	void VKRenderer::createInstance()
@@ -426,9 +465,7 @@ namespace VKE
 
 	void VKRenderer::createSwapChain()
 	{
-		// Pick best settings that are supported
-		FSwapChainDetail SwapChainDetail = getSwapChainDetail(MainDevice.PD);
-
+		getSwapChainDetail(MainDevice.PD);
 		// Get Parameters for SwapChain
 		VkSurfaceFormatKHR SurfaceFormat = SwapChainDetail.getSurfaceFormat();
 		VkPresentModeKHR PresentMode = SwapChainDetail.getPresentationMode();
@@ -443,7 +480,10 @@ namespace VKE
 		SwapChainCreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
 		SwapChainCreateInfo.presentMode = PresentMode;
 		SwapChainCreateInfo.imageExtent = Resolution;
-
+		if (Resolution.width == 0)
+		{
+			printf("illegal");
+		}
 		/** Other values */
 		// Get 1 extra image to allow triple buffering
 		uint32_t MinImageCount = SwapChainDetail.SurfaceCapabilities.minImageCount + 1;
@@ -495,17 +535,17 @@ namespace VKE
 		std::vector<VkImage> Images(SwapChainImageCount);
 		vkGetSwapchainImagesKHR(MainDevice.LD, SwapChain.SwapChain, &SwapChainImageCount, Images.data());
 
-		SwapChain.Images.reserve(SwapChainImageCount);
+		SwapChain.Images.resize(SwapChainImageCount);
 
-		for (auto & Image : Images)
+		for (size_t i = 0; i < Images.size(); ++i)
 		{
 			FSwapChainImage SwapChainImage = {};
-			SwapChainImage.Image = Image;
-			SwapChainImage.ImgView = CreateImageViewFromImage(&MainDevice, Image, SwapChain.ImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			SwapChainImage.Image = Images[i];
+			SwapChainImage.ImgView = CreateImageViewFromImage(&MainDevice, Images[i], SwapChain.ImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
-			SwapChain.Images.push_back(SwapChainImage);
+			SwapChain.Images[i] = SwapChainImage;
 		}
-		assert(MAX_FRAME_DRAWS < Images.size());
+		assert(MAX_FRAME_DRAWS <= Images.size());
 		printf("%d Image view has been created\n", SwapChainImageCount);
 	}
 
@@ -677,6 +717,7 @@ namespace VKE
 			InputDescriptorSets[i].CreateImageBufferDescriptor(&ColorBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			InputDescriptorSets[i].CreateImageBufferDescriptor(&DepthBuffers[i], VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
+
 		// 2. Create Descriptor Pool
 		createDescriptorPool();
 		// 3. Create Descriptor Set Layout
@@ -685,7 +726,7 @@ namespace VKE
 			// UNIFORM DESCRIPTOR SET LAYOUT
 			DescriptorSets[i].CreateDescriptorSetLayout(FirstPass_vert);
 			// INPUT DESCRIPTOR LAYOUT
-			InputDescriptorSets[i].CreateDescriptorSetLayout(SecondPass_frag);
+			InputDescriptorSets[i].CreateDescriptorSetLayout(ThirdPass_frag);
 		}
 
 		for (size_t i = 0; i < Count; ++i)
@@ -696,7 +737,6 @@ namespace VKE
 			// 5. Update set write info
 			DescriptorSets[i].BindDescriptorWithSet();
 			InputDescriptorSets[i].BindDescriptorWithSet();
-
 		}
 	}
 
@@ -746,29 +786,29 @@ namespace VKE
 																				// VK_VERTEX_INPUT_RATE_INSTANCE : Move to a vertex for the next instance
 		// How the data for an attribute is defined within a vertex
 		const uint32_t AttrubuteDescriptionCount = 3;
-		VkVertexInputAttributeDescription AttributeDescriptions[AttrubuteDescriptionCount];
+		VkVertexInputAttributeDescription VertexInputAttributeDescriptions[AttrubuteDescriptionCount];
 
 		// Position attribute
-		AttributeDescriptions[0].binding = VERTEX_BUFFER_BIND_ID;				// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
-		AttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
-		AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;			// format of the data, defnie the size of the data, 3 * 32 bit float data
-		AttributeDescriptions[0].offset = offsetof(FVertex, Position);			// Similar stride concept, position start at 0, but the following attribute data should has offset of sizeof(glm::vec3)
+		VertexInputAttributeDescriptions[0].binding = VERTEX_BUFFER_BIND_ID;				// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, should be same as above
+		VertexInputAttributeDescriptions[0].location = 0;									// This binding corresponds to the layout(binding = 0, location = 0) in vertex shader, this is a position data
+		VertexInputAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;			// format of the data, defnie the size of the data, 3 * 32 bit float data
+		VertexInputAttributeDescriptions[0].offset = offsetof(FVertex, Position);			// Similar stride concept, position start at 0, but the following attribute data should has offset of sizeof(glm::vec3)
 		// Color attribute ...
-		AttributeDescriptions[1].binding = VERTEX_BUFFER_BIND_ID;
-		AttributeDescriptions[1].location = 1;
-		AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		AttributeDescriptions[1].offset = offsetof(FVertex, Color);
+		VertexInputAttributeDescriptions[1].binding = VERTEX_BUFFER_BIND_ID;
+		VertexInputAttributeDescriptions[1].location = 1;
+		VertexInputAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		VertexInputAttributeDescriptions[1].offset = offsetof(FVertex, Color);
 		// texture coordinate attribute
-		AttributeDescriptions[2].binding = VERTEX_BUFFER_BIND_ID;
-		AttributeDescriptions[2].location = 2;
-		AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		AttributeDescriptions[2].offset = offsetof(FVertex, TexCoord);
+		VertexInputAttributeDescriptions[2].binding = VERTEX_BUFFER_BIND_ID;
+		VertexInputAttributeDescriptions[2].location = 2;
+		VertexInputAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		VertexInputAttributeDescriptions[2].offset = offsetof(FVertex, TexCoord);
 
 		VertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
 		VertexInputCreateInfo.pVertexBindingDescriptions = &VertexBindDescription;				// list of vertex binding description data spacing, stride info
 		VertexInputCreateInfo.vertexAttributeDescriptionCount = AttrubuteDescriptionCount;
-		VertexInputCreateInfo.pVertexAttributeDescriptions = AttributeDescriptions;				// data format where to bind in shader
+		VertexInputCreateInfo.pVertexAttributeDescriptions = VertexInputAttributeDescriptions;				// data format where to bind in shader
 
 
 		// === Input Assembly ===
@@ -859,11 +899,10 @@ namespace VKE
 		ColorStateAttachments.colorBlendOp = VK_BLEND_OP_ADD;						// additive blending in PS.
 		// Blending color equation : (newColorAlpha * NewColor) + ((1 - newColorAlpha) * OldColor)
 
-		ColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		ColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		ColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		ColorStateAttachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		ColorStateAttachments.alphaBlendOp = VK_BLEND_OP_ADD;
 		// Blending alpha equation (1 * newAlpha) + (0 * oldAlpha)
-
 
 		ColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 		ColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;					// Alternative to calculation is to use logical operations
@@ -923,7 +962,7 @@ namespace VKE
 		// PipelineCache can save the cache when the next time create a pipeline
 		Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &GraphicPipeline);
 		RESULT_CHECK(Result, "Fail to create Graphics Pipelines.");
-		/** 2. Create second Pipeline*/
+		/** 2. Create second Pipeline: Particle rendering*/
 		{
 			// === Read in SPIR-V code of shaders === 
 			auto VertexShaderCode1 = FileIO::ReadFile("Content/Shaders/particle/particle.vert.spv");
@@ -943,36 +982,86 @@ namespace VKE
 			{
 				VSCreateInfo, FSCreateInfo
 			};
+
 			VkVertexInputBindingDescription ParticleInstanceInputBindingDescription = {};
 			ParticleInstanceInputBindingDescription.binding = INSTANCE_BUFFER_BIND_ID;
 			ParticleInstanceInputBindingDescription.stride = sizeof(BufferFormats::FParticle);		// Position
 			ParticleInstanceInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;		// Want to use instance draw to draw the particle
 
-			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[2];
-			ParticleInputAttributeDescriptions[0].binding = INSTANCE_BUFFER_BIND_ID;
-			ParticleInputAttributeDescriptions[0].location = 0;
-			ParticleInputAttributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including elapsed life time a Pos.w
-			ParticleInputAttributeDescriptions[0].offset = offsetof(BufferFormats::FParticle, Pos);
-			
-			ParticleInputAttributeDescriptions[1].binding = INSTANCE_BUFFER_BIND_ID;
-			ParticleInputAttributeDescriptions[1].location = 1;
-			ParticleInputAttributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
-			ParticleInputAttributeDescriptions[1].offset = offsetof(BufferFormats::FParticle, Vel);
+			const uint32_t ParticleInputAttributeDescriptionCount = 7;
+			VkVertexInputAttributeDescription ParticleInputAttributeDescriptions[ParticleInputAttributeDescriptionCount];
+			ParticleInputAttributeDescriptions[0] = VertexInputAttributeDescriptions[0];
+			ParticleInputAttributeDescriptions[1] = VertexInputAttributeDescriptions[1];
+			ParticleInputAttributeDescriptions[2] = VertexInputAttributeDescriptions[2];
 
+			ParticleInputAttributeDescriptions[3].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[3].location = 3;
+			ParticleInputAttributeDescriptions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including elapsed life time a Pos.w
+			ParticleInputAttributeDescriptions[3].offset = offsetof(BufferFormats::FParticle, Pos);
+
+			ParticleInputAttributeDescriptions[4].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[4].location = 4;
+			ParticleInputAttributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;				// including life time in Vel.w
+			ParticleInputAttributeDescriptions[4].offset = offsetof(BufferFormats::FParticle, Vel);
+
+			ParticleInputAttributeDescriptions[5].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[5].location = 5;
+			ParticleInputAttributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;				
+			ParticleInputAttributeDescriptions[5].offset = offsetof(BufferFormats::FParticle, ColorOverlay);
+
+			ParticleInputAttributeDescriptions[6].binding = INSTANCE_BUFFER_BIND_ID;
+			ParticleInputAttributeDescriptions[6].location = 6;
+			ParticleInputAttributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			ParticleInputAttributeDescriptions[6].offset = offsetof(BufferFormats::FParticle, Volume);
+
+			const uint32_t BindDescriptionCount = 2;
+			VkVertexInputBindingDescription BindingDescriptions[BindDescriptionCount] = { VertexBindDescription, ParticleInstanceInputBindingDescription };
 			// particle vertex data
-			VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-			VertexInputCreateInfo.pVertexBindingDescriptions = &ParticleInstanceInputBindingDescription;
-			VertexInputCreateInfo.vertexAttributeDescriptionCount = 2;
+			VertexInputCreateInfo.vertexBindingDescriptionCount = BindDescriptionCount;
+			VertexInputCreateInfo.pVertexBindingDescriptions = BindingDescriptions;
+			VertexInputCreateInfo.vertexAttributeDescriptionCount = ParticleInputAttributeDescriptionCount;
 			VertexInputCreateInfo.pVertexAttributeDescriptions = ParticleInputAttributeDescriptions;
 
-			// Change back to point list
-			InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;				// VK_PRIMITIVE_TOPOLOGY_POINT_LIST will draw point
+			// No longer drawing point, instead is drawing bill board
+			//InputAssemblyCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+			
+			// Disable DepthTest and DepthWrite for particles
+			DepthStencilCreateInfo.depthTestEnable = VK_TRUE;
+			DepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
+			
+			// Change blending stage
+			VkPipelineColorBlendStateCreateInfo ParticleColorBlendStateCreateInfo = {};
+
+			// Blend attachment state (How blending is handled)
+			VkPipelineColorBlendAttachmentState ParticleColorStateAttachments = {};
+			ParticleColorStateAttachments.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT; // Color to apply blending to. use all channels to blend
+			ParticleColorStateAttachments.blendEnable = VK_TRUE;
+
+			// Pre-multiplied alpha
+			ParticleColorStateAttachments.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			ParticleColorStateAttachments.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			ParticleColorStateAttachments.colorBlendOp = VK_BLEND_OP_ADD;						// additive blending in PS.
+			// Blending color equation : (newColorAlpha * NewColor) + ((1 - newColorAlpha) * OldColor)
+
+			ParticleColorStateAttachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			ParticleColorStateAttachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			ParticleColorStateAttachments.alphaBlendOp = VK_BLEND_OP_ADD;
+			// Blending alpha equation (1 * newAlpha) + (1 * oldAlpha)
+
+			ParticleColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			ParticleColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;					// Alternative to calculation is to use logical operations
+			//ColorBlendStateCreateInfo.logicOp = VK_LOGIC_OP_COPY;
+			ParticleColorBlendStateCreateInfo.attachmentCount = 1;
+			ParticleColorBlendStateCreateInfo.pAttachments = &ParticleColorStateAttachments;
 
 			// Create Another pipeline layout
+			const uint32_t ParticleSetLayoutCount = 2;
+			VkDescriptorSetLayout ParticlePassLayouts[ParticleSetLayoutCount] = { cDescriptorSet::GetDescriptorSetLayout(EDescriptorSetType::FirstPass_vert), cDescriptorSet::GetDescriptorSetLayout(EDescriptorSetType::ParticlePass_frag) };
+
 			VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo1 = {};
 			PipelineLayoutCreateInfo1.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			PipelineLayoutCreateInfo1.setLayoutCount = 1;
-			PipelineLayoutCreateInfo1.pSetLayouts = &DescriptorSets[0].GetDescriptorSetLayout();
+			PipelineLayoutCreateInfo1.setLayoutCount = ParticleSetLayoutCount;
+			PipelineLayoutCreateInfo1.pSetLayouts = ParticlePassLayouts;
 			PipelineLayoutCreateInfo1.pushConstantRangeCount = 0;
 			PipelineLayoutCreateInfo1.pPushConstantRanges = nullptr;
 
@@ -983,7 +1072,7 @@ namespace VKE
 			PipelineCreateInfo.pStages = ShaderStages1;
 			PipelineCreateInfo.layout = RenderParticlePipelineLayout;
 			PipelineCreateInfo.subpass = 1;	// Which sub-pass this pipeline is in 
-
+			PipelineCreateInfo.pColorBlendState = &ParticleColorBlendStateCreateInfo;
 			// Create the second pipeline 
 			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &RenderParticlePipeline);
 			RESULT_CHECK(Result, "Fail to create the second Graphics Pipelines.");
@@ -1036,11 +1125,53 @@ namespace VKE
 			PipelineCreateInfo.pStages = ShaderStages2;
 			PipelineCreateInfo.layout = PostProcessPipelineLayout;
 			PipelineCreateInfo.subpass = 2;	// Which sub-pass this pipeline is in 
-
+			PipelineCreateInfo.pColorBlendState = &ColorBlendStateCreateInfo;
 			// Create the third pipeline 
 			Result = vkCreateGraphicsPipelines(MainDevice.LD, VK_NULL_HANDLE, 1, &PipelineCreateInfo, nullptr, &PostProcessPipeline);
 			RESULT_CHECK(Result, "Fail to create the third Graphics Pipelines.");
 		}
+
+	}
+
+	void VKRenderer::recreateSwapChain()
+	{
+		vkDeviceWaitIdle(MainDevice.LD);
+
+		cleanupSwapChain();
+
+		createSwapChain();
+		createRenderPass();
+		createGraphicsPipeline();
+		createFrameBuffer();
+		createCommandBuffers();
+	}
+
+	void VKRenderer::cleanupSwapChain()
+	{
+		for (auto& FrameBuffer : SwapChainFramebuffers)
+		{
+			vkDestroyFramebuffer(MainDevice.LD, FrameBuffer, nullptr);
+		}
+
+		vkFreeCommandBuffers(MainDevice.LD, MainDevice.GraphicsCommandPool, static_cast<uint32_t>(CommandBuffers.size()), CommandBuffers.data());
+
+		// Destroy pipelines first and then destroy render pass
+		vkDestroyPipeline(MainDevice.LD, PostProcessPipeline, nullptr);
+		vkDestroyPipelineLayout(MainDevice.LD, PostProcessPipelineLayout, nullptr);
+
+		vkDestroyPipeline(MainDevice.LD, RenderParticlePipeline, nullptr);
+		vkDestroyPipelineLayout(MainDevice.LD, RenderParticlePipelineLayout, nullptr);
+
+		vkDestroyPipeline(MainDevice.LD, GraphicPipeline, nullptr);
+		vkDestroyPipelineLayout(MainDevice.LD, PipelineLayout, nullptr);
+
+		vkDestroyRenderPass(MainDevice.LD, RenderPass, nullptr);
+
+		for (auto & Image : SwapChain.Images)
+		{
+			vkDestroyImageView(MainDevice.LD, Image.ImgView, nullptr);
+		}
+		vkDestroySwapchainKHR(MainDevice.LD, SwapChain.SwapChain, nullptr);
 
 	}
 
@@ -1187,18 +1318,27 @@ namespace VKE
 	void VKRenderer::createDescriptorPool()
 	{
 		// Type of descriptors + how many DESCRIPTORS, not DESCRIPTOR Sets (combined makes the pool size)
-		const uint32_t DescriptorTypeCount = 3;
-		VkDescriptorPoolSize PoolSize[DescriptorTypeCount] = {};
-		PoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		PoolSize[0].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
-		PoolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		PoolSize[1].descriptorCount = static_cast<uint32_t>(SwapChain.Images.size());
-		PoolSize[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		PoolSize[2].descriptorCount = static_cast<uint32_t>(ColorBuffers.size() + DepthBuffers.size());
+		// in order to enable imgui, needs a larger descriptor pool
+		const uint32_t DescriptorTypeCount = 11;
+		const uint32_t MaxDescriptorsPerType = 1000;
+		VkDescriptorPoolSize PoolSize[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, MaxDescriptorsPerType },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MaxDescriptorsPerType }
+		};
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = static_cast<uint32_t>(SwapChain.Images.size() + ColorBuffers.size());
+		PoolCreateInfo.maxSets = DescriptorTypeCount * MaxDescriptorsPerType;
 		PoolCreateInfo.poolSizeCount = DescriptorTypeCount;
 		PoolCreateInfo.pPoolSizes = PoolSize;
 
@@ -1240,18 +1380,20 @@ namespace VKE
 				FDrawCall* Drawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (i *DBuffer->GetSlotSize()));
 				*Drawcall = RenderList[i]->Transform.M();
 			}
-			// Particle is drawn after all render objects
-			FDrawCall* ParticleDrawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + (RenderList.size() *DBuffer->GetSlotSize()));
-			*ParticleDrawcall = pCompute->Emitter.Transform.M();
+			for (size_t i = 0; i < pCompute->Emitters.size(); ++i)
+			{
+				// Particle is drawn after all render objects
+				FDrawCall* ParticleDrawcall = reinterpret_cast<FDrawCall*>(reinterpret_cast<uint64_t>(DBuffer->GetAllocatedMemory()) + ((RenderList.size() + i) * DBuffer->GetSlotSize()));
+				*ParticleDrawcall = pCompute->Emitters[i].Transform.M();
+			}
 			
 			// Copy Model data RenderList.Size() + Emitter.Size()
 			// Reuse void* Data
-			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + 1);
+			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + pCompute->Emitters.size());
 			DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
 		}
 
 	}
-
 
 	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
 	{
@@ -1366,7 +1508,8 @@ namespace VKE
 		{
 			return false;
 		}
-		if (!getSwapChainDetail(device).IsValid())
+		getSwapChainDetail(device);
+		if (!SwapChainDetail.IsValid())
 		{
 			return false;
 		}
@@ -1396,7 +1539,7 @@ namespace VKE
 		throw std::runtime_error("Fail to find a matching format!");
 	}
 
-	bool VKRenderer::CreateModel(const std::string& ifileName, cModel*& oModel)
+	bool VKRenderer::CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel)
 	{
 		// Import model "scene"
 		Assimp::Importer Importer;
@@ -1444,13 +1587,14 @@ namespace VKE
 				Mesh->CreateDescriptorSet(SamplerDescriptorPool);
 			}
 		}
-		oModel = DBG_NEW cModel(Meshes);
+		oModel = std::make_shared<cModel>(Meshes);
 
 		return true;
 	}
 
 	void VKRenderer::recordCommands()
 	{
+		const uint32_t EmitterCount = pCompute->Emitters.size();
 		VkCommandBuffer& CB = CommandBuffers[SwapChain.ImageIndex];
 		// Begin info can be the same
 		VkCommandBufferBeginInfo BufferBeginInfo = {};
@@ -1467,7 +1611,7 @@ namespace VKE
 		const uint32_t ClearColorCount = 3;
 		VkClearValue ClearValues[ClearColorCount] = {};
 		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };							// SwapChain image clear color, doesn't make any difference if the image is drawn properly
-		ClearValues[1].color = { 0.4f, 0.4f, 0.4f, 1.0f };							// Color attachment clear value
+		ClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };							// Color attachment clear value
 		ClearValues[2].depthStencil.depth = 1.0f;									// Depth attachment clear value
 
 		RenderPassBeginInfo.pClearValues = ClearValues;								// List of clear values 
@@ -1479,48 +1623,34 @@ namespace VKE
 		VkResult Result = vkBeginCommandBuffer(CB, &BufferBeginInfo);
 		RESULT_CHECK_ARGS(Result, "Fail to start recording a command buffer[%d]", SwapChain.ImageIndex);
 
-		const int& GraphicFamilyIndex = MainDevice.QueueFamilyIndices.graphicFamily;
-		const int& ComputeFamilyIndex = MainDevice.QueueFamilyIndices.computeFamily;
-		const cBuffer& StorageBuffer = pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(0)->GetBuffer();
-
 		/** Record part */
 		// Acquire barrier
 		if (pCompute->needSynchronization())
 		{
-			VkBufferMemoryBarrier BufferBarrier = {};
-			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-			BufferBarrier.srcAccessMask = 0;
-			BufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-			// Transfer ownership from compute queue to graphic queue
-			BufferBarrier.srcQueueFamilyIndex = ComputeFamilyIndex;
-			BufferBarrier.dstQueueFamilyIndex = GraphicFamilyIndex;
-			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
-			BufferBarrier.offset = 0;
-			BufferBarrier.size = StorageBuffer.BufferSize();
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
+			
+			// Let graphic queue own the buffers
+			for (uint32_t i = 0; i < EmitterCount; ++i)
+			{
+				BufferBarriers[i] = pCompute->Emitters[i].GraphicOwnBarrier(0, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT);
+			}
 
 			// Block the vertex input stage until compute shader has finished
 			vkCmdPipelineBarrier(CB,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-				0,							// No Dependency flag
-				0, nullptr,					// Not a Memory barrier
-				1, &BufferBarrier,			// A Buffer memory Barrier
-				0, nullptr);				// Not a Image memory barrier
+				0,										// No Dependency flag
+				0, nullptr,								// Not a Memory barrier
+				EmitterCount, BufferBarriers.data(),	// A Buffer memory Barrier
+				0, nullptr);							// Not a Image memory barrier
 		}
 
-		// Begin Render Pass
+		// Begin first Render Pass
 		vkCmdBeginRenderPass(CB, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		// Start the first sub-pass
 		// Bind Pipeline to be used in render pass
 		vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicPipeline);
-		/*
-			Deferred shading example:
-			G-Buffer pipeline, stores all data to multiple attachments
-			Switch to another pipeline, do lighting
-			Switch to another pipeline, do HDR
-			...
-		*/
 
 		// Draw all models in the render list
 		for (size_t j = 0; j < RenderList.size(); ++j)
@@ -1575,28 +1705,40 @@ namespace VKE
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipeline);
 
-			// Bind storage buffer as a vertex buffer
+			std::shared_ptr<cMesh> QuadMesh = GQuadModel->GetMesh(0);
 			VkDeviceSize Offsets[] = { 0 };
-			vkCmdBindVertexBuffers(CB, INSTANCE_BUFFER_BIND_ID, 1, &pCompute->GetStorageBuffer().GetvkBuffer(), Offsets);
+			// Bind vertex buffer
+			vkCmdBindVertexBuffers(CB, VERTEX_BUFFER_BIND_ID, 1, &QuadMesh->GetVertexBuffer(), Offsets);
+			// Bind index buffer
+			vkCmdBindIndexBuffer(CB, QuadMesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+			for (size_t i = 0; i < EmitterCount; ++i)
+			{
+				// Update descriptor data
+				pCompute->Emitters[i].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->Emitters[i].ParticleSupportData);
 
-			// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
-			uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * RenderList.size();
+				// Bind instance data buffer as a vertex buffer
+				vkCmdBindVertexBuffers(CB, INSTANCE_BUFFER_BIND_ID, 1, &pCompute->Emitters[i].GetStorageBuffer().GetvkBuffer(), Offsets);
 
-			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
-				0, 1, &DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
-				1, &ParticleDynamicOffset);	// no dynamic offset because no model matrix
-			
-			// Instance draw
-			// draw a quad
-			vkCmdDraw(CB, 6, Particle_Count, 0, 0);
+				// Particle is drawn after all Model, so the offset should be RenderList.size() * Length
+				uint32_t ParticleDynamicOffset = static_cast<uint32_t>(DescriptorSets[SwapChain.ImageIndex].GetDescriptorAt<cDescriptor_DynamicBuffer>(1)->GetSlotSize()) * (RenderList.size() + i);
+
+				const uint32_t DescriptorSetCount = 2;
+				// Two descriptor sets
+				VkDescriptorSet DescriptorSetGroup[] = { DescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(), pCompute->Emitters[i].RenderDescriptorSet.GetDescriptorSet() };
+	
+				vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderParticlePipelineLayout,
+					0, DescriptorSetCount, DescriptorSetGroup,
+					1, &ParticleDynamicOffset);
+
+				// draw the quad with multiple instance
+				vkCmdDrawIndexed(CB, QuadMesh->GetIndexCount(), Particle_Count, 0, 0, 0);
+			}
 		}
 		// Start the third sub-pass
 		{
-
 			vkCmdNextSubpass(CB, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipeline);
-			
-			pCompute->ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(1)->UpdateBufferData(&pCompute->ParticleSupportData);
+
 			// No need to bind vertex buffer or index buffer
 			vkCmdBindDescriptorSets(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, PostProcessPipelineLayout,
 				0, 1, &InputDescriptorSets[SwapChain.ImageIndex].GetDescriptorSet(),
@@ -1606,35 +1748,54 @@ namespace VKE
 		}
 		// End Render Pass
 		vkCmdEndRenderPass(CB);
+		
+		// Begin second (imgui) render pass
+		// Rendering
+		ImGui::Render();
+		ImDrawData* draw_data = ImGui::GetDrawData();
+		ImGui_ImplVulkanH_Window* wd = Editor::GetMainWindowData();
+		wd->FrameIndex = SwapChain.ImageIndex;
+		ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
+		{
+			VkRenderPassBeginInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			info.renderPass = wd->RenderPass;
+			info.framebuffer = fd->Framebuffer;
+			info.renderArea.extent.width = wd->Width;
+			info.renderArea.extent.height = wd->Height;
+			info.clearValueCount = 1;
+			info.pClearValues = &wd->ClearValue;
+			vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+		}
+
+		// Record dear imgui primitives into command buffer
+		ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
+		// End imgui render pass
+		vkCmdEndRenderPass(fd->CommandBuffer);
 
 		// Release barrier
 		if (pCompute->needSynchronization())
 		{
-			VkBufferMemoryBarrier BufferBarrier = {};
-			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-			// The storage buffer is used as vertex input
-			BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-			BufferBarrier.dstAccessMask = 0;
-			// Transfer ownership from graphic queue to compute queue
-			BufferBarrier.srcQueueFamilyIndex = GraphicFamilyIndex;
-			BufferBarrier.dstQueueFamilyIndex = ComputeFamilyIndex;	
-			BufferBarrier.buffer = StorageBuffer.GetvkBuffer();
-			BufferBarrier.offset = 0;
-			BufferBarrier.size = StorageBuffer.BufferSize();
+			std::vector<VkBufferMemoryBarrier> BufferBarriers(EmitterCount);
+
+			// Let compute queue own the buffers
+			for (uint32_t i = 0; i < EmitterCount; ++i)
+			{
+				BufferBarriers[i] = pCompute->Emitters[i].ComputeOwnBarrier(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, 0);
+			}
 
 			// Block the compute shader until vertex shader finished reading the storage buffer
 			vkCmdPipelineBarrier(CB,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				0,							// No Dependency flag
-				0, nullptr,					// Not a Memory barrier
-				1, &BufferBarrier,			// A Buffer memory Barrier
-				0, nullptr);				// Not a Image memory barrier
+				0,										// No Dependency flag
+				0, nullptr,								// Not a Memory barrier
+				EmitterCount, BufferBarriers.data(),	// A Buffer memory Barrier
+				0, nullptr);							// Not a Image memory barrier
 		}
 
 		Result = vkEndCommandBuffer(CB);
 		RESULT_CHECK_ARGS(Result, "Fail to stop recording a command buffer[%d]", SwapChain.ImageIndex);
-
 	}
 
 
@@ -1676,12 +1837,11 @@ namespace VKE
 
 	}
 
-	FSwapChainDetail VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)
+	void VKRenderer::getSwapChainDetail(const VkPhysicalDevice& device)
 	{
-		FSwapChainDetail SwapChainDetails;
-
+		
 		// Capabilities for the surface of this device
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Surface, &SwapChainDetails.SurfaceCapabilities);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Surface, &SwapChainDetail.SurfaceCapabilities);
 
 		// get list of support formats
 		{
@@ -1689,8 +1849,8 @@ namespace VKE
 			vkGetPhysicalDeviceSurfaceFormatsKHR(device, Surface, &FormatCount, nullptr);
 			if (FormatCount > 0)
 			{
-				SwapChainDetails.ImgFormats.resize(FormatCount);
-				vkGetPhysicalDeviceSurfaceFormatsKHR(device, Surface, &FormatCount, SwapChainDetails.ImgFormats.data());
+				SwapChainDetail.ImgFormats.resize(FormatCount);
+				vkGetPhysicalDeviceSurfaceFormatsKHR(device, Surface, &FormatCount, SwapChainDetail.ImgFormats.data());
 			}
 		}
 
@@ -1700,12 +1860,10 @@ namespace VKE
 			vkGetPhysicalDeviceSurfacePresentModesKHR(device, Surface, &ModeCount, nullptr);
 			if (ModeCount > 0)
 			{
-				SwapChainDetails.PresentationModes.resize(ModeCount);
-				vkGetPhysicalDeviceSurfacePresentModesKHR(device, Surface, &ModeCount, SwapChainDetails.PresentationModes.data());
+				SwapChainDetail.PresentationModes.resize(ModeCount);
+				vkGetPhysicalDeviceSurfacePresentModesKHR(device, Surface, &ModeCount, SwapChainDetail.PresentationModes.data());
 			}
 		}
-
-		return SwapChainDetails;
 	}
 
 

@@ -63,7 +63,7 @@ namespace VKE
 			return m_keyStatusMap.find(i_key) != m_keyStatusMap.end();
 		}
 
-		void FUserInput::UpdateInput()
+		void FUserInput::Update()
 		{
 			// Don't want the app update input while the app is not in focus
 			if (!bAppInFocus)

@@ -55,6 +55,7 @@ namespace VKE
 
 	void cMesh::cleanUp()
 	{
+		SamplerDescriptorSet.cleanUp();
 		VertexBuffer.cleanUp();
 		IndexBuffer.cleanUp();
 	}

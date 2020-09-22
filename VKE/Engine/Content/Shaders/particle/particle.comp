@@ -11,23 +11,44 @@ const float firctionCoefficient = 0.5;
 struct sConeEmitter
 {
 	float Radius;
-	float Angle;				// in degree
+	float Angle;				// in radians
 	float StartSpeedMin;
 	float StartSpeedMax;
+	
 	float StartDelayRangeMin;
 	float StartDelayRangeMax;
 	float LifeTimeRangeMin;
 	float LifeTimeRangeMax;
+	
+	vec4 StartColor;
+	vec4 ColorOverLifeTimeStart;
+	vec4 ColorOverLifeTimeEnd;
+	
+	float StartSizeMin;
+	float StartSizeMax;
+	float NoiseMin;
+	float NoiseMax;
+	
+	float StartRotationMin;
+	float StartRotationMax;
+	int bEnableSubTexture;
+	int TileWidth;
 };
 
 struct sParticle
 {
 	vec3 Pos;
 	float ElpasedTime;
+	
 	vec3 Vel;
 	float LifeTime;
+
+	vec4 ColorOverlay;
+
 	float Volume;
-	float padding;
+	float RotationAlongZ;
+	float TileID;		
+	float TileWidth;
 };
 
 // Binding 0 : Position storage buffer
@@ -40,6 +61,8 @@ layout (std140, binding = 1) uniform sParticleSupportData
 {
 	float dt;
 	int bUseGravity;
+	float EmitRateOverTime;		// numbers of particle will emit per second
+	float EmitTimer;			// Elapsed time since last particle emission
 };
 layout (std140, binding = 2) uniform s_ConeEmitter 
 {
@@ -72,6 +95,10 @@ float floatConstruct( uint m ) {
     float  f = uintBitsToFloat( m );       // Range [1:2]
     return f - 1.0;                        // Range [0:1]
 }
+bool isFloatZero(float f)
+{
+	return abs(f) < 0.0001;
+}
 
 // Pseudo-random value in half-open range [0:1].
 float random( float x ) { return floatConstruct(hash(floatBitsToUint(x))); }
@@ -79,12 +106,28 @@ float random( vec2  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 
+
+
 float randomRange(float min, float max, float rnd)
-{
+{	
+	// if min and max is almost the same, no need to get random between
+	if(isFloatZero(max - min)) 
+		return min;
 	return rnd * (max - min) + min;
 }
-
-layout( local_size_x = 128 ) in;
+int randomRange(int min, int max, float rnd)
+{
+	int result = int(randomRange(float(min), float(max) + 1.0, rnd));
+	if (result > max)
+	{
+		result = max;
+	}
+	return result;
+}
+vec4 LerpV4(in vec4 a,in vec4 b, float t)
+{
+	return (b - a) * t + a;
+}
 
 void NextParticle(inout sParticle oParticle)
 {
@@ -98,34 +141,54 @@ void NextParticle(inout sParticle oParticle)
 	oPos.z += R * sinTheta;
 	oParticle.Pos = oPos;
 
+	// Volume
+	oParticle.Volume = randomRange(EmitterData.StartSizeMin, EmitterData.StartSizeMax,random(vec2(oParticle.Pos.z, oParticle.Pos.y)));
+	// Rotation
+	oParticle.RotationAlongZ = randomRange(EmitterData.StartRotationMin, EmitterData.StartRotationMax,random(vec2(oParticle.Pos.x, oParticle.Pos.y)));
+
 	// Velocity
 	float PercentageToCenter = R / EmitterData.Radius;
 	float Alpha = PercentageToCenter * EmitterData.Angle;
 	float sinAlpha = sin(Alpha);
 	float StartSpeed = randomRange(EmitterData.StartSpeedMin, EmitterData.StartSpeedMax, random(vec2(oParticle.Pos.x, oParticle.Pos.z)));
 	oParticle.Vel = vec3(sinAlpha * cosTheta, cos(Alpha), sinAlpha * sinTheta) * StartSpeed;	// normalized * Start Speed
-
+	
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
-	oParticle.ElpasedTime = 0.0f;//-randomRange(EmitterData.StartDelayRangeMin, EmitterData.StartDelayRangeMax, random(vec2(oParticle.Vel.x, oParticle.Vel.z)));
+	oParticle.ElpasedTime = 0.0f;
+
+	// Texture sub tiling
+	if (EmitterData.bEnableSubTexture > 0)
+	{
+		const int SubTextures = EmitterData.TileWidth * EmitterData.TileWidth;
+		// e.g. if TileWidth == 2, then TileID's range is [0, 1, 2, 3]
+		oParticle.TileID = randomRange(0, SubTextures - 1, random(vec4(oParticle.Pos.x ,oParticle.Vel.z, oParticle.Pos.y ,oParticle.Vel.x)));
+	}
+	oParticle.TileWidth = EmitterData.TileWidth;
 }
+
+layout( local_size_x = 32 ) in;
 void main()
 {
 	uint gid = gl_GlobalInvocationID.x; // the .y and .z are both 1 in this case
-	Particles[ gid ].ElpasedTime += dt;
+
+	Particles[gid].ElpasedTime += dt;
 	// Only update particles with ElpasedTime greater than 0
-	if(Particles[ gid ].ElpasedTime < 0)
+	if(Particles[gid].ElpasedTime < 0)
 	{
 		return;
 	}
-	else if (Particles[ gid ].ElpasedTime >= Particles[gid].LifeTime)
+	else if (Particles[gid].ElpasedTime >= Particles[gid].LifeTime)
 	{
-		NextParticle(Particles[ gid ]);
+		// disable this particle
+		NextParticle(Particles[gid]);
 	}
+	
+	float lifePercent = Particles[gid].ElpasedTime / Particles[gid].LifeTime;
 
-	vec3 p = Particles[ gid ].Pos;
-	vec3 v = Particles[ gid ].Vel;
-	vec3 a = DAMPING * v;
+	vec3 p = Particles[gid].Pos;
+	vec3 v = Particles[gid].Vel;
+	vec3 a = DAMPING * v + vec3(0, 0.25, 0.0);
 	if(p.y > groundY)
 	{
 		if(bUseGravity > 0)
@@ -138,6 +201,14 @@ void main()
 		// ground friction
 		a += firctionCoefficient * (-g.y) * -normalize(vec3(v.x, 0, v.z));
 	}
+
+	// Enable noise if there is one
+	if(!isFloatZero(EmitterData.NoiseMin) || !isFloatZero(EmitterData.NoiseMax))
+	{
+		vec3 aNoise = vec3(randomRange(EmitterData.NoiseMin, EmitterData.NoiseMax, random(v)), 0, randomRange(EmitterData.NoiseMin, EmitterData.NoiseMax, random(p)));
+		a += aNoise;
+	}
+	
 	vec3 pp = p + v * dt + 0.5 * dt * dt * a;
 	vec3 vp = v + a * dt;
 
@@ -150,6 +221,9 @@ void main()
 			vp.y = 0;
 	}
 
-	Particles[ gid ].Pos = pp;
-	Particles[ gid ].Vel = vp;
+	// update particle data
+	Particles[gid].Pos = pp;
+	Particles[gid].Vel = vp;
+	
+	Particles[gid].ColorOverlay = LerpV4(EmitterData.StartColor * EmitterData.ColorOverLifeTimeStart, EmitterData.StartColor * EmitterData.ColorOverLifeTimeEnd, lifePercent);
 }

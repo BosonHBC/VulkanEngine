@@ -70,9 +70,9 @@ namespace VKE
 	}
 
 
-	void FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
+	VkResult FSwapChainData::acquireNextImage(FMainDevice MainDevice, VkSemaphore PresentCompleteSemaphore)
 	{
-		vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
+		return vkAcquireNextImageKHR(MainDevice.LD, SwapChain,
 			std::numeric_limits<uint64_t>::max(),						// never timeout
 			PresentCompleteSemaphore,								// Signal us when that image is available to use
 			VK_NULL_HANDLE,
@@ -410,6 +410,17 @@ namespace VKE
 		);
 
 		EndCommandBuffer(CommandBuffer, LD, Queue, CommandPool);
+	}
+
+	int RandRangeInt(int min, int max)
+	{
+		int result = static_cast<int>(RandRange(static_cast<float>(min), static_cast<float>(max) + 1.0f));
+		// when RandRange_float returns 1.0, result would be max + 1, clamp that
+		if (result > max)
+		{
+			result = max;
+		}
+		return result;
 	}
 
 	float RandRange(float min, float max)

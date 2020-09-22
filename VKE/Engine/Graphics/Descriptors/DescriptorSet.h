@@ -8,8 +8,9 @@ namespace VKE
 	enum EDescriptorSetType : uint8_t
 	{
 		FirstPass_vert,
-		SecondPass_frag,
+		ThirdPass_frag,
 		FirstPass_frag,
+		ParticlePass_frag,
 		ComputePass,
 		Invalid = uint8_t(-1),
 	};
@@ -30,7 +31,7 @@ namespace VKE
 		cDescriptorSet(const cDescriptorSet& i_other) = default;
 		cDescriptorSet& operator = (const cDescriptorSet& i_other) = delete;
 		cDescriptorSet( cDescriptorSet&& i_other) = default;
-		cDescriptorSet& operator = (cDescriptorSet&& i_other) = delete;
+		cDescriptorSet& operator = (cDescriptorSet&& i_other) = default;
 		void cleanUp();
 
 		/** Getters */
@@ -45,7 +46,18 @@ namespace VKE
 			T* Descriptor = dynamic_cast<T*>(Descriptors[Idx]);
 			return Descriptor;
 		}
+		
+		template <class T>
+		const T* const GetDescriptorAt_Immutable(size_t Idx) const
+		{
+			if (Idx >= Descriptors.size())
+			{
+				return nullptr;
+			}
 
+			T* Descriptor = dynamic_cast<T*>(Descriptors[Idx]);
+			return Descriptor;
+		}
 		const VkDescriptorSetLayout& GetDescriptorSetLayout() const;
 		const VkDescriptorSet& GetDescriptorSet() const { return DescriptorSet; }
 

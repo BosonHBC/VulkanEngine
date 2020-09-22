@@ -159,6 +159,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Editor\Editor.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Graphics\Buffer\Buffer.cpp" />
     <ClCompile Include="Graphics\Buffer\ImageBuffer.cpp" />
@@ -173,12 +174,21 @@
     <ClCompile Include="Graphics\Texture\Texture.cpp" />
     <ClCompile Include="Graphics\Utilities.cpp" />
     <ClCompile Include="Graphics\VKRenderer.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="Input\InputDelegate.cpp" />
     <ClCompile Include="Input\UserInput.cpp" />
     <ClCompile Include="ParticleSystem\Emitter.cpp" />
+    <ClCompile Include="ParticleSystem\ParticleSystem.cpp" />
+    <ClCompile Include="Time.cpp" />
     <ClCompile Include="Transform\Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Editor\Editor.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Graphics\BufferFormats.h" />
     <ClInclude Include="Graphics\Buffer\Buffer.h" />
@@ -196,9 +206,19 @@
     <ClInclude Include="Graphics\Texture\Texture.h" />
     <ClInclude Include="Graphics\Utilities.h" />
     <ClInclude Include="Graphics\VKRenderer.h" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\imstb_rectpack.h" />
+    <ClInclude Include="imgui\imstb_textedit.h" />
+    <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="Input\InputDelegate.h" />
     <ClInclude Include="Input\UserInput.h" />
     <ClInclude Include="ParticleSystem\Emitter.h" />
+    <ClInclude Include="ParticleSystem\ParticleSystem.h" />
+    <ClInclude Include="Time.h" />
     <ClInclude Include="Transform\Transform.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -34,7 +34,7 @@ namespace VKE
 
 		/** Getters */
 		// Get buffer size for Descriptor_buffer
-		cBuffer& GetBuffer() { return Buffer; }
+		const cBuffer& GetBuffer() const { return Buffer; }
 		const VkDeviceSize& GetSlotSize() const { return BufferInfo.range; }
 		const VkDeviceMemory& GetBufferMemory() const { return Buffer.GetMemory(); }
 

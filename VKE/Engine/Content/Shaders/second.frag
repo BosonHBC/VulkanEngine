@@ -7,10 +7,25 @@ layout(input_attachment_index = 1, binding = 1) uniform subpassInput inputDepth;
 // output color to SwapChain image
 layout(location = 0) out vec4 outColor;
 
+void tosRGB(inout float c )
+{
+	if (c <= 0.0031308)
+	{
+		c = 12.92 * c;
+	}
+	else
+	{
+		c = 1.055 * pow(c, 1 / 2.4) - 0.055;
+	}
+}
+
 void main()
 {
 	outColor = vec4(subpassLoad(inputColor).rgb, 1.0f);
-   	return;
+   	//tosRGB(outColor.r); 
+	//tosRGB(outColor.g); 
+	//tosRGB(outColor.b);
+	return;
 	int xHalf = 800 / 2;
 	if(gl_FragCoord.x > xHalf)
 	{

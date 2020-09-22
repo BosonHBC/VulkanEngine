@@ -36,10 +36,10 @@ namespace VKE
 		void CreateDescriptorSet(VkDescriptorPool SamplerDescriptorPool);
 
 		uint32_t GetVertexCount() const { return VertexCount; }
-		VkBuffer GetVertexBuffer() const { return VertexBuffer.GetvkBuffer(); }
+		const VkBuffer& GetVertexBuffer() const { return VertexBuffer.GetvkBuffer(); }
 
 		uint32_t GetIndexCount() const { return IndexCount; }
-		VkBuffer GetIndexBuffer() const { return IndexBuffer.GetvkBuffer(); }
+		const VkBuffer& GetIndexBuffer() const { return IndexBuffer.GetvkBuffer(); }
 
 		void SetMaterialID(int MatID) { MaterialID = MatID; }
 		int GetMaterialID() const {	return MaterialID; }
