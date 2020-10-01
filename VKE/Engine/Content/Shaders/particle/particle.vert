@@ -56,7 +56,7 @@ void main()
     // Model matrix for individual quad
     mat4 Model = mat4(1.0);
     Model[3] = vec4(pos.xyz, 1.0);
-    mat4 ModelView = ViewMatrix * ModelMatrix * Model;
+    mat4 ModelView = ViewMatrix * Model;
    
     // Bill board effect
     // Remove rotation on X, Y axis, but keep the Z axis rotation if there is one

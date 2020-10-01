@@ -73,9 +73,10 @@ namespace VKE
 					{
 						continue;
 					}
-
-					if (ImGui::SliderFloat("Cone Angle", &CP->Emitters[i].EmitterData.Angle, 0.01f, glm::radians(90.f)))
+					float angle = glm::degrees(CP->Emitters[i].EmitterData.Angle);
+					if (ImGui::SliderFloat("Cone Angle", &angle, 0.01f, 90.f))
 					{
+						CP->Emitters[i].EmitterData.Angle = glm::radians(angle);
 						NeedToUpdateParticle = true;
 					}
 
@@ -84,10 +85,24 @@ namespace VKE
 						NeedToUpdateParticle = true;
 					}
 
+					glm::vec3 Position = CP->Emitters[i].Transform.Position();
+					if (ImGui::DragFloat3("Position", (float*)&Position, 0.1f))
+					{
+						CP->Emitters[i].Transform.SetPosition(Position);
+						CP->Emitters[i].Transform.Update();
+						NeedToUpdateParticle = true;
+					}
+
+					int MaxParticleCount = (int)CP->Emitters[i].ParticleSupportData.EmitRateOverTime;
+					if (ImGui::SliderInt("EmitRateOverTime", &MaxParticleCount, 1, Particle_Count))
+					{
+						CP->Emitters[i].ParticleSupportData.EmitRateOverTime = (float)MaxParticleCount;
+					}
+
 					if (NeedToUpdateParticle)
 					{
 						CP->Emitters[i].bNeedUpdate = true;
-						CP->Emitters[i].UpdateEmitterData(CP->Emitters[i].ComputeDescriptorSet.GetDescriptorAt<cDescriptor_Buffer>(2));
+						CP->Emitters[i].UpdateEmitterData();
 					}
 				}
 				ImGui::End();

@@ -308,6 +308,10 @@ namespace VKE
 		CreateModel("Quad.obj", GQuadModel);
 		GQuadModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1));
 
+	/*	std::shared_ptr<cModel> pTen01 = nullptr;
+		CreateModel("Ten01.obj", pTen01);
+		RenderList.push_back(pTen01);
+		pTen01->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));*/
 	}
 
 	void VKRenderer::createInstance()

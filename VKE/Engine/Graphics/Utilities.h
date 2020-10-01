@@ -37,8 +37,8 @@
 
 #define PI 3.14159265359f
 #define IsFloatZero(x) (x > -0.0001f && x < 0.0001f)
-#define Particle_Count 64
-#define Dispatch_Size_X 32
+#define Particle_Count 1024
+#define Dispatch_Size_X 128
 
 #define ACCESSOR_INLINE(ClassName, PropertyName) \
 	const ClassName& Get##PropertyName() const { return PropertyName; }
@@ -69,7 +69,7 @@ namespace VKE
 	// Maximum 3 image on the queue
 	const int MAX_FRAME_DRAWS = 3;
 	// Max objects are allowed in the scene
-	const int MAX_OBJECTS = 20;
+	const int MAX_OBJECTS = 128;
 	
 	extern uint64_t ElapsedFrame;
 	// =======================================

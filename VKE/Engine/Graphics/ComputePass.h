@@ -47,17 +47,12 @@ namespace VKE
 		// Compute pass commands, no need to re-record like graphic commands
 		void recordComputeCommands();
 
-		void undateUniformBuffer();
-
 		void recreateSwapChain();
 
 		void cleanupSwapChain();
 
 		bool bNeedComputePass = true;
 	private:
-
-		void createStorageBuffer();
-		void createUniformBuffer();
 		void prepareDescriptors();
 		void createComputePipeline();
 		void createCommandPool();

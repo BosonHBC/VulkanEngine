@@ -129,6 +129,10 @@ namespace VKE
 
 	VkDescriptorSetLayout cDescriptorSet::GetDescriptorSetLayout(EDescriptorSetType iType)
 	{
+		if (SDescriptorSetLayoutMap.find(iType) == SDescriptorSetLayoutMap.end())
+		{
+			return SDescriptorSetLayoutMap.at(EDescriptorSetType(0));
+		}
 		return SDescriptorSetLayoutMap.at(iType);
 	}
 

@@ -30,8 +30,8 @@ namespace VKE
 		cDescriptorSet ComputeDescriptorSet;		// Used in compute shader Storage buffer, uniform buffer
 		cDescriptorSet RenderDescriptorSet;			// Used in vertex / fragment shader when rendering, currently is for sampler
 
-		void NextParticle(BufferFormats::FParticle& oParticle);
-		void UpdateEmitterData(cDescriptor_Buffer* Descriptor);
+		void NextParticle(BufferFormats::FParticle& oParticle, int idx);
+		void UpdateEmitterData();
 		/** Graphic queue acquires ownership of this storage buffer */
 		VkBufferMemoryBarrier GraphicOwnBarrier( VkAccessFlags srcMask, VkAccessFlags dstMask) const;
 		/** Compute queue acquires ownership of this storage buffer */
@@ -40,6 +40,8 @@ namespace VKE
 		const cBuffer& GetStorageBuffer() const;
 
 		void Dispatch(const VkCommandBuffer& CommandBuffer, const VkPipelineLayout& ComputePipelineLayout);
+
+		void MoveVertically(float axis);
 	private:
 		
 	};

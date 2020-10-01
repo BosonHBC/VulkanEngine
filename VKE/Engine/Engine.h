@@ -7,8 +7,13 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 struct GLFWwindow;
+
 namespace VKE
 {
+	namespace UserInput
+	{
+		struct FUserInput;
+	}
 	class cCamera;
 
 	int init();
@@ -20,7 +25,7 @@ namespace VKE
 	GLFWwindow* GetGLFWWindow();
 	cCamera* GetCurrentCamera();
 	glm::ivec2 GetWindowExtent();
-
+	UserInput::FUserInput* GetUserInput();
 	glm::vec2 GetMouseDelta();
 	extern uint64_t ElapsedFrame;
 	extern bool bWindowIconified;

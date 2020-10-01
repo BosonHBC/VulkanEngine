@@ -119,6 +119,11 @@ namespace VKE {
 		return glm::ivec2(WIDTH, HEIGHT);
 	}
 
+	VKE::UserInput::FUserInput* GetUserInput()
+	{
+		return g_Input;
+	}
+
 	glm::vec2 GetMouseDelta()
 	{
 		if (g_Input)
@@ -161,6 +166,8 @@ namespace VKE {
 		g_Input->AddAxisKeyPairToMap("MoveRight", { EKeyCode::A,EKeyCode::D });
 		g_Input->AddAxisKeyPairToMap("MoveForward", { EKeyCode::S,EKeyCode::W });
 		g_Input->AddAxisKeyPairToMap("MoveUp", { EKeyCode::Control,EKeyCode::Space });
+
+		g_Input->AddAxisKeyPairToMap("MoveParticleVertically", { EKeyCode::Left,EKeyCode::Right });
 
 	}
 	void window_focus_callback(GLFWwindow* window, int focused)

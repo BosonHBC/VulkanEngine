@@ -10,6 +10,8 @@ const float firctionCoefficient = 0.5;
 
 struct sConeEmitter
 {
+	mat4 ModelMatrix;
+
 	float Radius;
 	float Angle;				// in radians
 	float StartSpeedMin;
@@ -50,7 +52,10 @@ struct sParticle
 	float TileID;		
 	float TileWidth;
 };
-
+struct sParticleCount
+{
+	int ParticleCount;
+};
 // Binding 0 : Position storage buffer
 layout(std140, binding = 0) buffer s_Particle 
 {
@@ -67,6 +72,10 @@ layout (std140, binding = 1) uniform sParticleSupportData
 layout (std140, binding = 2) uniform s_ConeEmitter 
 {
 	sConeEmitter EmitterData;
+};
+layout (std140, binding = 3) buffer s_ParticleCount 
+{
+	sParticleCount ParticleCount[];
 };
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 uint hash( uint x ) {
@@ -133,13 +142,16 @@ void NextParticle(inout sParticle oParticle)
 {
 	float R = clamp(EmitterData.Radius * sqrt(random(oParticle.Pos)), MinRadius, EmitterData.Radius);
 	float theta = random(vec2(oParticle.Pos.x, oParticle.Pos.y)) * 2 * PI;
-		
+
+	// oPos is in local space	
 	vec3 oPos = vec3(0.0);
 	float sinTheta = sin(theta);
 	float cosTheta = cos(theta);
 	oPos.x += R * cosTheta;
 	oPos.z += R * sinTheta;
-	oParticle.Pos = oPos;
+
+	// oParticle is in world space
+	oParticle.Pos = (EmitterData.ModelMatrix * vec4(oPos, 1.0)).xyz;
 
 	// Volume
 	oParticle.Volume = randomRange(EmitterData.StartSizeMin, EmitterData.StartSizeMax,random(vec2(oParticle.Pos.z, oParticle.Pos.y)));
@@ -155,7 +167,7 @@ void NextParticle(inout sParticle oParticle)
 	
 	// Time
 	oParticle.LifeTime = randomRange(EmitterData.LifeTimeRangeMin, EmitterData.LifeTimeRangeMax, random(vec2(oParticle.Pos.y, oParticle.Pos.z)));
-	oParticle.ElpasedTime = 0.0f;
+	oParticle.ElpasedTime = -float(gl_GlobalInvocationID.x) / EmitRateOverTime;
 
 	// Texture sub tiling
 	if (EmitterData.bEnableSubTexture > 0)
@@ -171,18 +183,27 @@ layout( local_size_x = 32 ) in;
 void main()
 {
 	uint gid = gl_GlobalInvocationID.x; // the .y and .z are both 1 in this case
-
 	Particles[gid].ElpasedTime += dt;
+
+	// start from this frame, this partile would be visible
+	if(Particles[gid].ElpasedTime < dt && Particles[gid].ElpasedTime >= 0)
+	{
+		ParticleCount[0].ParticleCount++;
+	}
+	// start from this frame, this partile would be invisible
+	if (Particles[gid].ElpasedTime - Particles[gid].LifeTime < dt && Particles[gid].ElpasedTime - Particles[gid].LifeTime >= 0)
+	{
+		ParticleCount[0].ParticleCount--;
+		NextParticle(Particles[gid]);
+		return;
+	}
+	
 	// Only update particles with ElpasedTime greater than 0
 	if(Particles[gid].ElpasedTime < 0)
 	{
 		return;
 	}
-	else if (Particles[gid].ElpasedTime >= Particles[gid].LifeTime)
-	{
-		// disable this particle
-		NextParticle(Particles[gid]);
-	}
+	// Particle is dead
 	
 	float lifePercent = Particles[gid].ElpasedTime / Particles[gid].LifeTime;
 

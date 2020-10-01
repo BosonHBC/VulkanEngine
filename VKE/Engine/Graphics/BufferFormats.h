@@ -64,9 +64,16 @@ namespace VKE
 			float TileWidth = 1;							 // how many sub-divisions per texture, tileWidth * tileWidth = totalTiles, assuming tileX == tileY
 		};
 
+		struct FParticleCount
+		{
+			int ParticleCount = 0;
+		};
+
 		/** Emitter Data */
 		struct FConeEmitter
 		{
+			glm::mat4 ModelMatrix = glm::mat4(1.0);
+
 			float Radius = 1.0f;
 			float Angle = 45.f;		// in degree
 			float StartSpeedMin = 1.0f;
