@@ -52,6 +52,15 @@
     <Filter Include="Source Files\Editor\ImGUI">
       <UniqueIdentifier>{9320b66d-4e8d-4503-a128-833c76b36a9c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Graphics\Light">
+      <UniqueIdentifier>{9f8da6d6-4577-49eb-980f-3b9a174a9a54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Misc">
+      <UniqueIdentifier>{0012833c-dca1-47dc-8fa3-fbf14fe75cca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Misc\Shape">
+      <UniqueIdentifier>{f425db5d-981e-41cc-a072-1d656986bf4a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -134,6 +143,15 @@
     </ClCompile>
     <ClCompile Include="ParticleSystem\ParticleSystem.cpp">
       <Filter>Source Files\ParticleSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc\Shape\Box.cpp">
+      <Filter>Source Files\Misc\Shape</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc\Shape\Shape.cpp">
+      <Filter>Source Files\Misc\Shape</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc\Shape\Sphere.cpp">
+      <Filter>Source Files\Misc\Shape</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +250,24 @@
     </ClInclude>
     <ClInclude Include="ParticleSystem\ParticleSystem.h">
       <Filter>Source Files\ParticleSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Light\Light.h">
+      <Filter>Source Files\Graphics\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\Light\PointLight.h">
+      <Filter>Source Files\Graphics\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\Shape\Box.h">
+      <Filter>Source Files\Misc\Shape</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\Shape\Rect.h">
+      <Filter>Source Files\Misc\Shape</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\Shape\Shape.h">
+      <Filter>Source Files\Misc\Shape</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\Shape\Sphere.h">
+      <Filter>Source Files\Misc\Shape</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

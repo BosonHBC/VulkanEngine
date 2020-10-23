@@ -111,6 +111,12 @@ namespace VKE
 			Emitters[i].init(iMainDevice);
 			Emitters[i].Transform.Update();
 		}
+
+		if (Emitters.size() == 0)
+		{
+			EmptyEmitter.init(iMainDevice);
+		}
+
 		// . set up descriptor set related
 		prepareDescriptors();
 		// . Create semaphores and fences
@@ -185,6 +191,11 @@ namespace VKE
 
 		vkDestroyCommandPool(pMainDevice->LD, ComputeCommandPool, nullptr);
 		
+		if (Emitters.size() == 0)
+		{
+			EmptyEmitter.cleanUp();
+		}
+
 		for (cEmitter& emitter : Emitters)
 		{
 			emitter.cleanUp();
@@ -230,7 +241,6 @@ namespace VKE
 		// Dispatch the compute job
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ComputePipeline);
 		
-
 		for (size_t i = 0; i < Emitters.size(); ++i)
 		{
 			Emitters[i].Dispatch(CommandBuffer, ComputePipelineLayout);
@@ -314,6 +324,17 @@ namespace VKE
 			Emitters[i].RenderDescriptorSet.CreateDescriptorSetLayout(ParticlePass_frag);
 			Emitters[i].RenderDescriptorSet.AllocateDescriptorSet(DescriptorPool);
 			Emitters[i].RenderDescriptorSet.BindDescriptorWithSet();
+		}
+
+		if (Emitters.size() == 0)
+		{
+			EmptyEmitter.ComputeDescriptorSet.CreateDescriptorSetLayout(ComputePass);
+			EmptyEmitter.ComputeDescriptorSet.AllocateDescriptorSet(DescriptorPool);
+			EmptyEmitter.ComputeDescriptorSet.BindDescriptorWithSet();
+
+			EmptyEmitter.RenderDescriptorSet.CreateDescriptorSetLayout(ParticlePass_frag);
+			EmptyEmitter.RenderDescriptorSet.AllocateDescriptorSet(DescriptorPool);
+			EmptyEmitter.RenderDescriptorSet.BindDescriptorWithSet();
 		}
 		
 

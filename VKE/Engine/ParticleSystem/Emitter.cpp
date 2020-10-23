@@ -105,6 +105,8 @@ namespace VKE
 		// Binding = 2, emitter data
 		ComputeDescriptorSet.CreateBufferDescriptor(sizeof(BufferFormats::FConeEmitter), 1, VK_SHADER_STAGE_COMPUTE_BIT);
 
+		Transform.Update();
+
 		// Update initial particle data
 		UpdateEmitterData();
 

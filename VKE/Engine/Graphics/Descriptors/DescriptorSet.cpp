@@ -131,6 +131,7 @@ namespace VKE
 	{
 		if (SDescriptorSetLayoutMap.find(iType) == SDescriptorSetLayoutMap.end())
 		{
+			// can not find this set layout, return 0
 			return SDescriptorSetLayoutMap.at(EDescriptorSetType(0));
 		}
 		return SDescriptorSetLayoutMap.at(iType);

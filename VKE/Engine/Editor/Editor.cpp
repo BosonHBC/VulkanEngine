@@ -60,6 +60,7 @@ namespace VKE
 				ImGui::End();
 			}
 
+			if(CP)
 			{
 				ImGui::Begin("Particles");
 				static int currentParticle = 0;

@@ -37,7 +37,7 @@
 
 #define PI 3.14159265359f
 #define IsFloatZero(x) (x > -0.0001f && x < 0.0001f)
-#define Particle_Count 1024
+#define Particle_Count 512
 #define Dispatch_Size_X 128
 
 #define ACCESSOR_INLINE(ClassName, PropertyName) \

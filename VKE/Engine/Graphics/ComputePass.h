@@ -10,7 +10,7 @@
 
 namespace VKE
 {
-
+	class cDescriptor_DynamicBuffer;
 	struct FComputePass
 	{
 		FComputePass() {}
@@ -47,6 +47,8 @@ namespace VKE
 		// Compute pass commands, no need to re-record like graphic commands
 		void recordComputeCommands();
 
+		void updateModelMatrixUniformBuffer(cDescriptor_DynamicBuffer* DBuffer, int offset);
+
 		void recreateSwapChain();
 
 		void cleanupSwapChain();
@@ -58,5 +60,8 @@ namespace VKE
 		void createCommandPool();
 		void createCommandBuffer();
 		void createSynchronization();
+
+		// A temp emitter to help create descriptor set layout when emitter.size() == 0
+		cEmitter EmptyEmitter;
 	};
 }

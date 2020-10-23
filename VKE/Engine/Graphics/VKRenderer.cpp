@@ -83,11 +83,12 @@ namespace VKE
 
 	void VKRenderer::tick(float dt)
 	{
+/*
 		if (RenderList.size() > 0 && RenderList[0])
 		{
 			RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
 			RenderList[0]->Transform.Update();
-		}
+		}*/
 
 		if (pCompute && pCompute->bNeedComputePass)
 		{
@@ -301,9 +302,9 @@ namespace VKE
 		RenderList.push_back(pContainerModel);
 		pContainerModel->Transform.SetTransform(glm::vec3(0, -2, -5), glm::quat(1, 0, 0, 0), glm::vec3(0.01f, 0.01f, 0.01f));*/
 
-		/*CreateModel("Plane.obj", pPlaneModel);
+		CreateModel("Plane.obj", pPlaneModel);
 		RenderList.push_back(pPlaneModel);
-		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));*/
+		pPlaneModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(25, 25, 25));
 		
 		CreateModel("Quad.obj", GQuadModel);
 		GQuadModel->Transform.SetTransform(glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1));
@@ -1394,7 +1395,10 @@ namespace VKE
 			// Copy Model data RenderList.Size() + Emitter.Size()
 			// Reuse void* Data
 			size_t DBufferSize = static_cast<size_t>(DBuffer->GetSlotSize()) * (RenderList.size() + pCompute->Emitters.size());
-			DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
+			if (DBufferSize > 0)
+			{
+				DBuffer->UpdatePartialData(DBuffer->GetAllocatedMemory(), 0, DBufferSize);
+			}
 		}
 
 	}
