@@ -110,9 +110,9 @@ namespace VKE
 		if (!TextureToUse.get())
 		{
 			printf("Warning: no texture is used in this emitter! Use DefaultWhite texture instead.\n");
-			TextureToUse = cTexture::Get(EDefaultTextureID::White);
+			TextureToUse = FTexture::Get(EDefaultTextureID::White);
 		}
-		cTexture* ParticleTestTex = TextureToUse.get();
+		FTexture* ParticleTestTex = TextureToUse.get();
 		RenderDescriptorSet.CreateImageBufferDescriptor(&ParticleTestTex->GetImageBuffer(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, ParticleTestTex->GetImageInfo().imageLayout, ParticleTestTex->GetImageInfo().sampler);
 	}
 

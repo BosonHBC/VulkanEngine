@@ -22,7 +22,7 @@ namespace VKE
 		return SetWrite;
 	}
 
-	void cDescriptor_Image::SetImageBuffer(cImageBuffer* const & iImageBuffer, VkImageLayout ImageLayout, VkSampler Sampler /*= VK_NULL_HANDLE*/)
+	void cDescriptor_Image::SetImageBuffer(FImageBuffer* const & iImageBuffer, VkImageLayout ImageLayout, VkSampler Sampler /*= VK_NULL_HANDLE*/)
 	{
 		if (!iImageBuffer)
 		{
@@ -34,7 +34,7 @@ namespace VKE
 		ImageInfo.sampler = Sampler;
 	}
 
-	void cDescriptor_Image::cleanUp()
+	void cDescriptor_Image::CleanUp()
 	{
 		
 	}

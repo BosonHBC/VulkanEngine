@@ -41,7 +41,7 @@ namespace VKE
 			// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 			{
 				static float f = 0.0f;
-				static int counter = 0;
+				static int32 counter = 0;
 
 				ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
@@ -62,10 +62,10 @@ namespace VKE
 
 			{
 				ImGui::Begin("Particles");
-				static int currentParticle = 0;
+				static int32 currentParticle = 0;
 
 				ImGui::InputInt("Current Index", &currentParticle);
-				currentParticle = glm::clamp(currentParticle, 0, static_cast<int>(CP->Emitters.size()- 1));
+				currentParticle = glm::clamp(currentParticle, 0, static_cast<int32>(CP->Emitters.size()- 1));
 				bool NeedToUpdateParticle = false;
 				for (size_t i = 0; i < CP->Emitters.size(); ++i)
 				{

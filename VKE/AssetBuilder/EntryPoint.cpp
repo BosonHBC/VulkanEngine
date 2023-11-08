@@ -1,6 +1,7 @@
 /*
 	This project is to help move asset from engine path to build path
 */
+#include "Core.h"
 #include <string>
 #include <windows.h>
 #include <vector>
@@ -60,9 +61,9 @@ bool CopyFile(const std::string& iFileName)
 	
 }
 
-int main(int argc, char *argv[])
+int32 main(int argc, char *argv[])
 {
-	for (int i = 1; i < argc; ++i)
+	for (int32 i = 1; i < argc; ++i)
 	{
 		CopyFile(argv[i]);
 	}

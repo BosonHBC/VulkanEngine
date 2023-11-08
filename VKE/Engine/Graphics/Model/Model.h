@@ -10,17 +10,17 @@ struct aiNode;
 struct aiMesh;
 namespace VKE
 {
-	class cModel
+	class FModel
 	{
 	public:
 		static std::vector<std::string> LoadMaterials(const aiScene* scene);
-		static std::vector < std::shared_ptr<cMesh> > LoadNode(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiNode* Node, const aiScene* Scene, const std::vector<int>& MatToTex);
-		static std::shared_ptr<cMesh> LoadMesh(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiMesh* Mesh, const aiScene* Scene, const std::vector<int>& MatToTex);
+		static std::vector < std::shared_ptr<cMesh> > LoadNode(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiNode* Node, const aiScene* Scene, const std::vector<int32>& MatToTex);
+		static std::shared_ptr<cMesh> LoadMesh(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiMesh* Mesh, const aiScene* Scene, const std::vector<int32>& MatToTex);
 		
-		cModel() = delete;
-		cModel(std::shared_ptr<cMesh> iMesh) { MeshList.push_back(iMesh); }
-		cModel(const std::vector<std::shared_ptr<cMesh>>& iMeshList) : MeshList(iMeshList) {}
-		~cModel() {};
+		FModel() = delete;
+		FModel(std::shared_ptr<cMesh> iMesh) { MeshList.push_back(iMesh); }
+		FModel(const std::vector<std::shared_ptr<cMesh>>& iMeshList) : MeshList(iMeshList) {}
+		virtual ~FModel() {}
 
 		void cleanUp();
 
@@ -28,7 +28,7 @@ namespace VKE
 		size_t GetMeshCount() const { return MeshList.size(); }
 		std::shared_ptr<cMesh> GetMesh(size_t idx) { assert(idx < GetMeshCount()); return MeshList[idx]; }
 
-		cTransform Transform;
+		FTransform Transform;
 	protected:
 		std::vector<std::shared_ptr<cMesh>> MeshList;
 		

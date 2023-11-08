@@ -4,7 +4,7 @@
 namespace VKE
 {
 
-	bool cImageBuffer::init(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,  VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImageAspectFlags AspectFlags)
+	bool FImageBuffer::Init(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,  VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImageAspectFlags AspectFlags)
 	{
 		pMainDevice = iMainDevice;
 		if (pMainDevice == nullptr)
@@ -23,7 +23,7 @@ namespace VKE
 		return true;
 	}
 
-	void cImageBuffer::cleanUp()
+	void FImageBuffer::CleanUp()
 	{
 		if (pMainDevice)
 		{

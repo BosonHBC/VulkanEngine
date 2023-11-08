@@ -5,9 +5,9 @@ namespace VKE
 {
 	struct FDescriptorInfo
 	{
-		VkDescriptorType Type;
-		uint32_t Binding;
-		VkShaderStageFlags Stages;
+		VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
+		uint32_t Binding = 0;
+		VkShaderStageFlags Stages = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 	};
 	/*
 		Interface of All kinds of descriptors: Buffer, Image
@@ -17,6 +17,7 @@ namespace VKE
 	{
 
 	public:
+		virtual ~IDescriptor() {}
 		/** Getters */
 		const FDescriptorInfo& GetDescriptorInfo() const { return DescriptorInfo; }
 
@@ -46,10 +47,10 @@ namespace VKE
 		// Helper function to get information when binding content to the descriptor set
 		virtual VkWriteDescriptorSet ConstructDescriptorBindingInfo(VkDescriptorSet SetToBind) = 0;
 	
-		virtual void cleanUp() = 0;
+		virtual void CleanUp() = 0;
 	protected:
 		// Information of this descriptor
 		FDescriptorInfo DescriptorInfo;
-		FMainDevice* pMainDevice;
+		FMainDevice* pMainDevice = nullptr;
 	};
 }

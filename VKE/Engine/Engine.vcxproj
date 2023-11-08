@@ -188,6 +188,8 @@
     <ClCompile Include="Transform\Transform.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Core\Core.h" />
+    <ClInclude Include="Core\Types.h" />
     <ClInclude Include="Editor\Editor.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Graphics\BufferFormats.h" />

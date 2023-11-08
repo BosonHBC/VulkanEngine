@@ -62,11 +62,11 @@ namespace VKE
 
 	void cMesh::CreateDescriptorSet(VkDescriptorPool SamplerDescriptorPool)
 	{
-		cTexture* Tex = cTexture::Get(MaterialID).get();
+		FTexture* Tex = FTexture::Get(MaterialID).get();
 		if (!Tex)
 		{
 			printf("Invalid Texture\n");
-			Tex = cTexture::Get(0).get();
+			Tex = FTexture::Get(0).get();
 		}
 		// @TODO:
 		// In the future, if the material has multiple textures, there should be a material class handle the descriptor creation

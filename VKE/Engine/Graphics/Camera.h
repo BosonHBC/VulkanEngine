@@ -23,10 +23,10 @@ namespace VKE
 			glm::quat _yaw(glm::vec3(0, i_initialYaw, 0));
 			Transform.SetTransform(i_initialPos, _pitch * _yaw, glm::vec3(1, 1, 1));
 		}
-		cCamera(const cCamera& i_other) = delete;
-		cCamera(cCamera&& i_other) = delete;
-		cCamera& operator = (const cCamera& i_other) = delete;
-		cCamera& operator = (cCamera&& i_other) = delete;
+		cCamera(const cCamera& Other) = delete;
+		cCamera(cCamera&& Other) = delete;
+		cCamera& operator = (const cCamera& Other) = delete;
+		cCamera& operator = (cCamera&& Other) = delete;
 		virtual ~cCamera() {};
 
 		/** Usage functions*/
@@ -40,7 +40,7 @@ namespace VKE
 		// Projection matrix
 		void UpdateProjectionMatrix(float i_fov, float i_aspect, float i_nearPlane = 0.1f, float i_farPlane = 100.f);
 
-		void MirrorAlongPlane(const cTransform& i_plane);
+		void MirrorAlongPlane(const FTransform& i_plane);
 
 		/** Getters*/
 		const glm::mat4& GetViewMatrix() { return FrameData.ViewMatrix; }
@@ -55,7 +55,7 @@ namespace VKE
 		BufferFormats::FFrame& GetFrameData() { return FrameData; }
 		
 		// Transform of the camera
-		cTransform Transform;
+		FTransform Transform;
 	protected:
 		/** private member variables*/
 		// Only when there is input changing the camera update the camera

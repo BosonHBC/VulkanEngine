@@ -4,18 +4,18 @@
 
 #include "../Engine/Engine.h"
 
-int main()
+int32 main()
 {
-	int exitCode = 0;
-	exitCode = VKE::init();
+	int32 exitCode = 0;
+	exitCode = VKE::Init();
 	if (exitCode == EXIT_FAILURE) 
 	{
 		return exitCode;
 	}
 
-	VKE::run();
+	VKE::Run();
 
-	VKE::cleanup();
+	VKE::Cleanup();
 
 	_CrtDumpMemoryLeaks();
 

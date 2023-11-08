@@ -23,9 +23,9 @@ namespace VKE
 		this->ObjectCount = ObjectCount;
 	}
 
-	void cDescriptor_DynamicBuffer::cleanUp()
+	void cDescriptor_DynamicBuffer::CleanUp()
 	{
-		cDescriptor_Buffer::cleanUp();
+		cDescriptor_Buffer::CleanUp();
 		// free allocated memory
 		_aligned_free(pAllocatedTransferSpace);
 	}

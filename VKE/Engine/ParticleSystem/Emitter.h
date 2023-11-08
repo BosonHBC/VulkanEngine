@@ -22,8 +22,8 @@ namespace VKE
 
 		BufferFormats::FParticle Particles[Particle_Count];
 		BufferFormats::FParticleSupportData ParticleSupportData;				// Including deltaTime, will add in the future
-		std::shared_ptr<cTexture> TextureToUse;									// Texture to use in this emitter
-		cTransform Transform;
+		std::shared_ptr<FTexture> TextureToUse;									// Texture to use in this emitter
+		FTransform Transform;
 		BufferFormats::FConeEmitter EmitterData;
 		bool bNeedUpdate = true;
 

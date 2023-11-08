@@ -1,4 +1,5 @@
 #pragma once
+#include "Core.h"
 #include "glm/glm.hpp"
 
 // Plug-ins
@@ -11,11 +12,11 @@ namespace VKE
 {
 	class cCamera;
 
-	int init();
+	int32 Init();
 
-	void run();
+	void Run();
 
-	void cleanup();
+	void Cleanup();
 
 	GLFWwindow* GetGLFWWindow();
 	cCamera* GetCurrentCamera();

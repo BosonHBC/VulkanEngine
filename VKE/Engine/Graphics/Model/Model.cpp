@@ -7,7 +7,7 @@
 namespace VKE
 {
 
-	std::vector<std::string> cModel::LoadMaterials(const aiScene* scene)
+	std::vector<std::string> FModel::LoadMaterials(const aiScene* scene)
 	{
 		std::vector<std::string> TextureList(scene->mNumMaterials);
 
@@ -26,7 +26,7 @@ namespace VKE
 				{
 					// Cut off any directory information already present
 					std::string pathStr = std::string(path.data);
-					int idx = pathStr.rfind("\\");
+					int32 idx = pathStr.rfind("\\");
 					TextureList[i] = pathStr.substr(idx + 1);
 				}
 			}
@@ -34,7 +34,7 @@ namespace VKE
 		return TextureList;
 	}
 
-	std::vector < std::shared_ptr<cMesh> > cModel::LoadNode(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiNode* Node, const aiScene* Scene, const std::vector<int>& MatToTex)
+	std::vector < std::shared_ptr<cMesh> > FModel::LoadNode(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiNode* Node, const aiScene* Scene, const std::vector<int32>& MatToTex)
 	{
 		std::vector<std::shared_ptr<cMesh>> MeshList;
 
@@ -56,7 +56,7 @@ namespace VKE
 		return MeshList;
 	}
 
-	std::shared_ptr<cMesh> cModel::LoadMesh(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiMesh* Mesh, const aiScene* Scene, const std::vector<int>& MatToTex)
+	std::shared_ptr<cMesh> FModel::LoadMesh(const std::string& iFileName, FMainDevice& MainDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, aiMesh* Mesh, const aiScene* Scene, const std::vector<int32>& MatToTex)
 	{
 		std::vector<FVertex> Vertices;
 		std::vector<uint32_t> Indices;
@@ -95,14 +95,14 @@ namespace VKE
 
 		// Create new mesh with details
 		std::shared_ptr<cMesh> NewMesh = cMesh::Load(iFileName, MainDevice, TransferQueue, TransferCommandPool, Vertices, Indices);
-		int MaterialID = MatToTex[Mesh->mMaterialIndex];
+		int32 MaterialID = MatToTex[Mesh->mMaterialIndex];
 
 		NewMesh->SetMaterialID(MaterialID);
 
 		return NewMesh;
 	}
 
-	void cModel::cleanUp()
+	void FModel::cleanUp()
 	{
 		for (auto mesh : MeshList)
 		{

@@ -4,18 +4,18 @@
 #include "glm/gtx/quaternion.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
-class cTransform
+class FTransform
 {
 public:
 	/** Constructors&destructor and assignment operators*/
-	cTransform(): m(glm::identity<glm::mat4>()), mInv(glm::identity<glm::mat4>()), m_position(glm::vec3(0,0,0)), m_rotation(glm::quat(1,0,0,0)), m_scale(glm::vec3(1,1,1)){}
-	cTransform(const glm::vec3& i_initialTranslation, const glm::quat& i_intialRotation, const glm::vec3& i_initialScale);
-	cTransform(const cTransform& i_other) = default;
-	cTransform(const glm::mat4& i_m) :m(i_m), mInv(glm::inverse(m)) {}
-	cTransform(const glm::mat4& i_m, const glm::mat4& i_mInv) :m(i_m), mInv(i_mInv) {}
-	cTransform& operator = (const cTransform& i_other) = default;
-	cTransform& operator = (const glm::mat4& i_m);
-	~cTransform();
+	FTransform(): m(glm::identity<glm::mat4>()), mInv(glm::identity<glm::mat4>()), m_position(glm::vec3(0,0,0)), m_rotation(glm::quat(1,0,0,0)), m_scale(glm::vec3(1,1,1)){}
+	FTransform(const glm::vec3& i_initialTranslation, const glm::quat& i_intialRotation, const glm::vec3& i_initialScale);
+	FTransform(const FTransform& Other) = default;
+	FTransform(const glm::mat4& i_m) :m(i_m), mInv(glm::inverse(m)) {}
+	FTransform(const glm::mat4& i_m, const glm::mat4& i_mInv) :m(i_m), mInv(i_mInv) {}
+	FTransform& operator = (const FTransform& Other) = default;
+	FTransform& operator = (const glm::mat4& i_m);
+	~FTransform() = default;
 
 	/** static functions*/
 	static glm::quat ToQuaternian(const double yaw, const double pitch, const double roll);
@@ -31,7 +31,7 @@ public:
 	void gScale(const float x, const float y, const float z);
 	void gScale(const glm::vec3& i_scale);
 
-	void MirrorAlongPlane(const cTransform& i_other);
+	void MirrorAlongPlane(const FTransform& Other);
 
 	/** Setters */
 	void SetTransform(const glm::vec3& i_initialTranslation, const glm::quat& i_intialRotation, const glm::vec3& i_initialScale);

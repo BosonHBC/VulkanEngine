@@ -1,4 +1,5 @@
 #pragma once
+#include "Core.h"
 #include "glm/glm.hpp"
 namespace VKE
 {
@@ -88,15 +89,15 @@ namespace VKE
 
 			float StartRotationMin = 0.0f;
 			float StartRotationMax = 0.0f;
-			int bEnableSubTexture = false;
-			int TileWidth = 1;
+			int32 bEnableSubTexture = false;
+			int32 TileWidth = 1;
 		};
 
 		/** Support data for particles */
 		struct FParticleSupportData
 		{
-			float dt;
-			int useGravity;
+			float dt = 0.0f;
+			int32 useGravity = 0;
 			float EmitRateOverTime = 10.f;			// numbers of particle will emit per second
 			float EmitTimer = 0.0;					// Elapsed time since last particle emission
 		};

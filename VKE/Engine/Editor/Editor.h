@@ -2,6 +2,7 @@
 
 struct ImGui_ImplVulkanH_Window;
 struct GLFWwindow;
+
 namespace VKE
 {
 	class VKRenderer;

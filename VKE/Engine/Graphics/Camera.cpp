@@ -16,7 +16,7 @@ namespace VKE
 			bNeedUpdateCamera = false;
 			// Clamp the domain of pitch and yaw
 			m_pitch = glm::clamp(m_pitch, -89.f, 89.f);
-			glm::vec3 _forward = m_worldUp * sin(glm::radians(m_pitch)) + cos(glm::radians(m_pitch)) * (cTransform::WorldForward * cos(glm::radians(m_yaw)) + cTransform::WorldRight * sin(glm::radians(m_yaw)));
+			glm::vec3 _forward = m_worldUp * sin(glm::radians(m_pitch)) + cos(glm::radians(m_pitch)) * (FTransform::WorldForward * cos(glm::radians(m_yaw)) + FTransform::WorldRight * sin(glm::radians(m_yaw)));
 			glm::vec3 _right = glm::normalize(glm::cross(_forward, m_worldUp));
 			glm::vec3 _up = glm::normalize(glm::cross(_right, _forward));
 
@@ -101,7 +101,7 @@ namespace VKE
 		bNeedUpdateCamera = true;
 	}
 
-	void cCamera::MirrorAlongPlane(const cTransform & i_plane)
+	void cCamera::MirrorAlongPlane(const FTransform & i_plane)
 	{
 		// mirror the transform;
 		float deltaY = (Transform.Position() - i_plane.Position()).y;

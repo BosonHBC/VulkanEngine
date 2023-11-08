@@ -33,7 +33,7 @@ namespace VKE
 		// . Setup Emitter
 
 		Emitters.resize(3);
-		Emitters[0].TextureToUse = cTexture::Get(1);
+		Emitters[0].TextureToUse = FTexture::Get(1);
 		Emitters[0].Transform.SetPosition(glm::vec3(0.0, 0.1, 0.0));
 		Emitters[0].EmitterData.Radius = 0.15f;
 		Emitters[0].EmitterData.Angle = glm::radians(10.f);
@@ -53,7 +53,7 @@ namespace VKE
 		Emitters[0].EmitterData.bEnableSubTexture = false;
 		Emitters[0].EmitterData.TileWidth = 1;
 
-		Emitters[1].TextureToUse = cTexture::Get(1);
+		Emitters[1].TextureToUse = FTexture::Get(1);
 		Emitters[1].Transform.SetPosition(glm::vec3(0.0, -0.1, 0.0));
 		Emitters[1].EmitterData.Radius = 0.1f;
 		Emitters[1].EmitterData.Angle = glm::radians(5.f);
@@ -73,7 +73,7 @@ namespace VKE
 		Emitters[1].EmitterData.bEnableSubTexture = false;
 		Emitters[1].EmitterData.TileWidth = 1;
 
-		Emitters[2].TextureToUse = cTexture::Get(2);	// Fire * 4
+		Emitters[2].TextureToUse = FTexture::Get(2);	// Fire * 4
 		Emitters[2].Transform.SetPosition(glm::vec3(0.0, 0.1, 0.0));
 		Emitters[2].EmitterData.Radius = 0.1f;
 		Emitters[2].EmitterData.Angle = glm::radians(5.f);

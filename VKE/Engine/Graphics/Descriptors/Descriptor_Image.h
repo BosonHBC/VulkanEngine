@@ -19,16 +19,16 @@ namespace VKE
 		cDescriptor_Image() {};
 		virtual ~cDescriptor_Image() {};
 
-		void SetImageBuffer(cImageBuffer* const & iImageBuffer, VkImageLayout ImageLayout, VkSampler Sampler = VK_NULL_HANDLE);
+		void SetImageBuffer(FImageBuffer* const & iImageBuffer, VkImageLayout ImageLayout, VkSampler Sampler = VK_NULL_HANDLE);
 
 		/* Clean up Function */
-		virtual void cleanUp();
+		virtual void CleanUp();
 
 		/** Getters */
 
 	protected:
 		// Reference to the Image Buffer
-		cImageBuffer* pImageBuffer = nullptr;
+		FImageBuffer* pImageBuffer = nullptr;
 
 		// Info of the Image buffer this descriptor is trying connecting with 
 		VkDescriptorImageInfo ImageInfo;

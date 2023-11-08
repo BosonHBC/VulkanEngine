@@ -14,9 +14,7 @@ namespace VKE
 			assert(false);
 			return false;
 		}
-
 		
-
 		return true;
 	}
 
@@ -55,7 +53,7 @@ namespace VKE
 		vkUnmapMemory(Buffer.GetDevice(), Buffer.GetMemory());
 	}
 
-	void cDescriptor_Buffer::cleanUp()
+	void cDescriptor_Buffer::CleanUp()
 	{
 		Buffer.cleanUp();
 	}

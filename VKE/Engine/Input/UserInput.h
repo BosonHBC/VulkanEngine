@@ -160,10 +160,10 @@ namespace VKE {
 			FUserInput() : m_actionBindings(), m_actionKeyMap(), m_axisBindings(), m_axisKeyMap()
 			{}
 			FUserInput(std::map<std::string, EKeyCode>& iActionKeyMap, std::map<std::string, FAxisBrother>& iAxisKeyMap) : m_actionKeyMap(iActionKeyMap), m_axisKeyMap(iAxisKeyMap) {}
-			FUserInput(const FUserInput& i_other) = delete;
-			FUserInput& operator = (const FUserInput& i_other) = delete;
-			FUserInput(const FUserInput&& i_other) = delete;
-			FUserInput& operator = (const FUserInput&& i_other) = delete;
+			FUserInput(const FUserInput& Other) = delete;
+			FUserInput& operator = (const FUserInput& Other) = delete;
+			FUserInput(const FUserInput&& Other) = delete;
+			FUserInput& operator = (const FUserInput&& Other) = delete;
 			~FUserInput();
 			/** Add action key pair to map*/
 			void AddActionKeyPairToMap(const char* i_actionName, const EKeyCode& i_keycode);

@@ -1,7 +1,6 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
-
 #include <memory>
 #include "Buffer/ImageBuffer.h"
 #include "Utilities.h"
@@ -13,42 +12,42 @@ namespace VKE
 		White = 0,
 		Count = 1,
 	};
-	class cTexture
+	class FTexture
 	{
 	public:
 		// Load asset
-		static std::shared_ptr<cTexture> Load(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM);
-		static std::shared_ptr<cTexture> Get(int ID);
+		static std::shared_ptr<FTexture> Load(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM);
+		static std::shared_ptr<FTexture> Get(int32 ID);
 		// Free all assets
 		static void Free();
 		static uint32_t s_CreatedResourcesCount;
 
-		cTexture();
-		cTexture(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM);
-		cTexture(const cTexture& i_other) = delete;
-		cTexture(cTexture&& i_other) = delete;
-		cTexture& operator = (const cTexture& i_other) = delete;
-		cTexture& operator = (cTexture&& i_other) = delete;
+		FTexture();
+		FTexture(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format = VK_FORMAT_R8G8B8A8_UNORM);
+		FTexture(const FTexture& Other) = delete;
+		FTexture(FTexture&& Other) = delete;
+		FTexture& operator = (const FTexture& Other) = delete;
+		FTexture& operator = (FTexture&& Other) = delete;
 
-		~cTexture();
+		~FTexture();
 
 		void cleanUp();
 
 		/** Getters */
 		VkDescriptorImageInfo GetImageInfo() const;
-		int GetID() const { return TextureID; }
-		cImageBuffer& GetImageBuffer() { return Buffer; }
+		int32 GetID() const { return TextureID; }
+		FImageBuffer& GetImageBuffer() { return Buffer; }
 	protected:
-		FMainDevice* pMainDevice;
-		int Width, Height;
+		FMainDevice* pMainDevice = nullptr;
+		int32 Width = 0, Height = 0;
 
-		cImageBuffer Buffer;
+		FImageBuffer Buffer;
 		VkSampler Sampler;
 
-		int createTextureImage(const std::string& fileName, VkFormat Format);
-		void createTextureSampler();
+		int32 CreateTextureImage(const std::string& fileName, VkFormat Format);
+		void CreateTextureSampler();
 
-		int TextureID;		// Ordered by the time created
+		int32 TextureID = 0;		// Ordered by the time created
 	};
 
 }

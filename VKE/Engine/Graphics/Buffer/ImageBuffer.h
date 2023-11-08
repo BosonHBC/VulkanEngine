@@ -11,19 +11,19 @@
 namespace VKE
 {
 	struct FMainDevice;
-	class cImageBuffer
+	class FImageBuffer
 	{
 	public:
 		/* Constructors and destructor*/
-		cImageBuffer() {}
-		virtual ~cImageBuffer() {}
-		cImageBuffer(const cImageBuffer& i_other) = delete;
-		cImageBuffer(cImageBuffer&& i_other) = default;	// Allow using std::vector
-		cImageBuffer& operator = (const cImageBuffer& i_other) = delete;
-		cImageBuffer& operator = (cImageBuffer&& i_other) = delete;
+		FImageBuffer() = default;
+		virtual ~FImageBuffer() = default;
+		FImageBuffer(const FImageBuffer& Other) = delete;
+		FImageBuffer(FImageBuffer&& Other) = default;	// Allow using std::vector
+		FImageBuffer& operator = (const FImageBuffer& Other) = delete;
+		FImageBuffer& operator = (FImageBuffer&& Other) = delete;
 
-		bool init(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImageAspectFlags AspectFlags);
-		void cleanUp();
+		bool Init(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImageAspectFlags AspectFlags);
+		void CleanUp();
 
 		// Getters
 		const VkImageView& GetImageView() const { return ImageView; }
@@ -31,13 +31,13 @@ namespace VKE
 		const VkDeviceMemory&  GetImageMemory() const { return Memory; }
 		const VkFormat& GetFormat() const { return ImageFormat; }
 	private:
-		FMainDevice* pMainDevice;
+		FMainDevice* pMainDevice = nullptr;
 
 		// Image format
-		VkFormat ImageFormat;
+		VkFormat ImageFormat = VK_FORMAT_MAX_ENUM;
 		// Components of an image buffer
-		VkImage Image;
-		VkDeviceMemory Memory;
-		VkImageView ImageView;
+		VkImage Image = NULL;
+		VkDeviceMemory Memory = NULL;
+		VkImageView ImageView = NULL;
 	};
 }

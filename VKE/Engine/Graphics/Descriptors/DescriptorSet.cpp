@@ -27,7 +27,7 @@ namespace VKE
 		Descriptors.push_back(newDBufferDescriptor);
 	}
 
-	void cDescriptorSet::CreateImageBufferDescriptor(cImageBuffer* const & iImageBuffer, VkDescriptorType Type, VkShaderStageFlags ShaderStage, VkImageLayout ImageLayout, VkSampler Sampler /*= VK_NULL_HANDLE*/)
+	void cDescriptorSet::CreateImageBufferDescriptor(FImageBuffer* const & iImageBuffer, VkDescriptorType Type, VkShaderStageFlags ShaderStage, VkImageLayout ImageLayout, VkSampler Sampler /*= VK_NULL_HANDLE*/)
 	{
 		cDescriptor_Image* newImageDescriptor = DBG_NEW cDescriptor_Image();
 		newImageDescriptor->CreateDescriptor(Type, Descriptors.size(), ShaderStage, pMainDevice);
@@ -115,8 +115,8 @@ namespace VKE
 	{
 		for (auto Descriptor : Descriptors)
 		{
-			Descriptor->cleanUp();
-			safe_delete(Descriptor);
+			Descriptor->CleanUp();
+			SAFE_DELETE(Descriptor);
 		}
 		Descriptors.clear();
 		pMainDevice = nullptr;

@@ -5,16 +5,16 @@
 
 namespace VKE
 {
-	std::map<std::string, std::shared_ptr<VKE::cTexture>> s_TextureContainer;
-	uint32_t cTexture::s_CreatedResourcesCount = 0;
-	std::vector<std::shared_ptr<VKE::cTexture>> s_TextureList;
+	std::map<std::string, std::shared_ptr<VKE::FTexture>> s_TextureContainer;
+	uint32_t FTexture::s_CreatedResourcesCount = 0;
+	std::vector<std::shared_ptr<VKE::FTexture>> s_TextureList;
 
-	std::shared_ptr<cTexture> cTexture::Load(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format)
+	std::shared_ptr<FTexture> FTexture::Load(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format)
 	{
 		// Not exist
 		if (s_TextureContainer.find(iTextureName) == s_TextureContainer.end())
 		{
-			auto newTexture = std::make_shared<cTexture>(iTextureName, iMainDevice, Format);
+			auto newTexture = std::make_shared<FTexture>(iTextureName, iMainDevice, Format);
 
 			s_TextureContainer.insert({ iTextureName, newTexture });
 			s_TextureList.push_back(newTexture);
@@ -26,12 +26,12 @@ namespace VKE
 		}
 	}
 
-	std::shared_ptr<cTexture> cTexture::Get(int ID)
+	std::shared_ptr<FTexture> FTexture::Get(int32 ID)
 	{
 		if (s_TextureList.size() <= 0)
 		{
 			printf("ERROR: Texture list is empty! Returning Null Texture\n");
-			return std::make_shared<cTexture>();
+			return std::make_shared<FTexture>();
 		}
 		if (static_cast<size_t>(ID) >= s_TextureList.size())
 		{
@@ -45,7 +45,7 @@ namespace VKE
 		
 	}
 
-	void cTexture::Free()
+	void FTexture::Free()
 	{
 		s_TextureContainer.clear();
 		for (auto& tex : s_TextureList)
@@ -55,20 +55,20 @@ namespace VKE
 		s_TextureList.clear();
 	}
 
-	cTexture::cTexture(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format)
+	FTexture::FTexture(const std::string& iTextureName, FMainDevice& iMainDevice, VkFormat Format)
 	{
 		pMainDevice = &iMainDevice;
 		// Create vkImage, vkMemory
-		createTextureImage(iTextureName, Format);
-		createTextureSampler();
+		CreateTextureImage(iTextureName, Format);
+		CreateTextureSampler();
 	}
 
-	cTexture::cTexture()
+	FTexture::FTexture()
 	{
 		printf("Warning! Default constructor is called, means error happened.\n");
 	}
 
-	cTexture::~cTexture()
+	FTexture::~FTexture()
 	{
 		--s_CreatedResourcesCount;
 		if (s_CreatedResourcesCount == 0)
@@ -77,14 +77,14 @@ namespace VKE
 		}
 	}
 
-	void cTexture::cleanUp()
+	void FTexture::cleanUp()
 	{
 		vkDestroySampler(pMainDevice->LD, Sampler, nullptr);
 
-		Buffer.cleanUp();
+		Buffer.CleanUp();
 	}
 
-	VkDescriptorImageInfo cTexture::GetImageInfo() const
+	VkDescriptorImageInfo FTexture::GetImageInfo() const
 	{
 		VkDescriptorImageInfo Info;
 		Info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;			// Image layout when in use
@@ -94,12 +94,12 @@ namespace VKE
 		return Info;
 	}
 
-	int cTexture::createTextureImage(const std::string& fileName, VkFormat Format)
+	int32 FTexture::CreateTextureImage(const std::string& fileName, VkFormat Format)
 	{
 		// Load image file
 		VkDeviceSize ImageSize;
 
-		unsigned char* ImageData = FileIO::LoadTextureFile(fileName, Width, Height, ImageSize);
+		uint8* ImageData = FileIO::LoadTextureFile(fileName, Width, Height, ImageSize);
 		if (!ImageData)
 		{
 			return -1;
@@ -123,7 +123,7 @@ namespace VKE
 		FileIO::freeLoadedTextureData(ImageData);
 
 		// 1. Create image to hold final texture
-		if (!Buffer.init(pMainDevice, Width, Height, Format, VK_IMAGE_TILING_OPTIMAL,
+		if (!Buffer.Init(pMainDevice, Width, Height, Format, VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,								// Destination of transfer, and also a texture sampler
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT
 			))
@@ -148,7 +148,7 @@ namespace VKE
 		return TextureID;
 	}
 
-	void cTexture::createTextureSampler()
+	void FTexture::CreateTextureSampler()
 	{
 		VkSamplerCreateInfo SamplerCreateInfo = {};
 		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

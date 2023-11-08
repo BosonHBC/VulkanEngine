@@ -16,7 +16,7 @@ namespace VKE
 	};
 
 	class IDescriptor;
-	class cImageBuffer;
+	class FImageBuffer;
 	class cDescriptorSet
 	{
 	public:
@@ -28,10 +28,10 @@ namespace VKE
 		cDescriptorSet() {};
 		cDescriptorSet(FMainDevice* iMainDevice) : pMainDevice(iMainDevice) {}
 		~cDescriptorSet() {};
-		cDescriptorSet(const cDescriptorSet& i_other) = default;
-		cDescriptorSet& operator = (const cDescriptorSet& i_other) = delete;
-		cDescriptorSet( cDescriptorSet&& i_other) = default;
-		cDescriptorSet& operator = (cDescriptorSet&& i_other) = default;
+		cDescriptorSet(const cDescriptorSet& Other) = default;
+		cDescriptorSet& operator = (const cDescriptorSet& Other) = delete;
+		cDescriptorSet( cDescriptorSet&& Other) = default;
+		cDescriptorSet& operator = (cDescriptorSet&& Other) = default;
 		void cleanUp();
 
 		/** Getters */
@@ -66,7 +66,7 @@ namespace VKE
 
 		void CreateDynamicBufferDescriptor(VkDeviceSize BufferFormatSize, uint32_t ObjectCount, VkShaderStageFlags ShaderStage);
 
-		void CreateImageBufferDescriptor(cImageBuffer* const & iImageBuffer, VkDescriptorType Type, VkShaderStageFlags ShaderStage, VkImageLayout ImageLayout, VkSampler Sampler = VK_NULL_HANDLE);
+		void CreateImageBufferDescriptor(FImageBuffer* const & iImageBuffer, VkDescriptorType Type, VkShaderStageFlags ShaderStage, VkImageLayout ImageLayout, VkSampler Sampler = VK_NULL_HANDLE);
 
 		void CreateStorageBufferDescriptor(VkDeviceSize BufferFormatSize, uint32_t ObjectCount, VkShaderStageFlags ShaderStage, VkBufferUsageFlags UsageFlags, VkMemoryPropertyFlags MemoryPropertyFlags);
 

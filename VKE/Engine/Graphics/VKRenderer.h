@@ -14,7 +14,7 @@
 #include <vector>
 namespace VKE
 {
-	class cModel;
+	class FModel;
 	struct FComputePass;
 	class VKRenderer
 	{
@@ -25,16 +25,16 @@ namespace VKE
 		VKRenderer(const VKRenderer& other) = delete;
 		VKRenderer& operator =(const VKRenderer& other) = delete;
 
-		int init(GLFWwindow* iWindow);
+		int32 init(GLFWwindow* iWindow);
 		void tick(float dt);
 		void draw();
 		void cleanUp();
 
 		void LoadAssets();
 
-		bool CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel);
+		bool CreateModel(const std::string& ifileName, std::shared_ptr<FModel>& oModel);
 		// Scene Objects
-		std::vector<std::shared_ptr<cModel>> RenderList;
+		std::vector<std::shared_ptr<FModel>> RenderList;
 	
 		// Accessors
 		ACCESSOR_INLINE(VkInstance, vkInstance);
@@ -50,7 +50,7 @@ namespace VKE
 		ACCESSOR_INLINE(std::vector<VkSemaphore>, OnImageAvailables);
 		ACCESSOR_INLINE(std::vector <VkSemaphore>, OnRenderFinisheds);
 		ACCESSOR_INLINE(std::vector<VkFence>, DrawFences);
-		ACCESSOR_INLINE(std::vector <cImageBuffer>, ColorBuffers);
+		ACCESSOR_INLINE(std::vector <FImageBuffer>, ColorBuffers);
 
 		// Compute pass
 		FComputePass* pCompute = nullptr;
@@ -73,8 +73,8 @@ namespace VKE
 		std::vector<VkFramebuffer> SwapChainFramebuffers;
 		std::vector<VkCommandBuffer> CommandBuffers;
 
-		std::vector <cImageBuffer> DepthBuffers;
-		std::vector <cImageBuffer> ColorBuffers;			
+		std::vector <FImageBuffer> DepthBuffers;
+		std::vector <FImageBuffer> ColorBuffers;			
 
 		// -Pipeline
 		VkRenderPass RenderPass;
@@ -145,7 +145,7 @@ namespace VKE
 		VkResult presentFrame();
 		void postPresentationStage();
 		/** Support functions */
-		bool checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount);
+		bool checkInstanceExtensionSupport(const char** checkExtentions, int32 extensionCount);
 		bool checkValidationLayerSupport();
 		bool checkDeviceExtensionSupport(const VkPhysicalDevice& device);
 		bool checkDeviceSuitable(const VkPhysicalDevice& device);

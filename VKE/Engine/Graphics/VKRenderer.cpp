@@ -33,9 +33,9 @@ namespace VKE
 {
 
 	//** Global Variables * /
-	std::shared_ptr<cModel> GQuadModel = nullptr;
+	std::shared_ptr<FModel> GQuadModel = nullptr;
 
-	int VKRenderer::init(GLFWwindow* iWindow)
+	int32 VKRenderer::init(GLFWwindow* iWindow)
 	{
 		window = iWindow;
 		try
@@ -55,9 +55,9 @@ namespace VKE
 			// Descriptor set and push constant related
 			{		
 				// Create Texture
-				cTexture::Load("DefaultWhite.png", MainDevice);	// ID = 0, default white texture
-				cTexture::Load("fireParticles/TXT_Sparks_01.tga", MainDevice);
-				cTexture::Load("fireParticles/TXT_Fire_01.tga", MainDevice);
+				FTexture::Load("DefaultWhite.png", MainDevice);	// ID = 0, default white texture
+				FTexture::Load("fireParticles/TXT_Sparks_01.tga", MainDevice);
+				FTexture::Load("fireParticles/TXT_Fire_01.tga", MainDevice);
 				CreateDescriptorSets();
 				createPushConstantRange();
 			}
@@ -85,7 +85,7 @@ namespace VKE
 	{
 		if (RenderList.size() > 0 && RenderList[0])
 		{
-			RenderList[0]->Transform.gRotate(cTransform::WorldUp, dt);
+			RenderList[0]->Transform.gRotate(FTransform::WorldUp, dt);
 			RenderList[0]->Transform.Update();
 		}
 
@@ -104,7 +104,7 @@ namespace VKE
 
 	VkResult VKRenderer::prepareForDraw()
 	{
-		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		int32 CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		// Wait for given fence to be opened from last draw before continuing
 		vkWaitForFences(MainDevice.LD, 1, &DrawFences[CurrentFrame],
 			VK_TRUE,													// Must wait for all fences to be opened(signaled) to pass this wait
@@ -117,7 +117,7 @@ namespace VKE
 
 	VkResult VKRenderer::presentFrame()
 	{
-		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		int32 CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		VkPresentInfoKHR PresentInfo = {};
 		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		PresentInfo.waitSemaphoreCount = 1;
@@ -146,7 +146,7 @@ namespace VKE
 
 	void VKRenderer::postPresentationStage()
 	{
-		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		int32 CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		if (pCompute && pCompute->bNeedComputePass)
 		{
 			// re-record commands
@@ -171,7 +171,7 @@ namespace VKE
 
 	void VKRenderer::draw()
 	{
-		int CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
+		int32 CurrentFrame = ElapsedFrame % MAX_FRAME_DRAWS;
 		VkResult PrepareResult = prepareForDraw();
 		// Swap chain is out of date
 		if ((PrepareResult == VK_ERROR_OUT_OF_DATE_KHR) || (PrepareResult == VK_SUBOPTIMAL_KHR))
@@ -233,10 +233,10 @@ namespace VKE
 		if (pCompute)
 		{
 			pCompute->cleanUp();
-			safe_delete(pCompute);
+			SAFE_DELETE(pCompute);
 		}
 		
-		cTexture::Free();
+		FTexture::Free();
 		// Clean up render list
 		for (auto Model : RenderList)
 		{
@@ -261,8 +261,8 @@ namespace VKE
 		{
 			for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 			{
-				ColorBuffers[i].cleanUp();
-				DepthBuffers[i].cleanUp();
+				ColorBuffers[i].CleanUp();
+				DepthBuffers[i].CleanUp();
 			}
 
 			ColorBuffers.clear();
@@ -294,8 +294,8 @@ namespace VKE
 	void VKRenderer::LoadAssets()
 	{
 		// Create Mesh
-		std::shared_ptr<cModel> pContainerModel = nullptr;
-		std::shared_ptr<cModel> pPlaneModel = nullptr;
+		std::shared_ptr<FModel> pContainerModel = nullptr;
+		std::shared_ptr<FModel> pPlaneModel = nullptr;
 
 		/*CreateModel("Container.obj", pContainerModel);
 		RenderList.push_back(pContainerModel);
@@ -400,7 +400,7 @@ namespace VKE
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(MainDevice.PD, &deviceProperties);
 		SetMinUniformOffsetAlignment(deviceProperties.limits.minUniformBufferOffsetAlignment);
-		printf("Min Uniform Buffer Offset Alignment: %d\n", static_cast<int>(GetMinUniformOffsetAlignment()));
+		printf("Min Uniform Buffer Offset Alignment: %d\n", static_cast<int32>(GetMinUniformOffsetAlignment()));
 	}
 
 	void VKRenderer::createLogicalDevice()
@@ -409,7 +409,7 @@ namespace VKE
 		// vector for queue create information
 		std::vector< VkDeviceQueueCreateInfo> queueCreateInfos;
 		// set of queue family indices, prevent duplication
-		std::set<int> queueFamilyIndices = { MainDevice.QueueFamilyIndices.graphicFamily, MainDevice.QueueFamilyIndices.presentationFamily, MainDevice.QueueFamilyIndices.computeFamily };
+		std::set<int32> queueFamilyIndices = { MainDevice.QueueFamilyIndices.graphicFamily, MainDevice.QueueFamilyIndices.presentationFamily, MainDevice.QueueFamilyIndices.computeFamily };
 		const float DefaultPriority = 0.0f;
 		for (auto& queueFamilyIdx : queueFamilyIndices)
 		{
@@ -588,13 +588,13 @@ namespace VKE
 		DepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		// Setup sub-pass 0
-		Subpasses[0] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
+		Subpasses[0] = Helpers::SubPassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
 		Subpasses[0].colorAttachmentCount = 1;
 		Subpasses[0].pColorAttachments = &ColorAttachmentReference;
 		Subpasses[0].pDepthStencilAttachment = &DepthAttachmentReference;
 
 		// Setup sub-pass 1, using the same as the first pass
-		Subpasses[1] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
+		Subpasses[1] = Helpers::SubPassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
 		Subpasses[1].colorAttachmentCount = 1;
 		Subpasses[1].pColorAttachments = &ColorAttachmentReference;
 		Subpasses[1].pDepthStencilAttachment = &DepthAttachmentReference;
@@ -633,7 +633,7 @@ namespace VKE
 		InputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		// Setup sub-pass 2
-		Subpasses[2] = Helpers::SubpassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
+		Subpasses[2] = Helpers::SubPassDescriptionDefault(VK_PIPELINE_BIND_POINT_GRAPHICS);
 		Subpasses[2].colorAttachmentCount = 1;
 		Subpasses[2].pColorAttachments = &SwapChainColorAttachmentReference;				// Color attachment references
 		Subpasses[2].inputAttachmentCount = InputReferenceCount;
@@ -1198,7 +1198,7 @@ namespace VKE
 
 		for (size_t i = 0; i < SwapChain.Images.size(); ++i)
 		{
-			if (!DepthBuffers[i].init(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
+			if (!DepthBuffers[i].Init(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, DepthFormat,
 				VK_IMAGE_TILING_OPTIMAL,
 				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |	// Use as depth / stencil attachment output
 				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT			// Also use as input in the next sub-pass
@@ -1208,7 +1208,7 @@ namespace VKE
 				return;
 			}
 
-			if (!ColorBuffers[i].init(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, ColorFormat,
+			if (!ColorBuffers[i].Init(&MainDevice, SwapChain.Extent.width, SwapChain.Extent.height, ColorFormat,
 				VK_IMAGE_TILING_OPTIMAL,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |		// Use as color attachment output
 				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT			// Also use as input in the next sub-pass
@@ -1364,7 +1364,7 @@ namespace VKE
 
 	void VKRenderer::updateUniformBuffers()
 	{
-		int idx = SwapChain.ImageIndex;
+		int32 idx = SwapChain.ImageIndex;
 		// Copy Frame data
 		if (cDescriptor_Buffer* Buffer = DescriptorSets[idx].GetDescriptorAt<cDescriptor_Buffer>(0))
 		{
@@ -1395,7 +1395,7 @@ namespace VKE
 
 	}
 
-	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int extensionCount)
+	bool VKRenderer::checkInstanceExtensionSupport(const char** checkExtentions, int32 extensionCount)
 	{
 		// Need to get number of extensions to create array of correct size to hold extensions
 		uint32_t ExtensionCount = 0;
@@ -1411,7 +1411,7 @@ namespace VKE
 		vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, extensions.data());
 
 		// Check if given extensions are available
-		for (int i = 0; i < extensionCount; ++i)
+		for (int32 i = 0; i < extensionCount; ++i)
 		{
 			bool hasExtension = false;
 			for (const auto& extension : extensions)
@@ -1539,7 +1539,7 @@ namespace VKE
 		throw std::runtime_error("Fail to find a matching format!");
 	}
 
-	bool VKRenderer::CreateModel(const std::string& ifileName, std::shared_ptr<cModel>& oModel)
+	bool VKRenderer::CreateModel(const std::string& ifileName, std::shared_ptr<FModel>& oModel)
 	{
 		// Import model "scene"
 		Assimp::Importer Importer;
@@ -1558,10 +1558,10 @@ namespace VKE
 		}
 
 		// get vector of all materials with 1:1 ID placement
-		std::vector<std::string> TextureNames = cModel::LoadMaterials(scene);
+		std::vector<std::string> TextureNames = FModel::LoadMaterials(scene);
 
 		// Conversion from the materials list IDs to our Descriptor Array IDs
-		std::vector<int> MatToTex(TextureNames.size(), 0);
+		std::vector<int32> MatToTex(TextureNames.size(), 0);
 
 		// Loop over texture names and create texture for them
 		for (size_t i = 0; i < MatToTex.size(); ++i)
@@ -1573,13 +1573,13 @@ namespace VKE
 			}
 			else
 			{
-				auto newTex = cTexture::Load(TextureNames[i], MainDevice, VK_FORMAT_R8G8B8A8_UNORM);
+				auto newTex = FTexture::Load(TextureNames[i], MainDevice, VK_FORMAT_R8G8B8A8_UNORM);
 				// Set value to index of new texture
 				MatToTex[i] = newTex->GetID();
 			}
 		}
 
-		std::vector<std::shared_ptr<cMesh>> Meshes = cModel::LoadNode(ifileName, MainDevice, MainDevice.graphicQueue, MainDevice.GraphicsCommandPool, scene->mRootNode, scene, MatToTex);
+		std::vector<std::shared_ptr<cMesh>> Meshes = FModel::LoadNode(ifileName, MainDevice, MainDevice.graphicQueue, MainDevice.GraphicsCommandPool, scene->mRootNode, scene, MatToTex);
 		for (auto& Mesh : Meshes)
 		{
 			if (Mesh.get())
@@ -1587,7 +1587,7 @@ namespace VKE
 				Mesh->CreateDescriptorSet(SamplerDescriptorPool);
 			}
 		}
-		oModel = std::make_shared<cModel>(Meshes);
+		oModel = std::make_shared<FModel>(Meshes);
 
 		return true;
 	}
@@ -1808,7 +1808,7 @@ namespace VKE
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilyList.data());
 
 		// Go through each queue family and check if it has at least 1 of the required types of queue
-		int i = 0;
+		int32 i = 0;
 		for (const auto& queueFamily : queueFamilyList)
 		{
 			if (queueFamily.queueCount > 0)

@@ -21,53 +21,53 @@ namespace VKE {
 	bool bWindowIconified = false;
 
 	//=================== Parameters =================== 
-	GLFWwindow* g_Window;
-	VKRenderer* g_Renderer;
-	UserInput::FUserInput* g_Input;
-	cCamera* g_Camera;
+	GLFWwindow* GWindow;
+	VKRenderer* GRenderer;
+	UserInput::FUserInput* GUserInput;
+	cCamera* GCamera;
 
 	//=================== Function declarations =================== 
 
 	// GLFW
-	void initGLFW();
-	void cleanupGLFW();
+	void InitGLFW();
+	void CleanupGLFW();
 	// Input
-	void initInput();
-	void window_focus_callback(GLFWwindow* window, int focused);
-	void window_iconify_callback(GLFWwindow* window, int iconified);
-	void cleanupInput();
-	void quitApp();
+	void InitInput();
+	void window_focus_callback(GLFWwindow* window, int32 focused);
+	void window_iconify_callback(GLFWwindow* window, int32 iconified);
+	void CleanupInput();
+	void QuitApp();
 
 	// Camera
-	void initCamera();
-	void cleanupCamera();
+	void InitCamera();
+	void CleanupCamera();
 
-	int init()
+	int32 Init()
 	{
-		int result = EXIT_SUCCESS;
-		initGLFW();
-		initInput();
-		initCamera();
+		int32 result = EXIT_SUCCESS;
+		InitGLFW();
+		InitInput();
+		InitCamera();
 		
-		g_Renderer = DBG_NEW VKRenderer();
-		if (g_Renderer->init(g_Window) == EXIT_FAILURE)
+		GRenderer = DBG_NEW VKRenderer();
+		if (GRenderer->init(GWindow) == EXIT_FAILURE)
 		{
 			return EXIT_FAILURE;
 		}
-		Editor::Init(g_Window, g_Renderer);
+		Editor::Init(GWindow, GRenderer);
 
 		return result;
 	}
 
-	void run()
+	void Run()
 	{
-		if (!g_Window)
+		if (!GWindow)
 		{
 			return;
 		}
 
 		double LastTime = glfwGetTime();
-		while (!glfwWindowShouldClose(g_Window))
+		while (!glfwWindowShouldClose(GWindow))
 		{
 			glfwPollEvents();
 
@@ -76,42 +76,42 @@ namespace VKE {
 			
 			LastTime = now;
 			// update editor
-			Editor::Update(g_Renderer);
+			Editor::Update(GRenderer);
 			
 			// not minimized
 			if (!bWindowIconified && !Editor::GbMovingWindow)
 			{
-				g_Input->Update();
+				GUserInput->Update();
 
-				g_Camera->Update();
+				GCamera->Update();
 
-				g_Renderer->tick((float)cTime::DT);
-				g_Renderer->draw();
+				GRenderer->tick((float)cTime::DT);
+				GRenderer->draw();
 			}
 		}
 	}
 
-	void cleanup()
+	void Cleanup()
 	{
-		Editor::CleanUp(g_Renderer);
+		Editor::CleanUp(GRenderer);
 
-		g_Renderer->cleanUp();
-		safe_delete(g_Renderer);
+		GRenderer->cleanUp();
+		SAFE_DELETE(GRenderer)
 
-		cleanupCamera();
-		cleanupInput();
-		cleanupGLFW();
+		CleanupCamera();
+		CleanupInput();
+		CleanupGLFW();
 	}
 
 
 	GLFWwindow* GetGLFWWindow()
 	{
-		return g_Window;
+		return GWindow;
 	}
 
 	cCamera* GetCurrentCamera()
 	{
-		return g_Camera;
+		return GCamera;
 	}
 
 	glm::ivec2 GetWindowExtent()
@@ -121,14 +121,14 @@ namespace VKE {
 
 	glm::vec2 GetMouseDelta()
 	{
-		if (g_Input)
+		if (GUserInput)
 		{
-			return g_Input->GetMouseDelta();
+			return GUserInput->GetMouseDelta();
 		}
 		return glm::vec2(0.0f);
 	}
 
-	void initGLFW()
+	void InitGLFW()
 	{
 		glfwInit();
 
@@ -136,69 +136,69 @@ namespace VKE {
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-		g_Window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
+		GWindow = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
 
-		glfwSetWindowFocusCallback(g_Window, window_focus_callback);
-		glfwSetWindowIconifyCallback(g_Window, window_iconify_callback);
+		glfwSetWindowFocusCallback(GWindow, window_focus_callback);
+		glfwSetWindowIconifyCallback(GWindow, window_iconify_callback);
 	}
-	void cleanupGLFW()
+	void CleanupGLFW()
 	{
-		glfwDestroyWindow(g_Window);
+		glfwDestroyWindow(GWindow);
 
 		glfwTerminate();
 	}
 
-	void initInput()
+	void InitInput()
 	{
 		using namespace UserInput;
-		g_Input = DBG_NEW UserInput::FUserInput();
-		g_Input->AddActionKeyPairToMap("Escape", EKeyCode::Escape);
-		g_Input->BindAction("Escape", EIT_OnPressed, &quitApp);
+		GUserInput = DBG_NEW UserInput::FUserInput();
+		GUserInput->AddActionKeyPairToMap("Escape", EKeyCode::Escape);
+		GUserInput->BindAction("Escape", EIT_OnPressed, &QuitApp);
 
-		g_Input->AddActionKeyPairToMap("TurnCamera", EKeyCode::LMB);
-		g_Input->AddActionKeyPairToMap("ZoomCamera", EKeyCode::RMB);
+		GUserInput->AddActionKeyPairToMap("TurnCamera", EKeyCode::LMB);
+		GUserInput->AddActionKeyPairToMap("ZoomCamera", EKeyCode::RMB);
 
-		g_Input->AddAxisKeyPairToMap("MoveRight", { EKeyCode::A,EKeyCode::D });
-		g_Input->AddAxisKeyPairToMap("MoveForward", { EKeyCode::S,EKeyCode::W });
-		g_Input->AddAxisKeyPairToMap("MoveUp", { EKeyCode::Control,EKeyCode::Space });
+		GUserInput->AddAxisKeyPairToMap("MoveRight", { EKeyCode::A,EKeyCode::D });
+		GUserInput->AddAxisKeyPairToMap("MoveForward", { EKeyCode::S,EKeyCode::W });
+		GUserInput->AddAxisKeyPairToMap("MoveUp", { EKeyCode::Control,EKeyCode::Space });
 
 	}
-	void window_focus_callback(GLFWwindow* window, int focused)
+	void window_focus_callback(GLFWwindow* window, int32 focused)
 	{
-		if (g_Input)
+		if (GUserInput)
 		{
-			g_Input->bAppInFocus = focused;
+			GUserInput->bAppInFocus = focused;
 		}
 	}
-	void window_iconify_callback(GLFWwindow* window, int iconified)
+	void window_iconify_callback(GLFWwindow* window, int32 iconified)
 	{
 		bWindowIconified = iconified > 0;
 	}
-	void quitApp()
+	void QuitApp()
 	{
-		glfwSetWindowShouldClose(g_Window, true);
+		glfwSetWindowShouldClose(GWindow, true);
 	}
-	void cleanupInput()
+	void CleanupInput()
 	{
-		safe_delete(g_Input);
+		SAFE_DELETE(GUserInput);
 	}
 
-	void initCamera()
+	void InitCamera()
 	{
-		g_Camera = DBG_NEW cCamera(glm::vec3(0, 1, 2.5), 15.f, 0.0f, 2.0f, 0.1f);
-		g_Camera->UpdateProjectionMatrix(glm::radians(45.f), (float)WIDTH / (float)HEIGHT);
-		g_Camera->Update();
+		GCamera = DBG_NEW cCamera(glm::vec3(0, 1, 2.5), 15.f, 0.0f, 2.0f, 0.1f);
+		GCamera->UpdateProjectionMatrix(glm::radians(45.f), (float)WIDTH / (float)HEIGHT);
+		GCamera->Update();
 
-		g_Input->BindAction("TurnCamera", UserInput::EIT_OnHold, g_Camera, &cCamera::TurnCamera);
-		g_Input->BindAction("ZoomCamera", UserInput::EIT_OnHold, g_Camera, &cCamera::ZoomCamera);
+		GUserInput->BindAction("TurnCamera", UserInput::EIT_OnHold, GCamera, &cCamera::TurnCamera);
+		GUserInput->BindAction("ZoomCamera", UserInput::EIT_OnHold, GCamera, &cCamera::ZoomCamera);
 
-		g_Input->BindAxis("MoveRight", g_Camera, &cCamera::MoveRight);
-		g_Input->BindAxis("MoveForward", g_Camera, &cCamera::MoveForward);
-		g_Input->BindAxis("MoveUp", g_Camera, &cCamera::MoveUp);
+		GUserInput->BindAxis("MoveRight", GCamera, &cCamera::MoveRight);
+		GUserInput->BindAxis("MoveForward", GCamera, &cCamera::MoveForward);
+		GUserInput->BindAxis("MoveUp", GCamera, &cCamera::MoveUp);
 
 	}
-	void cleanupCamera()
+	void CleanupCamera()
 	{
-		safe_delete(g_Camera);
+		SAFE_DELETE(GCamera);
 	}
 }

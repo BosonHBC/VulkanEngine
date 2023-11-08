@@ -19,7 +19,7 @@ namespace VKE
 		void* GetAllocatedMemory() const { return pAllocatedTransferSpace; }
 
 		/* Clean up Function */
-		void cleanUp() override;
+		void CleanUp() override;
 
 	protected:
 		// Allocate memory in CPU for copying data to GPU

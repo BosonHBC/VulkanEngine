@@ -1,4 +1,5 @@
 #pragma once
+#include "Core.h"
 #include <vector>
 #include <string>
 #include <stdexcept>
@@ -32,7 +33,7 @@
 #endif
 
 #define RESULT_CHECK_ARGS(Result, Message, Args) if(Result != VK_SUCCESS) {char Msg[256]; sprintf_s(Msg, Message, Args); throw std::runtime_error(Msg);}
-#define safe_delete(x) if(x!=nullptr) {delete x; x = nullptr; }
+#define SAFE_DELETE(x) if(x!=nullptr) {delete x; x = nullptr; }
 
 #define VERTEX_BUFFER_BIND_ID 0
 #define INSTANCE_BUFFER_BIND_ID 1
@@ -69,9 +70,9 @@ namespace VKE
 	};
 
 	// Maximum 3 image on the queue
-	const int MAX_FRAME_DRAWS = 3;
+	const int32 MAX_FRAME_DRAWS = 3;
 	// Max objects are allowed in the scene
-	const int MAX_OBJECTS = 20;
+	const int32 MAX_OBJECTS = 20;
 	
 	extern uint64_t ElapsedFrame;
 	// =======================================
@@ -89,9 +90,9 @@ namespace VKE
 	// Indices (location) of Queue Families (if they exist at all)
 	struct FQueueFamilyIndices
 	{
-		int graphicFamily = -1;			// Location of Graphics Queue Family
-		int presentationFamily = -1;	// Location of Presentation Queue Family
-		int computeFamily = -1;			// Location of compute queue family
+		int32 graphicFamily = -1;			// Location of Graphics Queue Family
+		int32 presentationFamily = -1;	// Location of Presentation Queue Family
+		int32 computeFamily = -1;			// Location of compute queue family
 		bool IsValid() const;
 	};
 
@@ -157,7 +158,7 @@ namespace VKE
 	namespace Helpers
 	{
 		VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits ShaderStage, VkShaderModule ShaderModule, const char* MainFunctionName = "main");
-		VkSubpassDescription SubpassDescriptionDefault(VkPipelineBindPoint BindPoint);
+		VkSubpassDescription SubPassDescriptionDefault(VkPipelineBindPoint BindPoint);
 	}
 
 	// ================================================
@@ -185,23 +186,23 @@ namespace VKE
 	VkDeviceSize GetMinUniformOffsetAlignment();
 
 	// Image creation related
-	VkImageView CreateImageViewFromImage(FMainDevice* iMainDevice, const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
-	bool CreateImage(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
+	VkImageView CreateImageViewFromImage(const FMainDevice* iMainDevice, const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags);
+	bool CreateImage(const FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory);
 
 	void TransitionImageLayout(VkDevice LD, VkQueue Queue, VkCommandPool CommandPool, VkImage Image, VkImageLayout CurrentLayout, VkImageLayout NewLayout);
 
 	namespace FileIO
 	{
 		std::vector<char> ReadFile(const std::string& filename);
-		std::string RelativePathToAbsolutePath(const std::string& iReleative);
+		std::string RelativePathToAbsolutePath(const std::string& iRelative);
 
-		unsigned char* LoadTextureFile(const std::string& fileName, int& oWidth, int& oHeight, VkDeviceSize& oImageSize);
-		void freeLoadedTextureData(unsigned char* Data);
+		uint8* LoadTextureFile(const std::string& fileName, int32& oWidth, int32& oHeight, VkDeviceSize& oImageSize);
+		void freeLoadedTextureData(uint8* Data);
 	}
 
 
 	float RandRange(float min, float max);
-	int RandRangeInt(int min, int max);
+	int32 RandRangeInt(int32 min, int32 max);
 	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max);
 
 	float Rand01();

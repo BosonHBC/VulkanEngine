@@ -30,7 +30,7 @@ namespace VKE
 		void UpdatePartialData(void * srcData, VkDeviceSize Offset, VkDeviceSize Size);
 
 		/* Clean up Function */
-		virtual void cleanUp();
+		virtual void CleanUp();
 
 		/** Getters */
 		// Get buffer size for Descriptor_buffer

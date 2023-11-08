@@ -8,7 +8,7 @@
 #include "stb_image.h"
 namespace VKE
 {
-	std::default_random_engine RndGenerator;
+	std::default_random_engine RndGenerator { 0 };
 	std::uniform_real_distribution<float> Float01Distribution(0.0f, 1.0f);
 
 	VkDeviceSize MinUniformBufferOffset = 0;
@@ -57,10 +57,10 @@ namespace VKE
 		else
 		{
 			// Need to set extent manually
-			int width, height;
+			int32 width, height;
 			glfwGetFramebufferSize(VKE::GetGLFWWindow(), &width, &height);
 
-			VkExtent2D NewExtent = {};
+			VkExtent2D NewExtent;
 			// Make new extent is inside boundaries defined by Surface
 			NewExtent.width = std::max(std::min(static_cast<uint32_t>(width), SurfaceCapabilities.maxImageExtent.width), SurfaceCapabilities.minImageExtent.width);
 			NewExtent.height = std::max(std::min(static_cast<uint32_t>(height), SurfaceCapabilities.maxImageExtent.height), SurfaceCapabilities.minImageExtent.height);
@@ -98,7 +98,7 @@ namespace VKE
 		ShaderModuleCreateModule.codeSize = iShaderCode.size();										// Length of code
 		ShaderModuleCreateModule.pCode = reinterpret_cast<const uint32_t*>(iShaderCode.data());		// Pointer to code
 
-		VkResult Result = vkCreateShaderModule(LD, &ShaderModuleCreateModule, nullptr, &ShaderModule);
+		const VkResult Result = vkCreateShaderModule(LD, &ShaderModuleCreateModule, nullptr, &ShaderModule);
 
 		if (Result != VK_SUCCESS)
 		{
@@ -118,7 +118,7 @@ namespace VKE
 		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;					// only one using in a time, similar to swap chain images
 
 		VkResult Result = vkCreateBuffer(MainDevice.LD, &BufferCreateInfo, nullptr, &oBuffer);
-		RESULT_CHECK(Result, "Fail to create buffer.");
+		RESULT_CHECK(Result, "Fail to create buffer.")
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -138,9 +138,9 @@ namespace VKE
 			Properties									// Memory property, is this local_bit or host_bit or others
 		);
 
-		// Allocate memory to VKDevieMemory
+		// Allocate memory to VKDeviceMemory
 		Result = vkAllocateMemory(MainDevice.LD, &MemAllocInfo, nullptr, &oBufferMemory);
-		RESULT_CHECK(Result, "Fail to allocate memory for buffer.");
+		RESULT_CHECK(Result, "Fail to allocate memory for buffer.")
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -206,7 +206,7 @@ namespace VKE
 		FenceCreateInfo.flags = 0;
 		VkFence Fence;
 		VkResult Result = vkCreateFence(LD, &FenceCreateInfo, nullptr, &Fence);
-		RESULT_CHECK(Result, "Fail to create fence for executing transfer command");
+		RESULT_CHECK(Result, "Fail to create fence for executing transfer command")
 
 		// Queue submission information
 		VkSubmitInfo SubmitInfo = {};
@@ -215,13 +215,13 @@ namespace VKE
 		SubmitInfo.pCommandBuffers = &CommandBuffer;
 
 		Result = vkQueueSubmit(Queue, 1, &SubmitInfo, Fence);
-		RESULT_CHECK(Result, "Fail to submit transfer command buffer to transfer queue");
+		RESULT_CHECK(Result, "Fail to submit transfer command buffer to transfer queue")
 
 		// Use fence to prevent submitting multiple transfer command buffers to a same queue,
 		// Sometime when there are tons of meshes loading in one time, this way can prevent crashing easily,
 		// But optimal way is using synchronization to load files at the same time.
 		Result = vkWaitForFences(LD, 1, &Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-		RESULT_CHECK(Result, "Fail to wait for fence");
+		RESULT_CHECK(Result, "Fail to wait for fence")
 		
 		// Free temp fence
 		vkDestroyFence(LD, Fence, nullptr);
@@ -232,10 +232,10 @@ namespace VKE
 	void CopyBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkBuffer DstBuffer, VkDeviceSize BufferSize)
 	{
 		// Allocate the transfer command buffer
-		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
+		const VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
 
 		// Region of data to copy from and to, allows copy multiple regions of data
-		VkBufferCopy BufferCopyRegion = {};
+		VkBufferCopy BufferCopyRegion;
 		BufferCopyRegion.srcOffset = 0;
 		BufferCopyRegion.dstOffset = 0;
 		BufferCopyRegion.size = BufferSize;
@@ -249,10 +249,10 @@ namespace VKE
 
 	void CopyImageBuffer(VkDevice LD, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SrcBuffer, VkImage DstImage, uint32_t Width, uint32_t Height)
 	{
-		VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
+		const VkCommandBuffer TransferCommandBuffer = BeginCommandBuffer(LD, TransferCommandPool);
 
 		// Region of data to copy from and to, allows copy multiple regions of data
-		VkBufferImageCopy ImageCopyRegion = {};
+		VkBufferImageCopy ImageCopyRegion;
 		ImageCopyRegion.bufferOffset = 0;
 		ImageCopyRegion.bufferRowLength = 0;										// for calculating data spacing, like calculating i, j for loop
 		ImageCopyRegion.bufferImageHeight = 0;										// the same calculating data spacing, means don't want to skip any pixel while reading
@@ -280,7 +280,7 @@ namespace VKE
 		return MinUniformBufferOffset;
 	}
 
-	VkImageView CreateImageViewFromImage(FMainDevice* iMainDevice, const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags)
+	VkImageView CreateImageViewFromImage(const FMainDevice* iMainDevice, const VkImage& iImage, const VkFormat& iFormat, const VkImageAspectFlags& iAspectFlags)
 	{
 		VkImageViewCreateInfo ViewCreateInfo = {};
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -301,13 +301,13 @@ namespace VKE
 
 		// Create Image view and return it
 		VkImageView ImageView;
-		VkResult Result = vkCreateImageView(iMainDevice->LD, &ViewCreateInfo, nullptr, &ImageView);
-		RESULT_CHECK(Result, "Fail to create an Image View");
+		const VkResult Result = vkCreateImageView(iMainDevice->LD, &ViewCreateInfo, nullptr, &ImageView);
+		RESULT_CHECK(Result, "Fail to create an Image View")
 
 		return ImageView;
 	}
 
-	bool CreateImage(FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory)
+	bool CreateImage(const FMainDevice* iMainDevice, uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkImage& oImage, VkDeviceMemory& oImageMemory)
 	{
 		// CREATE IMAGE
 		VkImageCreateInfo ImgCreateInfo = {};
@@ -326,35 +326,35 @@ namespace VKE
 		ImgCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;		// whether image can be shared between queues
 
 		VkResult Result = vkCreateImage(iMainDevice->LD, &ImgCreateInfo, nullptr, &oImage);
-		RESULT_CHECK(Result, "Fail to create an Image.");
+		RESULT_CHECK(Result, "Fail to create an Image.")
 		if (Result != VK_SUCCESS)
 		{
 			return false;
 		}
 		// Get memory requirements for a type of image
-		VkMemoryRequirements MemoryRequireMents;
-		vkGetImageMemoryRequirements(iMainDevice->LD, oImage, &MemoryRequireMents);
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(iMainDevice->LD, oImage, &MemoryRequirements);
 
 		// CREATE MEMORY FOR IMAGE
 		// Allocate memory to buffer
 		VkMemoryAllocateInfo MemAllocInfo = {};
 		MemAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemAllocInfo.allocationSize = MemoryRequireMents.size;
+		MemAllocInfo.allocationSize = MemoryRequirements.size;
 		MemAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(iMainDevice->PD,
-			MemoryRequireMents.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
+			MemoryRequirements.memoryTypeBits,				// Index of memory type on Physical Device that has required bit flags
 			PropFlags										// Memory property, is this local_bit or host_bit or others
 		);
 
-		// Allocate memory to VKDevieMemory
+		// Allocate memory to VKDeviceMemory
 		Result = vkAllocateMemory(iMainDevice->LD, &MemAllocInfo, nullptr, &oImageMemory);
-		RESULT_CHECK(Result, "Fail to allocate memory for image.");
+		RESULT_CHECK(Result, "Fail to allocate memory for image.")
 		if (Result != VK_SUCCESS)
 		{
 			return false;
 		}
 
 		Result = vkBindImageMemory(iMainDevice->LD, oImage, oImageMemory, 0);
-		RESULT_CHECK(Result, "Fail to bind image with memory.");
+		RESULT_CHECK(Result, "Fail to bind image with memory.")
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -364,7 +364,7 @@ namespace VKE
 
 	void TransitionImageLayout(VkDevice LD, VkQueue Queue, VkCommandPool CommandPool, VkImage Image, VkImageLayout CurrentLayout, VkImageLayout NewLayout)
 	{
-		VkCommandBuffer CommandBuffer = BeginCommandBuffer(LD, CommandPool);
+		const VkCommandBuffer CommandBuffer = BeginCommandBuffer(LD, CommandPool);
 
 		// Pipeline barrier - Image memory barrier
 		VkImageMemoryBarrier ImageMemoryBarrier = {};
@@ -412,9 +412,9 @@ namespace VKE
 		EndCommandBuffer(CommandBuffer, LD, Queue, CommandPool);
 	}
 
-	int RandRangeInt(int min, int max)
+	int32 RandRangeInt(int32 min, int32 max)
 	{
-		int result = static_cast<int>(RandRange(static_cast<float>(min), static_cast<float>(max) + 1.0f));
+		auto result = static_cast<int32>(RandRange(static_cast<float>(min), static_cast<float>(max) + 1.0f));
 		// when RandRange_float returns 1.0, result would be max + 1, clamp that
 		if (result > max)
 		{
@@ -430,7 +430,7 @@ namespace VKE
 
 	glm::vec3 RandRange(glm::vec3 min, glm::vec3 max)
 	{
-		return glm::vec3(RandRange(min.x, max.x), RandRange(min.y, max.y), RandRange(min.z, max.z));
+		return {RandRange(min.x, max.x), RandRange(min.y, max.y), RandRange(min.z, max.z)};
 	}
 
 	float Rand01()
@@ -445,18 +445,18 @@ namespace VKE
 			// Open stream from given file
 			// std::ios::binary tells stream to read file as binary
 			// std::ios::ate tells stream to start reading from end of file
-			std::string Path = filename;// FileIO::RelativePathToAbsolutePath(filename);
+			const std::string& Path = filename;// FileIO::RelativePathToAbsolutePath(filename);
 			std::ifstream file(Path, std::ios::in | std::ios::binary | std::ios::ate);
 
 			if (!file.is_open())
 			{
 				char msg[250];
-				sprintf_s(msg, "Fail to open the file: [%s]!", Path.c_str());
+				int32 Len = sprintf_s(msg, "Fail to open the file: [%s]!", Path.c_str());
 				throw std::runtime_error(msg);
 			}
 
 			// Get current read position and use to resize file buffer
-			size_t FileSize = static_cast<size_t>(file.tellg());
+			const size_t FileSize = static_cast<size_t>(file.tellg());
 			std::vector<char> FileBuffer(FileSize);
 
 			// Move read position (seek to) the start of the file
@@ -470,34 +470,33 @@ namespace VKE
 			return FileBuffer;
 		}
 
-		std::string RelativePathToAbsolutePath(const std::string& iReleative)
+		std::string RelativePathToAbsolutePath(const std::string& iRelative)
 		{
-			std::string result = std::string(_OUT_DIR) + iReleative.c_str();
+			std::string result = std::string(_OUT_DIR) + iRelative;
 			return result;
 		}
 
-		unsigned char* LoadTextureFile(const std::string& fileName, int& oWidth, int& oHeight, VkDeviceSize& oImageSize)
+		uint8* LoadTextureFile(const std::string& fileName, int32& oWidth, int32& oHeight, VkDeviceSize& oImageSize)
 		{
 			// Number of channel image uses
-			int channels = 0;
+			int32 channels = 0;
 
-			std::string fileLoc = "Content/Textures/" + fileName;
+			const std::string fileLoc = "Content/Textures/" + fileName;
 			// Make sure always has 4 channels
 			stbi_uc* Data = stbi_load(fileLoc.c_str(), &oWidth, &oHeight, &channels, STBI_rgb_alpha);
 
 			if (!Data)
 			{
-				std::string ErrorMsg = "Fail to load texture[" + fileLoc + "]." + stbi_failure_reason();
-				printf(ErrorMsg.c_str());
+				const std::string ErrorMsg = "Fail to load texture[" + fileLoc + "]." + stbi_failure_reason();
+				printf("%s", ErrorMsg.c_str());
 				throw std::runtime_error(ErrorMsg);
-				return nullptr;
 			}
 			// Calculate image size
-			oImageSize = oWidth * oHeight * 4;
+			oImageSize = static_cast<uint64>(oWidth) * oHeight * 4;
 			return Data;
 		}
 
-		void freeLoadedTextureData(unsigned char* Data)
+		void freeLoadedTextureData(uint8* Data)
 		{
 			stbi_image_free(Data);
 		}
@@ -524,21 +523,21 @@ namespace VKE
 			return ShaderStageCreateInfo;
 		}
 
-		VkSubpassDescription SubpassDescriptionDefault(VkPipelineBindPoint BindPoint)
+		VkSubpassDescription SubPassDescriptionDefault(VkPipelineBindPoint BindPoint)
 		{
-			VkSubpassDescription SubpassDescription;
-			SubpassDescription.pipelineBindPoint = BindPoint; // Pipeline type, (Graphics pipeline, Compute pipeline, RayTracing_NV...)
-			SubpassDescription.colorAttachmentCount = 0;
-			SubpassDescription.pColorAttachments = nullptr;
-			SubpassDescription.pDepthStencilAttachment = nullptr;
-			SubpassDescription.inputAttachmentCount = 0;
-			SubpassDescription.pInputAttachments = nullptr;
-			SubpassDescription.preserveAttachmentCount = 0;
-			SubpassDescription.pPreserveAttachments = nullptr;
-			SubpassDescription.pResolveAttachments = nullptr;
-			SubpassDescription.flags = 0;
+			VkSubpassDescription SubPassDescription;
+			SubPassDescription.pipelineBindPoint = BindPoint; // Pipeline type, (Graphics pipeline, Compute pipeline, RayTracing_NV...)
+			SubPassDescription.colorAttachmentCount = 0;
+			SubPassDescription.pColorAttachments = nullptr;
+			SubPassDescription.pDepthStencilAttachment = nullptr;
+			SubPassDescription.inputAttachmentCount = 0;
+			SubPassDescription.pInputAttachments = nullptr;
+			SubPassDescription.preserveAttachmentCount = 0;
+			SubPassDescription.pPreserveAttachments = nullptr;
+			SubPassDescription.pResolveAttachments = nullptr;
+			SubPassDescription.flags = 0;
 
-			return SubpassDescription;
+			return SubPassDescription;
 		}
 
 	}

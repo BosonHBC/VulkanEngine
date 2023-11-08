@@ -24,8 +24,8 @@ namespace VKE
 		static uint32_t s_CreatedResourcesCount;
 
 		cMesh() = delete;
-		cMesh(const cMesh& i_other) = delete;
-		cMesh& operator = (const cMesh& i_other) = delete;
+		cMesh(const cMesh& Other) = delete;
+		cMesh& operator = (const cMesh& Other) = delete;
 		~cMesh();
 
 		cMesh(FMainDevice& iMainDevice, 
@@ -41,12 +41,12 @@ namespace VKE
 		uint32_t GetIndexCount() const { return IndexCount; }
 		const VkBuffer& GetIndexBuffer() const { return IndexBuffer.GetvkBuffer(); }
 
-		void SetMaterialID(int MatID) { MaterialID = MatID; }
-		int GetMaterialID() const {	return MaterialID; }
+		void SetMaterialID(int32 MatID) { MaterialID = MatID; }
+		int32 GetMaterialID() const {	return MaterialID; }
 		const VkDescriptorSet& GetDescriptorSet() { return SamplerDescriptorSet.GetDescriptorSet(); }
 
 	private:
-		int MaterialID = 0;
+		int32 MaterialID = 0;
 		
 		uint32_t VertexCount, IndexCount;
 		cBuffer VertexBuffer, IndexBuffer;
