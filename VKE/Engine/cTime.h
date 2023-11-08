@@ -2,7 +2,7 @@
 
 namespace VKE
 {
-	namespace Time
+	namespace cTime
 	{
 		extern double DT;
 	}

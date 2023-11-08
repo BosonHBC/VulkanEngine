@@ -123,7 +123,7 @@
     <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
       <Filter>Source Files\Editor\ImGUI</Filter>
     </ClCompile>
-    <ClCompile Include="Time.cpp">
+    <ClCompile Include="cTime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Graphics\Utilities.cpp">
@@ -221,7 +221,7 @@
     <ClInclude Include="imgui\imgui_impl_vulkan.h">
       <Filter>Source Files\Editor\ImGUI</Filter>
     </ClInclude>
-    <ClInclude Include="Time.h">
+    <ClInclude Include="cTime.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\Utilities.h">

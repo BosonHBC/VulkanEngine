@@ -5,7 +5,7 @@
 #include "Input/UserInput.h"
 #include "Camera.h"
 #include "Editor/Editor.h"
-#include "Time.h"
+#include "cTime.h"
 // glm
 #include "glm/glm.hpp"
 #include "glm/mat4x4.hpp"
@@ -72,7 +72,7 @@ namespace VKE {
 			glfwPollEvents();
 
 			double now = glfwGetTime();
-			Time::DT = now - LastTime;
+			cTime::DT = now - LastTime;
 			
 			LastTime = now;
 			// update editor
@@ -85,7 +85,7 @@ namespace VKE {
 
 				g_Camera->Update();
 
-				g_Renderer->tick((float)Time::DT);
+				g_Renderer->tick((float)cTime::DT);
 				g_Renderer->draw();
 			}
 		}

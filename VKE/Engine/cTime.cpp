@@ -1,7 +1,7 @@
 #include "Time.h"
 namespace VKE
 {
-	namespace Time
+	namespace cTime
 	{
 		double DT;
 	}
